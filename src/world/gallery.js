@@ -75,8 +75,7 @@ export function buildGallery(ctx) {
   {
     const fg = new THREE.PlaneGeometry(W, D); fg.rotateX(-Math.PI / 2);
     const fm = Builder.matrix([cx, 0, cz]); worldUV(fg, 3, fm);
-    const floorMat = mats.concrete(0x4a4844);
-    floorMat.roughness = 0.45;
+    const floorMat = mats.ph('large_grey_tiles', 0x9a9690, { grime: 0.35, rough: 0.7, metal: 0 });
     B.add(fg, floorMat, fm, { collide: true, cast: false });
     // bandes de carrelage sombre (cheminements)
     for (const z of [G.z0 + 5.5, G.z1 - 7.5]) {

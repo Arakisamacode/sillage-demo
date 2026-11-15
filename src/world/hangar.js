@@ -11,7 +11,7 @@ export function buildHangar(ctx) {
   seed(1234);
 
   const wallPaint = mats.cladding(0x8a9094, { rust: 0.2 });
-  const wallLow = mats.paint(0x4a5054, { grime: 0.9, rust: 0.25 });
+  const wallLow = mats.diamond(0x9a9c9e);
   const trim = mats.paint(0x2c3134, { grime: 0.8 });
   const steel = mats.metal(0x6b6f72);
   const darkSteel = mats.metal(0x34383b, { rough: 0.7 });
@@ -30,7 +30,7 @@ export function buildHangar(ctx) {
   const floorGeo = new THREE.PlaneGeometry(floorW, floorD, 1, 1);
   floorGeo.rotateX(-Math.PI / 2);
   floorGeo.translate(0, 0, (Z_BACK + Z_BAY) / 2);
-  worldUV(floorGeo, 8);
+  worldUV(floorGeo, 4.5);
   const floor = new THREE.Mesh(floorGeo, mats.deck());
   floor.receiveShadow = true;
   scene.add(floor);
@@ -216,9 +216,9 @@ function crane(B, mats, z, yellow, darkSteel) {
 }
 
 function shutter(B, mats, x, z, w, h) {
-  const m = mats.metal(0x6a6e6b, { rough: 0.6 });
+  const m = mats.ph('worn_shutter', 0xffffff, { grime: 0.5 });
   // lames horizontales
-  for (let y = 0.12; y < h; y += 0.24) B.box(w, 0.2, 0.08, m, [x, y + 0.1, z], null, { cast: false, collide: false });
+  B.box(w, h, 0.08, m, [x, h / 2, z], null, { cast: false, tex: 3 });
   B.colliderBox(w, h, 0.3, [x, h / 2, z]);
   // caisson et glissières
   B.box(w + 1, 0.9, 0.9, mats.paint(0x3a4044), [x, h + 0.45, z - 0.2]);

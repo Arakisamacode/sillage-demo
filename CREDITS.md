@@ -36,7 +36,19 @@ reciblage à l'exécution sur le squelette des personnages (`src/characters/reta
 
 Source amont : https://polyhaven.com/hdris — licence : https://polyhaven.com/license
 
-## Textures PBR scannées
+## Textures PBR scannées Poly Haven (téléchargées directement)
+
+| Fichiers (`public/assets/textures/ph/{1k,2k}/`) | Texture Poly Haven | Licence |
+|---|---|---|
+| `hangar_concrete_floor_*` | https://polyhaven.com/a/hangar_concrete_floor | CC0 1.0 |
+| `corrugated_iron_02_*` | https://polyhaven.com/a/corrugated_iron_02 | CC0 1.0 |
+| `worn_shutter_*` | https://polyhaven.com/a/worn_shutter | CC0 1.0 |
+| `metal_plate_*` | https://polyhaven.com/a/metal_plate | CC0 1.0 |
+| `large_grey_tiles_*` | https://polyhaven.com/a/large_grey_tiles | CC0 1.0 |
+
+Script : `tools/fetch_polyhaven.py` (diffuse, normale OpenGL, ARM), recompressées en JPEG.
+
+## Textures PBR scannées (miroir ambientCG)
 
 | Fichiers (`public/assets/textures/scan/`) | Origine | Licence | Miroir utilisé |
 |---|---|---|---|

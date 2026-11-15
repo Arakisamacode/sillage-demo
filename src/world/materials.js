@@ -58,6 +58,13 @@ export class Materials {
     L('tiles_a', 'scan/tiles_albedo.jpg', true);
     L('tiles_n', 'scan/tiles_normal.jpg', false);
     L('tiles_r', 'scan/tiles_rough.jpg', false);
+    // scans Poly Haven (CC0) : 2k en qualité haute/ultra, 1k sinon
+    const res = this.q.name === 'high' || this.q.name === 'ultra' ? '2k' : '1k';
+    for (const id of ['hangar_concrete_floor', 'corrugated_iron_02', 'worn_shutter', 'metal_plate', 'large_grey_tiles']) {
+      L(id + '_diff', `ph/${res}/${id}_diff.jpg`, true);
+      L(id + '_nor', `ph/${res}/${id}_nor.jpg`, false);
+      L(id + '_arm', `ph/${res}/${id}_arm.jpg`, false);
+    }
     this.shared.uGrunge.value = this.tex.grunge;
     this.shared.uChips.value = this.tex.chips;
   }
@@ -151,18 +158,29 @@ export class Materials {
     return (this.cache[key] = m);
   }
 
-  /** Bardage nervuré peint (murs). Texture = 4 m. */
-  cladding(color, opts = {}) {
-    const key = 'clad_' + color + JSON.stringify(opts);
+  /** Texture scannée Poly Haven (diffuse + normale + ARM), teintée par `color`. */
+  ph(id, color = 0xffffff, opts = {}) {
+    const key = 'ph_' + id + color + JSON.stringify(opts);
     if (this.cache[key]) return this.cache[key];
     const m = new THREE.MeshStandardMaterial({
-      color: new THREE.Color(color), map: this.tex.clad_a, normalMap: this.tex.clad_n,
-      roughnessMap: this.tex.clad_orm, metalnessMap: this.tex.clad_orm, aoMap: this.tex.clad_orm,
-      roughness: 1, metalness: 1, aoMapIntensity: 1,
+      color: new THREE.Color(color), map: this.tex[id + '_diff'], normalMap: this.tex[id + '_nor'],
+      roughnessMap: this.tex[id + '_arm'], metalnessMap: this.tex[id + '_arm'], aoMap: this.tex[id + '_arm'],
+      roughness: opts.rough ?? 1, metalness: opts.metal ?? 1, aoMapIntensity: 1,
+      normalScale: new THREE.Vector2(opts.ns ?? 1, opts.ns ?? 1),
     });
-    this.addWear(m, { paint: 1, grime: opts.grime ?? 0.7, scratch: 0.4, floor: 1, rust: opts.rust ?? 0.2 });
+    this.addWear(m, { paint: 0, grime: opts.grime ?? 0.5, scratch: opts.scratch ?? 0.2, floor: opts.floor ?? 1, rust: opts.rust ?? 0, scale: opts.scale });
     return (this.cache[key] = m);
   }
+
+  /** Bardage ondulé (murs, conteneurs) : scan Poly Haven « corrugated_iron_02 ». */
+  cladding(color, opts = {}) {
+    // le scan est gris clair : on éclaircit la teinte pour garder la luminosité voulue
+    const c = new THREE.Color(color).multiplyScalar(1.7);
+    return this.ph('corrugated_iron_02', c.getHex(), { grime: opts.grime ?? 0.6, rust: opts.rust ?? 0.15, scratch: 0.2, metal: 0.25 });
+  }
+
+  /** Tôle larmée (soubassements, marches). */
+  diamond(color = 0xb0b0b0) { return this.ph('metal_plate', color, { grime: 0.7, floor: 1, rust: 0.05 }); }
 
   /** Métal brut sombre (poutres, mécanique). */
   metal(color = 0x5a5f63, opts = {}) {
@@ -198,11 +216,13 @@ export class Materials {
 
   deck() {
     if (this.cache.deck) return this.cache.deck;
+    // sol : scan Poly Haven « hangar_concrete_floor » (béton de hangar taché)
     const m = new THREE.MeshStandardMaterial({
-      color: 0xc9c6c0, map: this.tex.deck_a, normalMap: this.tex.deck_n, roughnessMap: this.tex.deck_orm,
-      metalnessMap: this.tex.deck_orm, aoMap: this.tex.deck_orm, roughness: 1, metalness: 1, aoMapIntensity: 0.7,
+      color: 0xd8d4cc, map: this.tex.hangar_concrete_floor_diff, normalMap: this.tex.hangar_concrete_floor_nor,
+      roughnessMap: this.tex.hangar_concrete_floor_arm, aoMap: this.tex.hangar_concrete_floor_arm,
+      roughness: 0.95, metalness: 0, aoMapIntensity: 0.8,
     });
-    this.addWear(m, { grime: 0.7, floor: 0.0, scratch: 0.15, scale: 0.08, rust: 0.0 });
+    this.addWear(m, { grime: 0.6, floor: 0.0, scratch: 0.1, scale: 0.08, rust: 0.0 });
     return (this.cache.deck = m);
   }
 
