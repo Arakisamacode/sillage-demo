@@ -75,8 +75,8 @@ export function buildGallery(ctx) {
   {
     const fg = new THREE.PlaneGeometry(W, D); fg.rotateX(-Math.PI / 2);
     const fm = Builder.matrix([cx, 0, cz]); worldUV(fg, 3, fm);
-    const floorMat = mats.concrete(0x5a5752);
-    floorMat.roughness = 0.55;
+    const floorMat = mats.concrete(0x4a4844);
+    floorMat.roughness = 0.45;
     B.add(fg, floorMat, fm, { collide: true, cast: false });
     // bandes de carrelage sombre (cheminements)
     for (const z of [G.z0 + 5.5, G.z1 - 7.5]) {
@@ -189,7 +189,7 @@ export function buildGallery(ctx) {
     l.position.set(x, G.h - 1.2, z);
     scene.add(l); lights.push(l);
   }
-  const fill = new THREE.SpotLight(0xffe2c0, 500, 40, 1.1, 0.9, 2);
+  const fill = new THREE.SpotLight(0xffe2c0, 220, 40, 1.1, 0.9, 2);
   fill.position.set(-72, G.h - 0.5, -4); fill.target.position.set(-72, 0, -4);
   scene.add(fill, fill.target);
 }
@@ -285,7 +285,7 @@ function shop(ctx, s, wall, wallDark, trim) {
     scene.add(l);
   }
   // comptoir et caisse
-  const counter = mats.paint(s.id === 'pieces' ? 0x3a4a5a : 0x6b4a33, { grime: 0.4 });
+  const counter = mats.paint(s.id === 'pieces' ? 0x3a4a5a : 0x5a3c28, { grime: 0.4, plain: true, rough: 0.5 });
   L.box(3.2, 1.05, 0.7, counter, [-1.6, 0.525, 3.2], null, { collide: true });
   L.box(3.3, 0.05, 0.8, mats.metal(0xa0a4a8, { rough: 0.3, grime: 0.3 }), [-1.6, 1.07, 3.2], null, { cast: false });
   L.box(0.4, 0.3, 0.05, mats.emissive(0x3ec7ff, 1.6), [-0.6, 1.25, 3.1], [-0.3, 0, 0], { cast: false });
@@ -296,7 +296,7 @@ function shop(ctx, s, wall, wallDark, trim) {
     for (let k = 0; k < 4; k++) {
       L.box(0.5, 0.04, depth - 1.5, mats.metal(0x6b6f72), [sx * (w / 2 - 0.3), 0.4 + k * 0.55, depth / 2 + 0.4], null, { cast: false });
       for (let i = 0; i < 8; i++) {
-        const col = new THREE.Color().setHSL(rand(), 0.4 + rand() * 0.4, 0.3 + rand() * 0.3).getHex();
+        const col = [0xb8452e, 0x2f6f9a, 0xd9b44a, 0x4a7d3a, 0xe6e1d6, 0x6a3f7a, 0x2b2b2b][Math.floor(rand() * 7)];
         L.box(0.3, 0.15 + rand() * 0.25, 0.25 + rand() * 0.2, mats.plastic(col, 0.6), [sx * (w / 2 - 0.3), 0.55 + k * 0.55 + 0.1, 1.2 + i * 0.52], null, { cast: false });
       }
     }
@@ -343,7 +343,7 @@ function shop(ctx, s, wall, wallDark, trim) {
 function kiosk(ctx, x, z) {
   const { mats, builder: B } = ctx;
   const L = new Local(B, x, 0, z, 0, ctx.scene);
-  const body = mats.paint(0x6b4a33, { grime: 0.4 });
+  const body = mats.paint(0x5a3c28, { grime: 0.4, plain: true, rough: 0.5 });
   // comptoir circulaire en segments
   const n = 12, r = 2.2;
   for (let i = 0; i < n; i++) {

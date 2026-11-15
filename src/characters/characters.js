@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 import { Retargeter } from './retarget.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 // Bibliothèque de personnages : modèles Quaternius (CC0) + animations UAL (CC0) reciblées.
 
@@ -59,24 +60,58 @@ export class CharacterLibrary {
   }
 
   _prepTemplate(name, scene) {
-    let height = 1.8;
-    scene.traverse((o) => {
-      if (o.isMesh) {
-        o.castShadow = !!this.q.npcShadows;
-        o.receiveShadow = true;
-        o.frustumCulled = true;
-        const m = o.material;
-        if (m) {
-          m.roughness = /metal/i.test(m.name) ? 0.35 : /eye/i.test(m.name) ? 0.2 : 0.78;
-          m.metalness = /metal/i.test(m.name) ? 0.8 : 0.0;
-          m.envMapIntensity = 0.8;
-        }
+    scene.updateMatrixWorld(true);
+    // Fusion : tous les sous-maillages (un par matériau) -> un seul SkinnedMesh à couleurs de sommets.
+    // Les matériaux Quaternius sont des couleurs unies : on les cuit dans l'attribut « color »
+    // (alpha = rugosité) => 1 appel de rendu par personnage au lieu d'une douzaine.
+    const skinned = [];
+    scene.traverse((o) => { if (o.isSkinnedMesh) skinned.push(o); });
+    let merged = null;
+    if (skinned.length) {
+      const ref = skinned[0];
+      const bones = ref.skeleton.bones;
+      const index = new Map(bones.map((b, i) => [b, i]));
+      const sameBind = skinned.every((m) => m.bindMatrix.equals(ref.bindMatrix) && m.skeleton.bones.every((b) => index.has(b)));
+      if (sameBind) {
+        const geos = skinned.map((m) => {
+          const g = m.geometry.clone();
+          for (const k of Object.keys(g.attributes)) if (!['position', 'normal', 'skinIndex', 'skinWeight'].includes(k)) g.deleteAttribute(k);
+          const n = g.attributes.position.count;
+          const col = new Float32Array(n * 4);
+          const c = m.material.color.clone();
+          const rough = /metal/i.test(m.material.name) ? 0.35 : /eye/i.test(m.material.name) ? 0.2 : /skin/i.test(m.material.name) ? 0.62 : 0.8;
+          for (let i = 0; i < n; i++) { col[i * 4] = c.r; col[i * 4 + 1] = c.g; col[i * 4 + 2] = c.b; col[i * 4 + 3] = rough; }
+          g.setAttribute('color', new THREE.BufferAttribute(col, 4));
+          // réindexation des os vers le squelette de référence
+          const si = g.attributes.skinIndex;
+          const arr = new Uint16Array(si.count * 4);
+          for (let i = 0; i < si.count; i++) for (let k = 0; k < 4; k++) arr[i * 4 + k] = index.get(m.skeleton.bones[si.getComponent(i, k)]) ?? 0;
+          g.setAttribute('skinIndex', new THREE.BufferAttribute(arr, 4));
+          if (!g.index) { const idx = []; for (let i = 0; i < n; i++) idx.push(i); g.setIndex(idx); }
+          return g;
+        });
+        const geo = mergeGeometries(geos, false);
+        const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, metalness: 0, envMapIntensity: 0.8 });
+        // rugosité depuis l'alpha des couleurs de sommets
+        mat.onBeforeCompile = (sh) => {
+          sh.fragmentShader = sh.fragmentShader.replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n roughnessFactor = vColor.a;')
+            .replace('#include <color_fragment>', 'diffuseColor.rgb *= vColor.rgb;');
+        };
+        mat.customProgramCacheKey = () => 'charvc';
+        merged = new THREE.SkinnedMesh(geo, mat);
+        merged.name = 'body';
+        merged.bind(ref.skeleton, ref.bindMatrix);
+        ref.parent.add(merged);
+        for (const m of skinned) m.parent.remove(m);
       }
+    }
+    scene.traverse((o) => {
+      if (o.isMesh) { o.castShadow = !!this.q.npcShadows; o.receiveShadow = true; o.frustumCulled = true; }
     });
     scene.updateMatrixWorld(true);
     let head = null;
     scene.traverse((o) => { if (o.name === 'Head') head = o; });
-    if (head) height = head.getWorldPosition(new THREE.Vector3()).y + 0.12;
+    const height = head ? head.getWorldPosition(new THREE.Vector3()).y + 0.12 : 1.8;
     this.templates[name] = { scene, height };
   }
 
@@ -100,13 +135,26 @@ export class Character {
     this.root.add(this.model);
     this.bones = {};
     this.model.traverse((o) => { if (o.isBone) this.bones[o.name] = o; });
-    // variation de teinte des vêtements (matériaux clonés)
+    // variation de teinte des vêtements : attribut couleur propre à l'instance (le reste est partagé)
     if (opts.tint) {
       this.model.traverse((o) => {
-        if (o.isMesh && o.material && !/skin|eye|hair|brow/i.test(o.material.name)) {
-          o.material = o.material.clone();
-          o.material.color.offsetHSL(opts.tint[0], opts.tint[1], opts.tint[2]);
+        if (!o.isSkinnedMesh || !o.geometry.attributes.color) return;
+        const g = new THREE.BufferGeometry();
+        for (const [k, v] of Object.entries(o.geometry.attributes)) g.setAttribute(k, v);
+        g.setIndex(o.geometry.index);
+        g.boundingSphere = o.geometry.boundingSphere; g.boundingBox = o.geometry.boundingBox;
+        const src = o.geometry.attributes.color.array, col = new Float32Array(src.length);
+        const c = new THREE.Color(), hsl = {};
+        for (let i = 0; i < src.length; i += 4) {
+          c.setRGB(src[i], src[i + 1], src[i + 2]);
+          c.getHSL(hsl);
+          // peau (teintes orangées claires) et yeux préservés
+          const skin = hsl.h > 0.02 && hsl.h < 0.11 && hsl.s > 0.25 && hsl.l > 0.35;
+          if (!skin && hsl.l > 0.06) c.offsetHSL(opts.tint[0], opts.tint[1], opts.tint[2]);
+          col[i] = c.r; col[i + 1] = c.g; col[i + 2] = c.b; col[i + 3] = src[i + 3];
         }
+        g.setAttribute('color', new THREE.BufferAttribute(col, 4));
+        o.geometry = g;
       });
     }
     this.mixer = new THREE.AnimationMixer(this.model);

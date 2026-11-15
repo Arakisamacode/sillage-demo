@@ -1,7 +1,7 @@
 // Préréglages de qualité. Chaque niveau règle la résolution, les ombres, les effets et la foule.
 export const PRESETS = {
   low: {
-    name: 'low', pixelRatio: 1.0, maxPixels: 1280 * 720, shadows: true, shadowMap: 1024, spotShadows: 0,
+    name: 'low', pixelRatio: 1.5, maxPixels: 1280 * 720, shadows: true, shadowMap: 1024, spotShadows: 0,
     ao: false, bloom: true, smaa: false, beams: true, dust: 300, npcs: 18, anisotropy: 2, envRes: 128,
     npcShadows: false, aoSamples: 8, texScale: 0.5,
   },

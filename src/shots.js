@@ -19,5 +19,10 @@ export const SHOTS = {
   hangarlife: { pos: [-22, 1.7, -12], look: [-29, 1.2, 3], fov: 65 },
   gallerylife: { pos: [-46, 1.7, -3], look: [-80, 1.2, -7], fov: 65 },
   shops: { pos: [-70, 1.7, -2], look: [-80, 2.0, 10], fov: 70 },
+  benchwin: { pos: [-66, 1.5, -15], look: [-76, 0.9, -21.5], fov: 60 },
+  kiosk: { pos: [-66, 1.6, -1], look: [-72, 1.0, -7], fov: 60 },
+  breakarea: { pos: [-25.5, 1.6, 6.5], look: [-30, 1.0, 3.5], fov: 60 },
+  sittest: { pos: [-84.5, 1.3, -17.4], look: [-86, 0.6, -21.0], fov: 55 },
+  weldclose: { pos: [17.5, 2.6, 24.5], look: [14.3, 2.3, 20.5], fov: 55 },
   cockpit: { pos: [-13, 3.2, -22], look: [-13, 3, -40], fov: 70 },
 };

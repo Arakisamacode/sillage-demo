@@ -154,12 +154,16 @@ export function buildScenes(ctx) {
   const sparks = new Sparks(scene, quality);
   S.weld = {
     lift, sparks, target: 0.55, liftPos,
-    board: fau.local(-3.3, 0, 4.0), onPlatform: () => fau.local(-3.0, 0, 2.3).setY(lift.h + 0.06),
+    board: fau.local(-3.3, 0, 4.0), onPlatform: () => fau.local(-2.78, 0, 2.3).setY(lift.h + 0.06),
     torchPoint: fau.local(-1.85, 2.55, 2.3),
-    faceYaw: PADS.p4.heading - Math.PI / 2,
+    faceYaw: 0,
     welder: null, active: false,
   };
-  S.updaters.push((dt) => {
+  {
+    const p = S.weld.onPlatform(), q = S.weld.torchPoint;
+    S.weld.faceYaw = Math.atan2(q.x - p.x, q.z - p.z);
+  }
+  S.updaters.push((dt, t) => {
     const w = S.weld;
     const h = lift.h + Math.sign(w.target - lift.h) * Math.min(Math.abs(w.target - lift.h), dt * 0.35);
     if (h !== lift.h) lift.setHeight(h);
@@ -168,7 +172,7 @@ export function buildScenes(ctx) {
       const hand = w.welder.char.bones.HandR;
       if (hand) { hand.getWorldPosition(_v); sparks.origin.lerpVectors(_v, w.torchPoint, 0.55); }
       // soudure par cordons : 3,5 s de soudure, 1 s de pause
-      const ph = (performance.now() / 1000) % 4.5;
+      const ph = t % 4.5;
       sparks.on = ph < 3.5;
     } else sparks.on = false;
     sparks.update(dt, 0);

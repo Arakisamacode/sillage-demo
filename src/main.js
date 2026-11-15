@@ -49,6 +49,7 @@ async function boot() {
   const mats = new Materials(renderer, quality, manager);
   mats.preload();
   const builder = new Builder(scene);
+  builder.cellSize = quality.name === 'low' ? 80 : 40;
   const ctx = { scene, camera, renderer, quality, mats, builder, manager, updaters: [], screens: [] };
 
   progress(0.05, 'Construction du hangar');
@@ -73,9 +74,22 @@ async function boot() {
   ctx.fx = buildFX(ctx);
   const player = new Player(ctx, builder.collisionGeometry());
   player.setAvatar(lib.create('M_Spacesuit', { height: 1.78 }));
-  crowd.populate();
+  if (shotName === 'sittest') {
+    const W = crowd.world;
+    const seats = [W.benchesWindow[2], W.benchesWindow[3], W.benchesMid[0], W.benchHangar[0]];
+    seats.forEach((st, i) => crowd.spawn('test', ['M_Suit', 'F_Casual', 'M_Worker', 'F_SciFi'][i], function* (a) {
+      a.pos.set(st.x, 0, st.z); a.yaw = st.yaw;
+      for (;;) yield { type: 'sit', x: st.x, z: st.z, yaw: st.yaw, dur: 999, talk: i % 2 === 1 };
+    }));
+  } else crowd.populate();
   ctx.crowd = crowd; ctx.player = player; ctx.scenes = scenes;
 
+  // qualité basse : ombre du soleil calculée une fois (décor statique) ; les éléments mobiles n'y projettent pas
+  if (quality.name === 'low') {
+    renderer.three.shadowMap.autoUpdate = false;
+    renderer.three.shadowMap.needsUpdate = true;
+    for (const v of [scenes.forklift.obj.group, scenes.tug.obj.group]) v.traverse((o) => { o.castShadow = false; });
+  }
   renderer.setupPost(scene, camera);
   renderer.setExposure(1.0);
   renderer.resize();
@@ -177,7 +191,7 @@ async function boot() {
   $('start').classList.remove('hidden');
 
   // ------------------------------------------------------------------ boucle
-  let last = performance.now(), t = 0, fpsAcc = 0, fpsN = 0;
+  let last = performance.now(), t = 0, fpsAcc = 0, fpsN = 0, shadowTick = 0;
   const clockEl = $('clock'), fpsEl = $('fps'), promptEl = $('prompt');
   function frame() {
     const now = performance.now();
@@ -202,6 +216,7 @@ async function boot() {
     if (toastT > 0) { toastT -= dt; if (toastT <= 0) $('toast').classList.add('hidden'); }
     const st = 14 * 3600 + 7 * 60 + t * 10; // 1 s réelle = 10 s à bord
     clockEl.textContent = `HALDEN-7 · ${String(Math.floor(st / 3600) % 24).padStart(2, '0')}:${String(Math.floor(st / 60) % 60).padStart(2, '0')} · ${crowd.agents.length} pers.`;
+    if (quality.name === 'medium') { renderer.three.shadowMap.autoUpdate = false; renderer.three.shadowMap.needsUpdate = (++shadowTick % 2) === 0; }
     renderer.render(dt);
     fpsAcc += dt; fpsN++;
     if (fpsAcc > 0.5) { fpsEl.textContent = `${Math.round(fpsN / fpsAcc)} i/s · ${quality.name}`; fpsAcc = 0; fpsN = 0; }

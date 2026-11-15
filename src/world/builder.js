@@ -42,7 +42,8 @@ export class Builder {
     const cast = opts.cast ?? true, receive = opts.receive ?? true;
     g.computeBoundingSphere();
     const c = g.boundingSphere.center;
-    const cell = g.boundingSphere.radius > 30 ? 'big' : Math.floor(c.x / 24) + '_' + Math.floor(c.z / 24);
+    const cs = this.cellSize || 40;
+    const cell = g.boundingSphere.radius > 30 ? 'big' : Math.floor(c.x / cs) + '_' + Math.floor(c.z / cs);
     const key = mat.uuid + (cast ? 'c' : '') + (receive ? 'r' : '') + cell;
     let grp = this.groups.get(key);
     if (!grp) { grp = { mat, geos: [], cast, receive }; this.groups.set(key, grp); }
