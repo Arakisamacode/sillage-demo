@@ -137,7 +137,7 @@ export function buildScenes(ctx) {
   S.updaters.push(() => {
     const f = S.fuel;
     if (f.state === 'held' && f.holder) {
-      const hand = f.holder.char.bones.HandR || f.holder.char.bones.Hand_R;
+      const hand = f.holder.char.handR;
       if (hand) hand.getWorldPosition(f.end);
     } else if (f.state === 'connected') f.end.copy(f.port);
     else f.end.copy(f.nozzleRest);
@@ -169,7 +169,7 @@ export function buildScenes(ctx) {
     if (h !== lift.h) lift.setHeight(h);
     if (w.welder && w.welder.data.onLift) w.welder.pos.y = lift.h + 0.06;
     if (w.active && w.welder) {
-      const hand = w.welder.char.bones.HandR;
+      const hand = w.welder.char.handR;
       if (hand) { hand.getWorldPosition(_v); sparks.origin.lerpVectors(_v, w.torchPoint, 0.55); }
       // soudure par cordons : 3,5 s de soudure, 1 s de pause
       const ph = t % 4.5;

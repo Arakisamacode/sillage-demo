@@ -11,13 +11,13 @@ Héron, Mulet H4, Faucon, Navette ST-40, Galerie du Belvédère…) sont invent�
 
 ## Personnages (modèles 3D)
 
-| Fichiers | Auteur / pack | Licence | Source amont | Miroir utilisé |
-|---|---|---|---|---|
-| `public/assets/characters/M_*.glb` | Quaternius — *Ultimate Modular Men Pack* | CC0 1.0 | https://quaternius.com/packs/ultimatemodularcharacters.html | https://github.com/trebeljahr/quaternius-showcase (`public/glb/modular_men/`) |
-| `public/assets/characters/F_*.glb` | Quaternius — *Ultimate Modular Women Pack* | CC0 1.0 | https://quaternius.com/packs/ultimatemodularwomen.html | https://github.com/trebeljahr/quaternius-showcase (`public/glb/modular_women/`) |
+| Fichiers | Auteur / pack | Licence | Source |
+|---|---|---|---|
+| `public/assets/characters/ubc/U{M,F}_{light,dark}.glb`, `Hair_*.glb` | Quaternius — *Universal Base Characters* (version gratuite « Standard ») | CC0 1.0 (licence incluse : `public/assets/characters/ubc/LICENSE_quaternius_ubc.txt`) | https://quaternius.com/packs/universalbasecharacters.html — téléchargé sur https://quaternius.itch.io/universal-base-characters |
 
-Modifications : suppression des doublons et soudure des sommets (`tools/optimize_characters.mjs`) ;
-à l'exécution, fusion des sous-maillages en un seul maillage à couleurs de sommets.
+Modifications : textures ramenées à 1024 px en JPEG, attributs inutilisés supprimés, conversion en .glb
+(`tools/prep_ubc.mjs`). Les combinaisons, bottes, gants et bandes réfléchissantes sont peints à l'exécution
+par un shader (`src/characters/characters.js`) ; les coiffures sont accrochées à l'os de la tête.
 
 ## Animations
 

@@ -24,5 +24,7 @@ export const SHOTS = {
   breakarea: { pos: [-25.5, 1.6, 6.5], look: [-30, 1.0, 3.5], fov: 60 },
   sittest: { pos: [-84.5, 1.3, -17.4], look: [-86, 0.6, -21.0], fov: 55 },
   weldclose: { pos: [17.5, 2.6, 24.5], look: [14.3, 2.3, 20.5], fov: 55 },
+  lineup: { pos: [0, 1.55, 0.6], look: [0, 1.05, -4], fov: 62 },
+  portrait: { pos: [-2.2, 1.6, -2.2], look: [-1.5, 1.35, -4], fov: 40 },
   cockpit: { pos: [-13, 3.2, -22], look: [-13, 3, -40], fov: 70 },
 };

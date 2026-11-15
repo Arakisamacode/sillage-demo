@@ -8,6 +8,7 @@ import * as THREE from 'three';
 // source -> cible ; l'enfant sert à calculer la direction de l'os.
 // Les doigts sont numérotés 2-4 (hommes) ou 1-3 (femmes) selon le pack Quaternius.
 export function boneMap(tgtNames) {
+  if (tgtNames.has('pelvis')) return ueBoneMap();
   const fo = tgtNames.has('Index1L') ? 1 : 2;      // premier index de phalange
   const thumb = tgtNames.has('Thumb1L') ? [1, 2, 3] : [2, 3];
   return [
@@ -34,6 +35,36 @@ export function boneMap(tgtNames) {
         ];
       }),
       ...thumb.map((ti, k) => [`DEF-thumb0${k + 1}${s}`, `Thumb${ti}${s}`, k + 1 < thumb.length ? `DEF-thumb0${k + 2}${s}` : null, k + 1 < thumb.length ? `Thumb${thumb[k + 1]}${s}` : null]),
+    ]),
+  ];
+}
+
+/** Squelette type Unreal (Universal Base Characters) : pelvis, spine_01…, clavicle_l… */
+function ueBoneMap() {
+  return [
+    ['DEF-hips', 'pelvis', 'DEF-spine001', 'spine_01'],
+    ['DEF-spine001', 'spine_01', 'DEF-spine002', 'spine_02'],
+    ['DEF-spine002', 'spine_02', 'DEF-spine003', 'spine_03'],
+    ['DEF-spine003', 'spine_03', 'DEF-neck', 'neck_01'],
+    ['DEF-neck', 'neck_01', 'DEF-head', 'Head'],
+    ['DEF-head', 'Head', null, null],
+    ...[['L', 'l'], ['R', 'r']].flatMap(([S, s]) => [
+      [`DEF-shoulder${S}`, `clavicle_${s}`, `DEF-upper_arm${S}`, `upperarm_${s}`],
+      [`DEF-upper_arm${S}`, `upperarm_${s}`, `DEF-forearm${S}`, `lowerarm_${s}`],
+      [`DEF-forearm${S}`, `lowerarm_${s}`, `DEF-hand${S}`, `hand_${s}`],
+      [`DEF-hand${S}`, `hand_${s}`, `DEF-f_middle01${S}`, `middle_01_${s}`],
+      [`DEF-thigh${S}`, `thigh_${s}`, `DEF-shin${S}`, `calf_${s}`],
+      [`DEF-shin${S}`, `calf_${s}`, `DEF-foot${S}`, `foot_${s}`],
+      [`DEF-foot${S}`, `foot_${s}`, `DEF-toe${S}`, `ball_${s}`],
+      [`DEF-toe${S}`, `ball_${s}`, null, null],
+      ...['index', 'middle', 'ring', 'pinky', 'thumb'].flatMap((f) => {
+        const src = f === 'thumb' ? 'DEF-thumb' : `DEF-f_${f}`;
+        return [
+          [`${src}01${S}`, `${f}_01_${s}`, `${src}02${S}`, `${f}_02_${s}`],
+          [`${src}02${S}`, `${f}_02_${s}`, `${src}03${S}`, `${f}_03_${s}`],
+          [`${src}03${S}`, `${f}_03_${s}`, null, null],
+        ];
+      }),
     ]),
   ];
 }
@@ -68,6 +99,8 @@ export class Retargeter {
     this.src = findBones(srcRoot);
     this.tgt = findBones(tgtRoot);
     this.pairs = boneMap(new Set(Object.keys(this.tgt))).filter(([s, t]) => this.src[s] && this.tgt[t]);
+    const tn = (src) => (this.pairs.find((p) => p[0] === src) || [])[1];
+    this.hips = tn('DEF-hips'); this.armL = tn('DEF-upper_armL'); this.footL = tn('DEF-footL');
     this.clips = srcClips;
     this.srcMixer = new THREE.AnimationMixer(srcRoot);
     this._prepare();
@@ -90,7 +123,7 @@ export class Retargeter {
     this.tgtRoot.updateMatrixWorld(true);
     // orientation : même côté pour le bras gauche
     const sl = worldPos(S['DEF-upper_armL'], new THREE.Vector3()).x - worldPos(S['DEF-hips'], _v2).x;
-    const tl = worldPos(T.UpperArmL, new THREE.Vector3()).x - worldPos(T.Hips, _v2).x;
+    const tl = worldPos(T[this.armL], new THREE.Vector3()).x - worldPos(T[this.hips], _v2).x;
     if (Math.sign(sl) !== Math.sign(tl)) {
       this.srcRoot.rotation.y += Math.PI;
       this.srcRoot.updateMatrixWorld(true);
@@ -111,16 +144,16 @@ export class Retargeter {
       this.refTgt[t] = worldQuat(T[t], new THREE.Quaternion());
     }
     this.refSrcHips = worldPos(S['DEF-hips'], new THREE.Vector3());
-    this.refTgtHips = worldPos(T.Hips, new THREE.Vector3());
+    this.refTgtHips = worldPos(T[this.hips], new THREE.Vector3());
     // échelle : hauteur des hanches au-dessus des pieds
     const sFoot = worldPos(S['DEF-footL'], new THREE.Vector3());
-    const tFoot = worldPos(T.FootL, new THREE.Vector3());
+    const tFoot = worldPos(T[this.footL], new THREE.Vector3());
     this.scale = (this.refTgtHips.y - tFoot.y) / Math.max(0.01, this.refSrcHips.y - sFoot.y);
     // conserver la pose de référence locale de la cible
     this.tgtRefLocal = {};
     for (const [, t] of this.pairs) this.tgtRefLocal[t] = T[t].quaternion.clone();
-    this.hipsParentInv = new THREE.Matrix4().copy(T.Hips.parent.matrixWorld).invert();
-    this.tgtHipsRefLocalPos = T.Hips.position.clone();
+    this.hipsParentInv = new THREE.Matrix4().copy(T[this.hips].parent.matrixWorld).invert();
+    this.tgtHipsRefLocalPos = T[this.hips].position.clone();
   }
 
   /** Cuit un clip source en clip cible (échantillonné à fps). */
@@ -141,7 +174,7 @@ export class Retargeter {
       this._poseSource(name, time);
       // repartir de la référence cible
       for (const [, t] of this.pairs) T[t].quaternion.copy(this.tgtRefLocal[t]);
-      T.Hips.position.copy(this.tgtHipsRefLocalPos);
+      T[this.hips].position.copy(this.tgtHipsRefLocalPos);
       this.tgtRoot.updateMatrixWorld(true);
       for (const [s, t] of this.pairs) {
         worldQuat(S[s], qa);
@@ -166,11 +199,11 @@ export class Retargeter {
       }
     }
     const tracks = Object.entries(qtracks).map(([bone, v]) => new THREE.QuaternionKeyframeTrack(`${bone}.quaternion`, times, v));
-    tracks.push(new THREE.VectorKeyframeTrack('Hips.position', times, hipsPos));
+    tracks.push(new THREE.VectorKeyframeTrack(`${this.hips}.position`, times, hipsPos));
     const out = new THREE.AnimationClip(opts.rename ?? name, clip.duration, tracks);
     // remettre la cible au repos d'origine
     for (const [, t] of this.pairs) T[t].quaternion.copy(this.tgtRefLocal[t]);
-    T.Hips.position.copy(this.tgtHipsRefLocalPos);
+    T[this.hips].position.copy(this.tgtHipsRefLocalPos);
     return out;
   }
 }

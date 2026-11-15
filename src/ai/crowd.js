@@ -3,6 +3,7 @@ import { Agent } from './agent.js';
 import { NavGrid } from './nav.js';
 import { HX, Z_BAY, Z_BACK, AIRLOCK, GALLERY, PADS } from '../world/layout.js';
 import { SHOPS } from '../world/gallery.js';
+import { HAIRS, HAIR_COLORS } from '../characters/characters.js';
 
 // Foule : rôles, emplois du temps et densité. Personne ne marche au hasard :
 // chaque routine enchaîne des tâches liées à un lieu de travail ou à un trajet logique.
@@ -353,34 +354,53 @@ function* copilot(a, W) {
 // =============================================================================== distribution
 // [rôle, modèles possibles, routine, options]  — l'ordre fixe la priorité (faible qualité = moins de figurants)
 function roster(W) {
-  const workers = ['M_Worker', 'F_Worker'];
+  const workers = null;
   const list = [
-    ['ravitailleur', ['M_Worker'], fueler, {}],
-    ['soudeur', ['F_Worker', 'M_Worker'], welder, {}],
-    ['cariste', ['M_Worker', 'M_Casual2'], forkDriver, {}],
-    ['tractoriste', ['F_Worker', 'M_Worker'], tugDriver, {}],
-    ['sécurité', ['M_Swat', 'F_Soldier'], patrol('patrolHangar', 0), { walk: 1.1 }],
-    ['sécurité', ['F_Soldier', 'M_Swat'], patrol('patrolGallery', 3), { walk: 1.1 }],
-    ['commerçant', ['F_Casual'], shopkeeper('nouilles'), {}],
-    ['commerçant', ['M_Casual'], shopkeeper('cafe'), {}],
-    ['commerçant', ['M_Adventurer'], shopkeeper('pieces'), {}],
-    ['commerçant', ['F_Formal'], shopkeeper('pharma'), {}],
-    ['commerçant', ['F_SciFi'], shopkeeper('combis'), {}],
-    ['barista', ['M_Punk', 'F_Punk'], barista, {}],
+    ['ravitailleur', 'M', fueler, {}],
+    ['soudeur', null, welder, {}],
+    ['cariste', null, forkDriver, {}],
+    ['tractoriste', null, tugDriver, {}],
+    ['sécurité', null, patrol('patrolHangar', 0), { walk: 1.1 }],
+    ['sécurité', null, patrol('patrolGallery', 3), { walk: 1.1 }],
+    ['commerçant', 'F', shopkeeper('nouilles'), {}],
+    ['commerçant', 'M', shopkeeper('cafe'), {}],
+    ['commerçant', 'M', shopkeeper('pieces'), {}],
+    ['commerçant', 'F', shopkeeper('pharma'), {}],
+    ['commerçant', 'F', shopkeeper('combis'), {}],
+    ['barista', null, barista, {}],
     ['mécanicien', workers, mechanic, {}],
     ['manutentionnaire', workers, handler, {}],
-    ['pilote', ['M_Spacesuit', 'F_SciFi'], pilot, {}],
-    ['entretien', ['M_Farmer', 'F_Worker'], cleaner, {}],
-    ['copilote', ['F_Adventurer', 'M_Spacesuit'], copilot, {}],
-    ['client', ['M_Casual', 'F_Casual', 'M_Suit', 'F_Suit', 'M_Beach', 'F_Formal', 'M_Casual2', 'F_Adventurer'], shopper, {}],
-    ['client', ['M_Casual', 'F_Casual', 'M_Suit', 'F_Suit', 'M_Beach', 'F_Formal', 'M_Casual2', 'F_Punk'], shopper, {}],
-    ['client', ['F_Suit', 'M_Suit', 'F_Casual'], shopper, {}],
-    ['client', ['M_Beach', 'F_Adventurer'], shopper, {}],
+    ['pilote', null, pilot, {}],
+    ['entretien', null, cleaner, {}],
+    ['copilote', null, copilot, {}],
+    ['client', null, shopper, {}],
+    ['client', null, shopper, {}],
+    ['client', null, shopper, {}],
+    ['client', null, shopper, {}],
   ];
   return list;
 }
 
-export const TRAVELER_MODELS = ['M_Casual', 'F_Casual', 'M_Suit', 'F_Suit', 'M_Beach', 'F_Formal', 'M_Casual2', 'F_Adventurer', 'M_Adventurer', 'F_Punk', 'M_Punk', 'F_SciFi'];
+// tenues par rôle (combinaisons, uniformes) ; les civils reçoivent des couleurs variées
+const UNIFORMS = {
+  ravitailleur: { top: 0xb4501c, hivis: true, accent: 0xd8e04a, gloves: true },
+  soudeur: { top: 0x4e4434, boot: 0x2a1c12, gloves: true },
+  mécanicien: { top: 0xb85a1e, hivis: true, accent: 0xd8e04a, gloves: true },
+  manutentionnaire: { top: 0x2f4a6a, hivis: true, accent: 0xe8c23a, gloves: true },
+  cariste: { top: 0x2f4a6a, hivis: true, accent: 0xe8c23a },
+  tractoriste: { top: 0x2f4a6a, hivis: true, accent: 0xe8c23a },
+  sécurité: { top: 0x1b222c, accent: 0x6f86a8, gloves: true, hivis: true },
+  pilote: { top: 0x4a525a, accent: 0xd86a20, hivis: true },
+  copilote: { top: 0x4a525a, accent: 0xd86a20, hivis: true },
+  entretien: { top: 0x3d6656, accent: 0xd8e04a, hivis: true },
+  barista: { top: 0x24211f, bottom: 0x4a3426, zip: false },
+};
+const SHIRTS = [0x6b2f2a, 0x2c4a6e, 0x5a6a4a, 0xb8b0a0, 0x3a3a3e, 0x7a5a3a, 0x8a3a5a, 0x2e5a5e, 0xc8a46a, 0x55453a];
+const PANTS = [0x26282c, 0x2f3a4e, 0x4a4036, 0x3a3a3a, 0x5a564c, 0x1e2a3a];
+function outfitFor(role) {
+  if (UNIFORMS[role]) return UNIFORMS[role];
+  return { top: pick(SHIRTS), bottom: pick(PANTS), boot: pick([0x15130f, 0x3a2416, 0x2a2a2a]), zip: Math.random() < 0.4, belt: Math.random() < 0.7 };
+}
 
 export class Crowd {
   constructor(ctx, scenes) {
@@ -396,11 +416,14 @@ export class Crowd {
     this.cartMesh = null;
   }
 
-  spawn(role, model, routine, opts = {}) {
+  spawn(role, gender, routine, opts = {}) {
+    const g = gender || (Math.random() < 0.5 ? 'M' : 'F');
+    const model = `U${g}_${Math.random() < 0.5 ? 'light' : 'dark'}`;
     const c = this.ctx.lib.create(model, {
-      height: opts.height ?? (model[0] === 'F' ? R(1.62, 1.74) : R(1.72, 1.86)),
-      tint: opts.tint ?? [R(-0.04, 0.04), R(-0.1, 0.05), R(-0.06, 0.06)],
-      formal: role === 'commerçant' || model.includes('Suit') || model.includes('Formal'),
+      height: opts.height ?? (g === 'F' ? R(1.62, 1.74) : R(1.72, 1.88)),
+      outfit: opts.outfit ?? outfitFor(role),
+      hair: pick(HAIRS[g]), hairColor: pick(HAIR_COLORS),
+      formal: role === 'commerçant',
     });
     this.ctx.scene.add(c.root);
     const a = new Agent(this, c, role, routine, { walkSpeed: opts.walk, x: opts.x, z: opts.z, yaw: opts.yaw });
@@ -412,8 +435,8 @@ export class Crowd {
     const list = roster(this.world);
     const fixed = Math.min(list.length, this.budget - 3);
     for (let i = 0; i < fixed; i++) {
-      const [role, models, routine, opts] = list[i];
-      this.spawn(role, pick(models), routine, opts);
+      const [role, gender, routine, opts] = list[i];
+      this.spawn(role, gender, routine, opts);
     }
     // chariot de ménage poussé par l'agent d'entretien
     const cl = this.agents.find((a) => a.role === 'entretien');
@@ -438,7 +461,7 @@ export class Crowd {
 
   spawnTraveler(arriving) {
     const routine = arriving ? travelerArriving : travelerDeparting;
-    const a = this.spawn('voyageur', pick(TRAVELER_MODELS), routine);
+    const a = this.spawn('voyageur', null, routine);
     return a;
   }
 

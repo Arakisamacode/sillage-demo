@@ -81,7 +81,7 @@ src/main.js              démarrage, boucle, interactions, menu
 src/core/                rendu (post-traitement ACES, bloom, AO, SMAA), qualité, entrées
 src/world/               hangar, sas et galerie, vaisseaux, accessoires, matériaux et usure,
                          ciel et planète, éclairage, faisceaux et poussière, signalétique
-src/characters/          chargement, reciblage des animations, mélange et regard
+src/characters/          personnages (Universal Base Characters), tenues en shader, reciblage des animations, regard
 src/ai/                  grille de navigation, agents, rôles et emplois du temps, scènes de travail
 src/vehicles/            chariot élévateur, tracteur + remorque, nacelle, chariot citerne
 src/player/              contrôleur capsule (three-mesh-bvh), caméras

@@ -73,11 +73,17 @@ async function boot() {
   builder.finalize();
   ctx.fx = buildFX(ctx);
   const player = new Player(ctx, builder.collisionGeometry());
-  player.setAvatar(lib.create('M_Spacesuit', { height: 1.78 }));
-  if (shotName === 'sittest') {
+  player.setAvatar(lib.create('UM_light', { height: 1.8, hair: 'Hair_SimpleParted', hairColor: 0x3a2618, outfit: { top: 0x3c4650, accent: 0xd86a20, hivis: true, gloves: true } }));
+  if (shotName === 'lineup' || shotName === 'portrait') {
+    const roles = [['mécanicien', 'M'], ['pilote', 'F'], ['sécurité', 'M'], ['client', 'F'], ['ravitailleur', 'M'], ['client', 'M'], ['entretien', 'F']];
+    roles.forEach(([r, g], i) => crowd.spawn(r, g, function* (a) {
+      a.pos.set(-4.5 + i * 1.5, 0, -4); a.yaw = 0;
+      for (;;) yield { type: 'act', anim: i % 3 === 1 ? 'talk' : 'idle', dur: 999 };
+    }));
+  } else if (shotName === 'sittest') {
     const W = crowd.world;
     const seats = [W.benchesWindow[2], W.benchesWindow[3], W.benchesMid[0], W.benchHangar[0]];
-    seats.forEach((st, i) => crowd.spawn('test', ['M_Suit', 'F_Casual', 'M_Worker', 'F_SciFi'][i], function* (a) {
+    seats.forEach((st, i) => crowd.spawn(['client', 'client', 'mécanicien', 'pilote'][i], ['M', 'F', 'M', 'F'][i], function* (a) {
       a.pos.set(st.x, 0, st.z); a.yaw = st.yaw;
       for (;;) yield { type: 'sit', x: st.x, z: st.z, yaw: st.yaw, dur: 999, talk: i % 2 === 1 };
     }));
