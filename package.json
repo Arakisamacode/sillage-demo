@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "shots": "node tools/screenshots.mjs"
+    "shots": "node tools/screenshots.mjs",
+    "build:artifact": "VITE_B64=1 vite build --outDir dist-artifact && node tools/pack_b64.mjs dist-artifact"
   },
   "dependencies": {
     "n8ao": "^2.0.2",

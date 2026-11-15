@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 import { Retargeter } from './retarget.js';
+import { loadBinary } from '../core/binary.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 // Bibliothèque de personnages : modèles Quaternius (CC0) + animations UAL (CC0) reciblées.
@@ -33,12 +34,12 @@ export class CharacterLibrary {
   }
 
   async load(names = MODELS, onProgress) {
-    const anim = await this.loader.loadAsync(BASE + 'anim/ual.glb');
+    const anim = await this.loader.parseAsync(await loadBinary(BASE + 'anim/ual.glb'), '');
     this.srcScene = anim.scene;
     this.srcClips = anim.animations;
     let k = 0;
     await Promise.all(names.map(async (n) => {
-      const g = await this.loader.loadAsync(BASE + `characters/${n}.glb`);
+      const g = await this.loader.parseAsync(await loadBinary(BASE + `characters/${n}.glb`), '');
       this._prepTemplate(n, g.scene);
       onProgress && onProgress(++k / names.length);
     }));

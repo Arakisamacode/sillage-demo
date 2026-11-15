@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { EXRLoader } from 'three/addons/loaders/EXRLoader.js';
+import { loadBinary } from '../core/binary.js';
 import { KEY_DIR } from './sky.js';
 import { HX, Z_BAY, Z_BACK, H, PADS } from './layout.js';
 
@@ -12,7 +13,14 @@ export function buildLighting(ctx) {
 
   // ------------------------------------------------------------- environnement HDRI
   const pmrem = new THREE.PMREMGenerator(renderer.three);
-  new EXRLoader(manager).load(import.meta.env.BASE_URL + 'assets/hdri/warehouse.exr', (tex) => {
+  loadBinary(import.meta.env.BASE_URL + 'assets/hdri/warehouse.exr').then((buf) => {
+    const d = new EXRLoader().parse(buf);
+    const tex = new THREE.DataTexture(d.data, d.width, d.height, d.format, d.type);
+    if (d.flipY !== undefined) tex.flipY = d.flipY;
+    if (d.colorSpace !== undefined) tex.colorSpace = d.colorSpace;
+    tex.minFilter = tex.magFilter = THREE.LinearFilter;
+    tex.generateMipmaps = false;
+    tex.needsUpdate = true;
     tex.mapping = THREE.EquirectangularReflectionMapping;
     const env = pmrem.fromEquirectangular(tex).texture;
     scene.environment = env;
@@ -20,7 +28,7 @@ export function buildLighting(ctx) {
     scene.environmentRotation = new THREE.Euler(0, 1.2, 0);
     tex.dispose();
     out.env = env;
-  });
+  }).catch((e) => console.warn('HDRI', e));
 
   // ------------------------------------------------------------- lumière planétaire (froide)
   const sun = new THREE.DirectionalLight(0x9fbfff, 3.6);

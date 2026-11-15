@@ -58,6 +58,9 @@ Par défaut : *Basse* sur écran tactile, *Haute* sur ordinateur.
 
 ## Mise en ligne
 
+- **Artifact claude.ai** : `npm run build:artifact` produit `dist-artifact/`, où les .glb/.exr sont livrés
+  en base64 (.b64.txt), car ce type d'hébergement ne sert que des formats web standard.
+
 Le build est statique (dossier `dist/`, chemins relatifs) : il se dépose tel quel sur n'importe quel
 hébergement de fichiers.
 
