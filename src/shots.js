@@ -17,7 +17,7 @@ export const SHOTS = {
   fuel: { pos: [8.5, 1.7, 7.5], look: [14, 1.0, 14], fov: 65 },
   forklift: { pos: [24, 2.2, 3], look: [15, 1.0, 4], fov: 65 },
   hangarlife: { pos: [-22, 1.7, -12], look: [-29, 1.2, 3], fov: 65 },
-  gallerylife: { pos: [-46, 1.7, -3], look: [-80, 1.2, -7], fov: 65 },
+  gallerylife: { pos: [-49, 1.7, -19.5], look: [-80, 1.4, -2], fov: 65 },
   shops: { pos: [-70, 1.7, -2], look: [-80, 2.0, 10], fov: 70 },
   benchwin: { pos: [-66, 1.5, -15], look: [-76, 0.9, -21.5], fov: 60 },
   kiosk: { pos: [-66, 1.6, -1], look: [-72, 1.0, -7], fov: 60 },

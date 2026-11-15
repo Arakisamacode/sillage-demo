@@ -98,6 +98,7 @@ async function boot() {
   input.setTouch(touch);
   ctx.input = input;
   const audio = new Audio(ctx);
+  ctx.audio = audio;
   crowd.onArrival = () => audio.announce('arrival');
   player.onStep = (p, sp) => audio.step(p, sp);
   for (const d of ctx.doors) d.onMove = (opening) => audio.door(new THREE.Vector3(d.x, 2, d.z), opening);

@@ -46,7 +46,7 @@ console.log('   dans la soute :', await walk(5, 0, 1));
 console.log('   vers le cockpit :', await walk(3, 0, 1));
 const it = await page.evaluate(() => { const p = window.__app.player.pos; return window.__app.interactables().map((i) => i.pos.distanceTo(p).toFixed(2)); });
 console.log('   distance aux interactions :', it.join(', '));
-  console.log('   jusqu\'au cockpit :', await walk(5, 0, 1));
+  console.log('   jusqu\'au cockpit :', await walk(7, 0, 1));
 await shot('ship_inside');
 await page.evaluate(() => { window.__app.player.sit(window.__app.seat); window.__walk(1, 0, 0); });
 await shot('cockpit');
@@ -69,5 +69,12 @@ console.log('5. contre le mur est :', await walk(5, 0, 1, true));
 await page.evaluate(() => window.__tp(-27.55, 0.05, -28.5, 0));
 console.log('6. escalier :', await walk(7, 0, 1));
 await shot('stairs');
+// audio : démarrage et mises à jour (vérifie l'absence d'erreurs)
+console.log('7. audio :', await page.evaluate(() => {
+  const A = window.__app; A.audio.start(true);
+  for (let i = 0; i < 120; i++) { window.__walk(1 / 30, 0, 1); A.audio.update(1 / 30, A.player, A.crowd, A.scenes); }
+  A.audio.announce('arrival'); A.audio.step(A.player.pos, 1.4); A.audio.door(A.player.pos, true); A.audio.coffee(); A.audio.blip(); A.audio._ratchet(A.player.pos);
+  return A.audio.ac.state + ' / ' + A.audio.ac.sampleRate;
+}));
 console.log(logs.slice(0, 20).join('\n') || 'aucune erreur');
 await browser.close();

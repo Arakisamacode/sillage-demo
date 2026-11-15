@@ -169,6 +169,23 @@ export class Audio {
     o.connect(g).connect(p); o.start(t); o.stop(t + 0.3);
   }
 
+  /** visseuse à chocs / clé pneumatique */
+  _ratchet(pos) {
+    const ac = this.ac, t0 = ac.currentTime;
+    const p = this._panner(pos, 3, 35);
+    const n = 6 + Math.floor(Math.random() * 14);
+    for (let i = 0; i < n; i++) {
+      const t = t0 + i * 0.045;
+      const s = this._src(false); const bp = ac.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1800; bp.Q.value = 4;
+      const g = ac.createGain(); g.gain.setValueAtTime(0.0, t); g.gain.linearRampToValueAtTime(0.35, t + 0.003); g.gain.exponentialRampToValueAtTime(0.001, t + 0.035);
+      s.connect(bp).connect(g).connect(p); s.start(t, Math.random() * 3, 0.05);
+    }
+    const o = ac.createOscillator(); o.type = 'sawtooth'; o.frequency.value = 340;
+    const og = ac.createGain(); og.gain.setValueAtTime(0.02, t0); og.gain.linearRampToValueAtTime(0, t0 + n * 0.045);
+    const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 1200;
+    o.connect(lp).connect(og).connect(p); o.start(t0); o.stop(t0 + n * 0.045 + 0.05);
+  }
+
   step(pos, speed) {
     if (!this.ac || !this.enabled) return;
     const ac = this.ac, t = ac.currentTime;
@@ -330,6 +347,13 @@ export class Audio {
     if ((fk.state === 'back1' || fk.state === 'back2') && fk.vehicle.speed > 0.1) {
       this.beepT -= dt;
       if (this.beepT <= 0) { this.beepT = 0.6; this._beep(fk.vehicle.pos); }
+    }
+    // outils des mécaniciens au travail
+    this.toolT = (this.toolT ?? 3) - dt;
+    if (this.toolT <= 0) {
+      this.toolT = 1.5 + Math.random() * 4;
+      const w = crowd.agents.find((a) => (a.char.override === 'repair' || a.char.override === 'interact') && a.pos.distanceToSquared(player.pos) < 900 && a.role !== 'commerçant' && a.role !== 'barista');
+      if (w) this._ratchet(new THREE.Vector3(w.pos.x, 0.8, w.pos.z));
     }
     // conversations : jusqu'à 3 voix sur les PNJ qui discutent près du joueur
     if (!this.voices.length) for (let i = 0; i < 3; i++) this.voices.push(this._voice());
