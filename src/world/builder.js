@@ -154,8 +154,8 @@ export class Builder {
     return meshes;
   }
 
-  collisionGeometry() {
-    const geos = this.colliders.map((g) => {
+  collisionGeometry(keep = null) {
+    const geos = this.colliders.filter((g, i) => !keep || keep(g, i)).map((g) => {
       const c = new THREE.BufferGeometry();
       c.setAttribute('position', g.attributes.position.clone());
       return c;

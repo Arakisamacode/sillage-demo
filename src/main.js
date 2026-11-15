@@ -17,8 +17,11 @@ import { Crowd } from './ai/crowd.js';
 import { Player } from './player/player.js';
 import { Audio } from './audio/audio.js';
 import { SHOTS } from './shots.js';
+import { buildExterior } from './world/exterior.js';
+import { Flight } from './flight/flight.js';
 
 const params = new URLSearchParams(location.search);
+const HX_ = 32;
 const shotName = params.get('shot');
 const $ = (id) => document.getElementById(id);
 const loadbar = $('loadbar'), loadtext = $('loadtext');
@@ -59,6 +62,7 @@ async function boot() {
   ctx.ships = buildShips(ctx);
   buildProps(ctx);
   buildGallery(ctx);
+  buildExterior(ctx);
   ctx.lights = buildLighting(ctx);
   const lib = new CharacterLibrary(manager, quality);
   const libReady = lib.load(undefined, (p) => progress(0.6 + 0.3 * p, 'Chargement des personnages'));
@@ -73,6 +77,20 @@ async function boot() {
   builder.finalize();
   ctx.fx = buildFX(ctx);
   const player = new Player(ctx, builder.collisionGeometry());
+  const flight = new Flight(ctx, ctx.ships.heron);
+  ctx.flight = flight;
+  flight.onEvent = (e) => {
+    const msg = {
+      takeoff: ['Contrôle de pont : Héron, autorisation de décollage accordée, aire zéro deux. Champ de confinement ouvert.', 'Décollage autorisé · aire 02'],
+      airborne: [null, 'En vol · ZQSD : poussée · souris : orientation · Espace / C : monter / descendre · Q / E : roulis · V : vue'],
+      landing: ['Contrôle de pont : Héron, autorisation d\'atterrissage, aire zéro deux.', 'Atterrissage autorisé · aire 02'],
+      landed: [null, 'Posé sur l\'aire 02 · moteurs coupés'],
+    }[e];
+    if (!msg) return;
+    if (msg[0]) audio.say(msg[0]);
+    toast(msg[1]);
+    if (e === 'landed' && player.avatar) player.avatar.root.visible = player.thirdPerson;
+  };
   player.setAvatar(lib.create('UM_light', { height: 1.82, hair: 'Hair_Buzzed', hairColor: 0x2a1d14, outfit: { top: 0x2b3036, bottom: 0x2b3036, boot: 0x16181a, accent: 0x6f86a8, gloves: true, zip: false }, armor: { plate: 0x3a4148, under: 0x1b1e21, accent: 0x6e6a3a, light: 0x5fe6c8 } }));
   player.thirdPerson = true; player.camDist = 2.6;
   if (shotName === 'lineup' || shotName === 'portrait') {
@@ -152,9 +170,12 @@ async function boot() {
     for (const d of ctx.doors) d.update(dt, blockers);
     for (const u of ctx.updaters) u(dt, t);
     sky.update(dt, t, camera);
+    const c = camera.position, insideStation = (c.x > -HX_ && c.x < HX_ && c.z > -46 && c.z < 31 && c.y < 25) || (c.x < -40 && c.x > -103 && c.z > -25 && c.z < 11);
+    scene.fog.density += ((insideStation ? 0.0042 : 0.0) - scene.fog.density) * Math.min(1, dt * 3);
   }
 
   ctx.simulate = simulate;
+  ctx.player = player;
   ctx.interactables = () => interactables;
   ctx.seat = seat;
   $('loading').classList.add('hidden');
@@ -204,14 +225,28 @@ async function boot() {
     input.update();
     if (input.consume('menu')) openMenu();
     if (running) {
-      if (input.consume('view')) player.toggleView();
-      player.update(dt, input, crowd.agents.filter((a) => !a.attached), ctx.doors);
-      let near = null;
-      if (player.seated) near = { label: 'E — Se lever', fn: () => player.stand() };
-      else for (const it of interactables) if (it.pos.distanceTo(player.pos) < it.r) { near = it; break; }
-      promptEl.classList.toggle('hidden', !near);
-      if (near) promptEl.textContent = near.label;
-      if (near && input.consume('use')) near.fn();
+      if (flight.active) {
+        // ------------------------------------------------ en vol
+        if (input.consume('view')) flight.toggleView();
+        flight.update(dt, input);
+        let label = flight.state === 'flying'
+          ? (flight.nearPad() ? (touch ? '⏻ — Atterrir sur l\'aire 02' : 'L — Atterrir sur l\'aire 02') : (flight.insideHangar() ? 'Sortie par la baie · vitesse limitée dans le hangar' : `${Math.round(flight.vel.length())} m/s · Maj : postcombustion`))
+          : flight.state === 'spool' ? 'Démarrage des moteurs…' : 'Atterrissage automatique…';
+        promptEl.classList.remove('hidden'); promptEl.textContent = label;
+        if ((input.consume('fly') || input.consume('land')) && flight.state === 'flying') flight.land();
+        input.consume('flyKey');
+      } else {
+        if (input.consume('view')) player.toggleView();
+        player.update(dt, input, crowd.agents.filter((a) => !a.attached), ctx.doors);
+        let near = null;
+        if (player.seated) near = { label: touch ? '⏻ — Décoller · E — Se lever' : 'ESPACE — Décoller · E — Se lever', fn: () => player.stand() };
+        else for (const it of interactables) if (it.pos.distanceTo(player.pos) < it.r) { near = it; break; }
+        promptEl.classList.toggle('hidden', !near);
+        if (near) promptEl.textContent = near.label;
+        if (player.seated && (input.consume('fly') || input.consume('flyKey'))) { flight.takeOff(); if (player.avatar) player.avatar.root.visible = false; }
+        else if (near && input.consume('use')) near.fn();
+        input.consume('fly'); input.consume('flyKey'); input.consume('land');
+      }
       input.consume('use');
     }
     simulate(dt, t);

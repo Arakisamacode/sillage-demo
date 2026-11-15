@@ -114,6 +114,9 @@ export class Audio {
   }
 
   // --------------------------------------------------------------------------- annonces
+  /** annonce libre (carillon + voix) */
+  say(text) { this._sayText = text; this.announce('custom'); }
+
   announce(kind) {
     if (!this.ac || !this.enabled) return;
     const ac = this.ac, t = ac.currentTime + 0.05;
@@ -124,7 +127,7 @@ export class Audio {
       o.connect(g); g.connect(this.master); g.connect(this.revSend); o.start(t + i * 0.32); o.stop(t + i * 0.32 + 1.7);
     });
     const list = ANNOUNCES[kind] || ANNOUNCES.misc;
-    const text = list[Math.floor(Math.random() * list.length)];
+    const text = kind === 'custom' ? this._sayText : list[Math.floor(Math.random() * list.length)];
     if (window.speechSynthesis && window.SpeechSynthesisUtterance) {
       setTimeout(() => {
         if (!this.enabled) return;
@@ -157,6 +160,7 @@ export class Audio {
       return { o, g, pan, lp };
     };
     this.fork = engine(55);
+    this.ship = engine(38);
     this.tug = engine(70);
     this.beepT = 0;
   }
@@ -342,6 +346,14 @@ export class Audio {
       const sp = Math.abs(v.speed);
       eng.g.gain.setTargetAtTime(0.03 + sp * 0.05, t, 0.2);
       eng.o.frequency.setTargetAtTime(45 + sp * 22, t, 0.3);
+    }
+    const fl = this.ctx.flight;
+    if (fl) {
+      this._setPos(this.ship.pan, fl.pos);
+      const on = fl.active ? 0.12 + fl.throttle * 0.5 : 0;
+      this.ship.g.gain.setTargetAtTime(on, t, 0.3);
+      this.ship.o.frequency.setTargetAtTime(32 + fl.throttle * 60, t, 0.4);
+      this.ship.lp.frequency.setTargetAtTime(300 + fl.throttle * 900, t, 0.4);
     }
     const fk = scenes.forklift;
     if ((fk.state === 'back1' || fk.state === 'back2') && fk.vehicle.speed > 0.1) {

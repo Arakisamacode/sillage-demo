@@ -17,6 +17,8 @@ export class Input {
       if (!this.enabled) return;
       this.keys.add(e.code);
       if (e.code === 'KeyV') this.pressed.add('view');
+      if (e.code === 'Space') this.pressed.add('flyKey');
+      if (e.code === 'KeyL') this.pressed.add('land');
       if (e.code === 'KeyE' || e.code === 'KeyF') this.pressed.add('use');
       if (e.code === 'KeyM') this.pressed.add('map');
       if (e.code === 'KeyH') this.pressed.add('hud');
@@ -66,6 +68,12 @@ export class Input {
     btn('t-view', () => this.pressed.add('view'));
     btn('t-use', () => this.pressed.add('use'));
     btn('t-menu', () => this.pressed.add('menu'));
+    btn('t-fly', () => this.pressed.add('fly'));
+    for (const [id, k] of [['t-up', 'touchUp'], ['t-down', 'touchDown']]) {
+      const el = document.getElementById(id);
+      el.addEventListener('pointerdown', (e) => { e.stopPropagation(); this[k] = true; });
+      for (const ev of ['pointerup', 'pointercancel', 'pointerleave']) el.addEventListener(ev, () => { this[k] = false; });
+    }
   }
 
   _stickMove(e, sx, sy, R, knob) {

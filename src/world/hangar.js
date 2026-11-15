@@ -305,7 +305,7 @@ function bayFrame(B, mats, ctx) {
   B.box(doorW + 6, 1.2, 14, mats.metal(0x3c4044), [0, -0.6, z - 7.5], null, { collide: true });
   B.box(doorW + 6, 0.3, 0.6, yellow, [0, 0.0, z - 14.3]);
   // garde-corps invisibles : le joueur ne sort pas dans l'espace (champ de confinement)
-  B.colliderBox(doorW, doorH, 0.3, [0, doorH / 2, z - 0.5]);
+  ctx.bayField = B.colliderBox(doorW, doorH, 0.3, [0, doorH / 2, z - 0.5]);
 
   // champ de confinement atmosphérique (léger voile bleuté animé)
   const fieldMat = new THREE.ShaderMaterial({

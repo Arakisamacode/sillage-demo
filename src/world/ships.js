@@ -13,18 +13,27 @@ import { paintedText, decalMaterial } from './signage.js';
 //  - « Navette ST-40 » (aire 05), débarquement de passagers
 
 class ShipCtx {
-  constructor(ctx, pad, name) {
+  constructor(ctx, pad, name, dynamic = false) {
     this.ctx = ctx;
-    this.B = ctx.builder;
+    // dynamic : géométrie dans un lot propre (déplaçable en vol) ; collisions toujours dans le lot global
+    this.CB = ctx.builder;
+    this.B = dynamic ? new Builder(null) : ctx.builder;
+    this.dynamic = dynamic;
     this.mats = ctx.mats;
     this.heading = pad.heading;
     this.origin = new THREE.Vector3(pad.x, 0, pad.z);
     this.M = new THREE.Matrix4().compose(this.origin, new THREE.Quaternion().setFromEuler(new THREE.Euler(0, pad.heading, 0)), new THREE.Vector3(1, 1, 1));
     this.name = name;
+    // root : transformation de vol (identité au repos) ; group : repère local de l'aire ; worldGroup : maillages en coordonnées monde
+    this.root = new THREE.Group();
+    this.root.matrixAutoUpdate = false;
+    ctx.scene.add(this.root);
     this.group = new THREE.Group();
     this.group.position.copy(this.origin);
     this.group.rotation.y = pad.heading;
-    ctx.scene.add(this.group);
+    this.root.add(this.group);
+    this.worldGroup = new THREE.Group();
+    this.root.add(this.worldGroup);
     this.navLights = [];
   }
   add(geo, mat, pos = [0, 0, 0], rot = null, opts = {}) {
@@ -38,18 +47,18 @@ class ShipCtx {
     this.add(h.under, m.under, [0, 0, 0], null, { cast: true });
     this.add(h.plates, m.plate, [0, 0, 0], null, { cast: true });
     this.add(h.alt, m.alt || m.plate, [0, 0, 0], null, { cast: true });
-    if (opts.collide !== false) { const c = h.under.clone(); c.applyMatrix4(this.M); this.B.addCollider(c); }
+    if (opts.collide !== false) { const c = h.under.clone(); c.applyMatrix4(this.M); this.CB.addCollider(c); }
     return h;
   }
   /** boîte de collision en coordonnées locales */
   cbox(w, h, d, pos) {
     const p = new THREE.Vector3(...pos).applyMatrix4(this.M);
-    this.B.colliderBox(w, h, d, [p.x, p.y, p.z], [0, this.heading, 0]);
+    this.CB.colliderBox(w, h, d, [p.x, p.y, p.z], [0, this.heading, 0]);
   }
   /** empreinte au sol pour l'évitement des PNJ */
   footprint(hw, hd, cx = 0, cz = 0) {
     const p = new THREE.Vector3(cx, 0, cz).applyMatrix4(this.M);
-    this.B.addObstacle(p.x, p.z, hw, hd, this.heading);
+    this.CB.addObstacle(p.x, p.z, hw, hd, this.heading);
   }
   local(x, y, z) { return new THREE.Vector3(x, y, z).applyMatrix4(this.M); }
   navLight(pos, color, blink = 0) {
@@ -77,7 +86,7 @@ class ShipCtx {
     // bras de compas
     this.box(0.08, h * 0.5, 0.08, strut, [x, h * 0.55, z + 0.35], [0.35, 0, 0]);
     // flexibles hydrauliques
-    this.ctx.builder.add(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([
+    this.B.add(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([
       new THREE.Vector3(x + r * 1.4, h, z), new THREE.Vector3(x + r * 1.8, h * 0.6, z + 0.1), new THREE.Vector3(x + r * 1.1, h * 0.3, z),
     ]), 10, 0.025, 5), mats.rubber(), new THREE.Matrix4(), { parent: this.M, cast: false });
     // cales de roue jaunes
@@ -155,7 +164,8 @@ function rover(S, mats, x, y, z, ry) {
 
 function buildHeron(ctx) {
   const pad = PADS.p2;
-  const S = new ShipCtx(ctx, pad, 'heron');
+  const c0 = ctx.builder.colliders.length;
+  const S = new ShipCtx(ctx, pad, 'heron', true);
   const { mats } = ctx;
   // -------------------------------------------------- matériaux
   const hull = mats.paint(0xd2cfc7, { grime: 0.75, scratch: 0.6, rust: 0.0, plain: true, rough: 0.45 });
@@ -199,8 +209,8 @@ function buildHeron(ctx) {
   can.renderOrder = 3;
   S.group.add(can);
   const P = cg.points;
-  for (let i = 0; i < P[0].length; i++) ctx.builder.tube(P.map((r) => S.local(r[i].x, r[i].y + 0.02, r[i].z).toArray()), 0.085, trim, { radial: 6, cast: false, smooth: false });
-  for (let j = 0; j < P.length; j += 3) ctx.builder.tube(P[j].map((p) => S.local(p.x, p.y + 0.02, p.z).toArray()), 0.07, trim, { radial: 6, cast: false, smooth: false });
+  for (let i = 0; i < P[0].length; i++) S.B.tube(P.map((r) => S.local(r[i].x, r[i].y + 0.02, r[i].z).toArray()), 0.085, trim, { radial: 6, cast: false, smooth: false });
+  for (let j = 0; j < P.length; j += 3) S.B.tube(P[j].map((p) => S.local(p.x, p.y + 0.02, p.z).toArray()), 0.07, trim, { radial: 6, cast: false, smooth: false });
   for (const sx of [-1, 1]) {
     // arête de chine (ressaut horizontal) + liseré
     S.box(0.4, 0.26, 26, trim, [sx * 4.72, 4.95, 1.5], null, { tex: 2 });
@@ -302,7 +312,7 @@ function buildHeron(ctx) {
     if (!lvl) S.cbox(sz, sz * 2, sz, [x, y + sz, z]);
   }
   // sangles d'arrimage du bloc arrière
-  ctx.builder.cable(S.local(3.4, fy + 1.0, 9.4).toArray(), S.local(0.6, fy + 0.02, 9.4).toArray(), -0.4, 0.02, mats.plastic(0xc8901a, 0.6));
+  S.B.cable(S.local(3.4, fy + 1.0, 9.4).toArray(), S.local(0.6, fy + 0.02, 9.4).toArray(), -0.4, 0.02, mats.plastic(0xc8901a, 0.6));
   // rover garé côté bâbord
   rover(S, mats, -1.6, fy, 6.5, Math.PI);
   // escalier vers le pont supérieur (bâbord avant, monte vers l'avant)
@@ -456,8 +466,8 @@ function buildHeron(ctx) {
 
   // -------------------------------------------------- lumières intérieures
   const lights = ctx.quality.name === 'low' ? [[0, 4.4, 6, 10]] : [[0, 4.4, 2, 9], [0, 4.4, 10, 9], [0, 7.4, -3, 7], [0, 7.4, 6, 7]];
-  for (const [x, y, z, i] of lights) { const l = new THREE.PointLight(0xffe4c4, i, 11, 2); l.position.copy(S.local(x, y, z)); ctx.scene.add(l); }
-  const bl = new THREE.PointLight(0x9fd6ff, 2.5, 5, 2); bl.position.copy(S.local(0, bf + 1.2, -13.5)); ctx.scene.add(bl);
+  for (const [x, y, z, i] of lights) { const l = new THREE.PointLight(0xffe4c4, i, 11, 2); l.position.copy(S.local(x, y, z)); S.worldGroup.add(l); }
+  const bl = new THREE.PointLight(0x9fd6ff, 2.5, 5, 2); bl.position.copy(S.local(0, bf + 1.2, -13.5)); S.worldGroup.add(bl);
 
   const seatPos = S.local(-1.1, bf + 0.3, -12.6);
   S.interior = {
@@ -465,6 +475,9 @@ function buildHeron(ctx) {
     seat: { pos: seatPos, yaw: pad.heading + Math.PI, eye: S.local(-1.1, bf + 1.45, -12.75), exit: S.local(-1.1, bf + 0.05, -11.2) },
     seatTrigger: S.local(-1.1, bf, -11.8),
   };
+  // géométrie du vaisseau : lot propre, attaché au groupe mobile
+  S.B.finalize(S.worldGroup);
+  S.colliderRange = [c0, ctx.builder.colliders.length];
   return S;
 }
 

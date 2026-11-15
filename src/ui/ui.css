@@ -41,7 +41,7 @@ body.is-touch .help.desktop, body:not(.is-touch) .help.touch { display: none; }
 #touch { position: fixed; inset: 0; z-index: 6; pointer-events: none; }
 #stick { position: absolute; left: calc(26px + env(safe-area-inset-left)); bottom: calc(26px + env(safe-area-inset-bottom)); width: 128px; height: 128px; border-radius: 50%; border: 1px solid rgba(255,255,255,.18); background: rgba(10,14,18,.25); pointer-events: auto; }
 #knob { position: absolute; left: 50%; top: 50%; width: 54px; height: 54px; margin: -27px; border-radius: 50%; background: rgba(240,240,240,.22); border: 1px solid rgba(255,255,255,.35); }
-.tbtns { position: absolute; right: calc(18px + env(safe-area-inset-right)); bottom: calc(24px + env(safe-area-inset-bottom)); display: grid; grid-template-columns: 64px 64px; gap: 12px; pointer-events: auto; }
+.tbtns { position: absolute; right: calc(18px + env(safe-area-inset-right)); bottom: calc(24px + env(safe-area-inset-bottom)); display: grid; grid-template-columns: 64px 64px 64px; gap: 12px; pointer-events: auto; }
 .tbtns button { width: 64px; height: 64px; border-radius: 50%; border: 1px solid rgba(255,255,255,.25); background: rgba(10,14,18,.35); color: var(--fg); font: inherit; font-size: 11px; letter-spacing: .08em; }
 .tbtns button.on { background: rgba(242,163,58,.45); }
 
