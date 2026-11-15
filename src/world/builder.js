@@ -53,7 +53,7 @@ export class Builder {
 
   /** Boîte à UV métriques. */
   box(w, h, d, mat, pos, rot, opts = {}) {
-    const g = metricBox(w, h, d, opts.tex ?? 2);
+    const g = metricBox(w, h, d, opts.tex ?? 3);
     this.add(g, mat, Builder.matrix(pos, rot), opts);
     if (opts.obstacle) this.addObstacle(pos[0], pos[2], w / 2, d / 2, rot ? rot[1] : 0);
     return g;

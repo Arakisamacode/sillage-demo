@@ -82,6 +82,7 @@ async function boot() {
   addEventListener('resize', () => renderer.resize());
   const input = new Input($('view'));
   input.setTouch(touch);
+  ctx.input = input;
   const audio = new Audio(ctx);
   crowd.onArrival = () => audio.announce('arrival');
   player.onStep = (p, sp) => audio.step(p, sp);
@@ -90,12 +91,13 @@ async function boot() {
   // ------------------------------------------------------------------ interactions
   const heron = ctx.ships.heron;
   const fy = heron.interior.floorY;
+  const cf = heron.interior.cockpitFloor;
   const seat = {
-    pos: heron.local(-0.8, fy + 0.3, -7.0), yaw: Math.PI,
-    eye: heron.local(-0.8, fy + 1.45, -7.1), exit: heron.local(-0.8, fy + 0.3, -5.4),
+    pos: heron.local(-0.8, cf + 0.25, -7.0), yaw: Math.PI,
+    eye: heron.local(-0.8, cf + 1.35, -7.1), exit: heron.local(-0.8, cf + 0.05, -5.6),
   };
   const interactables = [
-    { pos: heron.local(-0.8, fy + 0.3, -6.2), r: 1.2, label: 'E — S\'installer aux commandes', fn: () => { player.sit(seat); toast('Héron HL-2207 · systèmes en veille · autorisation de départ en attente'); audio.blip(); } },
+    { pos: heron.local(-0.8, cf, -6.0), r: 1.3, label: 'E — S\'installer aux commandes', fn: () => { player.sit(seat); toast('Héron HL-2207 · systèmes en veille · autorisation de départ en attente'); audio.blip(); } },
     { pos: new THREE.Vector3(-29.9, 0, 3.1), r: 1.4, label: 'E — Prendre un café', fn: () => { audio.coffee(); toast('Café serré · 2,50 ¤ débités'); } },
     { pos: new THREE.Vector3(ctx.kiosk.x, 0, ctx.kiosk.z), r: 3.7, label: 'E — Commander au kiosque', fn: () => { audio.coffee(); toast('« Et voilà, bonne escale ! »'); } },
   ];
@@ -135,6 +137,9 @@ async function boot() {
     sky.update(dt, t, camera);
   }
 
+  ctx.simulate = simulate;
+  ctx.interactables = () => interactables;
+  ctx.seat = seat;
   $('loading').classList.add('hidden');
 
   // ------------------------------------------------------------------ mode capture d'écran (revue artistique)

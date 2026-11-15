@@ -114,7 +114,7 @@ export class Materials {
           diffuseColor.rgb *= 1.0 - smoothstep(0.55, 1.0, streak_) * 0.25 * uWear.x * (1.0 - abs(vWNrm.y));
           float scr_ = gr_.g * uWear.z;
           diffuseColor.rgb += scr_ * 0.012;
-          float rustM_ = smoothstep(0.5, 0.9, grL_.r * gr_.b * 2.0) * uWear2.z;
+          float rustM_ = smoothstep(0.62, 0.95, grL_.r * 0.65 + gr_.r * 0.45) * uWear2.z * (1.0 - abs(vWNrm.y) * 0.8);
           diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.23, 0.11, 0.05), rustM_);
           `)
         .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
@@ -173,7 +173,7 @@ export class Materials {
       roughnessMap: this.tex.panels_orm, aoMap: this.tex.panels_orm, roughness: opts.rough ?? 0.75, metalness: opts.metal ?? 0.85,
       normalScale: new THREE.Vector2(opts.ns ?? 0.6, opts.ns ?? 0.6),
     });
-    this.addWear(m, { grime: opts.grime ?? 0.8, scratch: 0.9, floor: opts.floor ?? 1, rust: opts.rust ?? 0.3 });
+    this.addWear(m, { grime: opts.grime ?? 0.8, scratch: 0.9, floor: opts.floor ?? 1, rust: opts.rust ?? 0.12 });
     return (this.cache[key] = m);
   }
 

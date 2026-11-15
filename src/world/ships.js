@@ -79,6 +79,19 @@ class ShipCtx {
   }
 }
 
+/** section interpolée linéairement entre stations (pour poser des éléments sur la coque) */
+function interpStation(st, z) {
+  for (let i = 0; i < st.length - 1; i++) {
+    const a = st[i], b = st[i + 1];
+    if (z >= a.z && z <= b.z) {
+      const t = (z - a.z) / (b.z - a.z), o = {};
+      for (const k of ['w', 'h', 'y', 'n']) o[k] = (a[k] ?? 2.5) + ((b[k] ?? 2.5) - (a[k] ?? 2.5)) * t;
+      return o;
+    }
+  }
+  return { n: 2.5, ...st[st.length - 1] };
+}
+
 function greebles(S, mat, x0, x1, y, z0, z1, n, seedv) {
   let s = seedv;
   const r = () => { s = (s * 16807) % 2147483647; return (s - 1) / 2147483646; };
@@ -100,17 +113,49 @@ function buildHeron(ctx) {
   const metal = mats.metal(0x55595c);
   const glass = new THREE.MeshStandardMaterial({ color: 0x0b1015, roughness: 0.05, metalness: 1.0, envMapIntensity: 1.4 });
 
-  // fuselage
-  const fus = loft([
+  // fuselage : partie avant ouverte sur le dessus (verrière ajustée), partie arrière complète
+  const ST = [
     { z: -12.2, w: 0.25, h: 0.2, y: 3.5, n: 2.2 },
     { z: -10.5, w: 2.0, h: 1.3, y: 3.45, n: 2.3, fb: 0.2 },
     { z: -7.5, w: 3.9, h: 2.4, y: 3.45, n: 2.6, fb: 0.35 },
-    { z: -3, w: 4.8, h: 2.1, y: 3.55, n: 3.0, fb: 0.4 },
-    { z: 4, w: 4.9, h: 2.05, y: 3.6, n: 3.2, fb: 0.45 },
-    { z: 9, w: 4.4, h: 1.95, y: 3.7, n: 3.2, fb: 0.45 },
-    { z: 11.3, w: 3.9, h: 1.75, y: 3.75, n: 3.4, fb: 0.4 },
-  ], { radial: 48, steps: 7, texSize: 5 });
-  S.add(fus, hull);
+    { z: -3, w: 4.8, h: 2.1, y: 3.55, n: 3.0, fb: 0.15 },
+    { z: 4, w: 4.9, h: 2.05, y: 3.6, n: 3.2, fb: 0.12 },
+    { z: 9, w: 4.4, h: 1.95, y: 3.7, n: 3.2, fb: 0.1 },
+    { z: 11.3, w: 3.9, h: 1.75, y: 3.75, n: 3.4, fb: 0.0 },
+  ];
+  const hullDS = hull.clone(); hullDS.side = THREE.DoubleSide;
+  hullDS.onBeforeCompile = hull.onBeforeCompile; hullDS.customProgramCacheKey = hull.customProgramCacheKey;
+  const gap = 1.22;
+  const front = ST.slice(0, 4);
+  S.add(loft(front, { radial: 40, steps: 7, texSize: 5, arc: [Math.PI / 2 + gap, Math.PI / 2 - gap + Math.PI * 2] }), hullDS);
+  S.add(loft(ST.slice(3), { radial: 48, steps: 7, texSize: 5 }), hullDS);
+  // verrière : même section que la coque, sur l'ouverture
+  const canopyGlass = new THREE.MeshStandardMaterial({ color: 0x1a2a33, roughness: 0.04, metalness: 0.9, transparent: true, opacity: 0.38, side: THREE.DoubleSide, envMapIntensity: 1.6, depthWrite: false });
+  const can = new THREE.Mesh(loft(front.slice(1), { radial: 16, steps: 7, arc: [Math.PI / 2 - gap, Math.PI / 2 + gap] }), canopyGlass);
+  can.renderOrder = 3;
+  S.group.add(can);
+  // cadre de verrière
+  for (const k of [-1, 1]) {
+    const pts = [];
+    for (let i = 0; i <= 12; i++) {
+      const zz = -10.4 + (i / 12) * 7.3;
+      const st = interpStation(front, zz);
+      const t = Math.PI / 2 + k * gap;
+      const c = Math.cos(t), sn = Math.sin(t);
+      pts.push([Math.sign(c) * Math.pow(Math.abs(c), 2 / st.n) * st.w, st.y + Math.pow(Math.abs(sn), 2 / st.n) * st.h, zz]);
+    }
+    ctx.builder.tube(pts.map((p) => S.local(...p).toArray()), 0.07, hull2, { radial: 6, cast: false });
+  }
+  for (const zz of [-8.6, -6.2, -4.0]) {
+    const st = interpStation(front, zz);
+    const pts = [];
+    for (let i = 0; i <= 10; i++) {
+      const t = Math.PI / 2 - gap + (i / 10) * gap * 2;
+      const c = Math.cos(t), sn = Math.sin(t);
+      pts.push(S.local(Math.sign(c) * Math.pow(Math.abs(c), 2 / st.n) * st.w * 1.01, st.y + Math.pow(Math.abs(sn), 2 / st.n) * st.h * 1.01, zz).toArray());
+    }
+    ctx.builder.tube(pts, 0.06, hull2, { radial: 6, cast: false });
+  }
   // bande de couleur basse (sous-coque sombre)
   const belly = loft([
     { z: -9.5, w: 2.4, h: 0.7, y: 2.75, n: 3, fb: 0.0 },
@@ -119,16 +164,6 @@ function buildHeron(ctx) {
     { z: 11.25, w: 3.75, h: 0.7, y: 2.62, n: 4, fb: 0.0 },
   ], { radial: 40, steps: 5, texSize: 2, arc: [Math.PI * 1.02, Math.PI * 1.98] });
   S.add(belly, hull2);
-  // verrière
-  const canopy = loft([
-    { z: -11.0, w: 0.9, h: 0.25, y: 4.05, n: 2.2 },
-    { z: -9.5, w: 1.6, h: 0.75, y: 4.15, n: 2.4 },
-    { z: -7.0, w: 1.7, h: 0.95, y: 4.3, n: 2.6 },
-    { z: -5.0, w: 1.5, h: 0.55, y: 4.55, n: 2.6 },
-  ], { radial: 28, steps: 6, arc: [0.05, Math.PI - 0.05] });
-  S.add(canopy, glass, [0, 0, 0], null, { cast: false });
-  // montants de verrière
-  for (const x of [-0.75, 0.75]) S.box(0.07, 0.07, 4.2, hull2, [x, 4.92, -7.8], [-0.12, 0, x * 0.25]);
   // dos : arête dorsale, carénages, antennes
   S.box(0.6, 0.35, 12, hull, [0, 5.55, 3.8], [0.01, 0, 0], { tex: 3 });
   greebles(S, metal, -1.4, 1.4, 5.5, -2, 10, 22, 4242);
@@ -197,18 +232,23 @@ function buildHeron(ctx) {
   S.box(0.9, cy - fy, 0.15, darkM, [-1.45, (fy + cy) / 2, -3.9]);
   S.box(0.9, cy - fy, 0.15, darkM, [1.45, (fy + cy) / 2, -3.9]);
   S.box(2.0, 0.6, 0.15, darkM, [0, cy - 0.3, -3.9]);
-  // cockpit : plancher, sièges, consoles
-  S.box(3.4, 0.12, 6.0, floorM, [0, fy + 0.25, -7.0]);
+  // cockpit surélevé (vue par la verrière) : marches, plancher, sièges, consoles
+  const cf = fy + 0.95;
+  S.box(3.4, 0.12, 6.0, floorM, [0, cf - 0.06, -7.6]);
+  for (let k = 0; k < 3; k++) S.box(1.6, 0.08, 0.42, floorM, [0, fy + 0.3 * (k + 1) - 0.04, -4.05 - k * 0.42], null, { cast: false });
+  S.box(3.4, 0.95, 0.1, darkM, [0, fy + 0.47, -4.6 + 0.0], null, { cast: false });
   for (const x of [-0.8, 0.8]) {
     const seat = mats.plastic(0x222426, 0.7);
-    S.box(0.6, 0.15, 0.6, seat, [x, fy + 0.75, -7.0]);
-    S.box(0.6, 0.9, 0.15, seat, [x, fy + 1.25, -6.65], [-0.2, 0, 0]);
-    S.cyl(0.08, 0.1, 0.45, metal, [x, fy + 0.5, -7.0]);
-    S.box(0.9, 0.7, 0.6, darkM, [x, fy + 0.9, -8.6], [0.4, 0, 0]);
-    S.box(0.45, 0.3, 0.02, mats.emissive(0x3ec7ff, 2.2), [x - 0.2, fy + 1.27, -8.42], [-0.6, 0, 0], { cast: false });
-    S.box(0.35, 0.28, 0.02, mats.emissive(0xffa040, 1.8), [x + 0.22, fy + 1.27, -8.42], [-0.6, 0, 0], { cast: false });
+    S.box(0.6, 0.15, 0.6, seat, [x, cf + 0.45, -7.0]);
+    S.box(0.6, 0.9, 0.15, seat, [x, cf + 0.95, -6.65], [-0.2, 0, 0]);
+    S.cyl(0.08, 0.1, 0.4, metal, [x, cf + 0.2, -7.0]);
+    S.box(0.9, 0.55, 0.6, darkM, [x, cf + 0.55, -8.6], [0.4, 0, 0]);
+    S.box(0.45, 0.3, 0.02, mats.emissive(0x3ec7ff, 2.2), [x - 0.2, cf + 0.88, -8.42], [-0.6, 0, 0], { cast: false });
+    S.box(0.35, 0.28, 0.02, mats.emissive(0xffa040, 1.8), [x + 0.22, cf + 0.88, -8.42], [-0.6, 0, 0], { cast: false });
+    // manches et manettes
+    S.cyl(0.03, 0.03, 0.35, metal, [x + 0.25, cf + 0.6, -7.45], [0.2, 0, 0], { seg: 6 });
   }
-  S.box(3.0, 0.5, 0.8, darkM, [0, fy + 1.1, -9.4], [0.5, 0, 0]);
+  S.box(3.0, 0.35, 0.7, darkM, [0, cf + 0.55, -9.4], [0.5, 0, 0]);
   // cadre de porte arrière
   S.box(0.25, cy - fy + 0.3, 0.3, darkM, [-iw - 0.05, (fy + cy) / 2, 11.25]);
   S.box(0.25, cy - fy + 0.3, 0.3, darkM, [iw + 0.05, (fy + cy) / 2, 11.25]);
@@ -225,7 +265,7 @@ function buildHeron(ctx) {
   // collisions : ventre, parois, plafond, cockpit, rampe, nacelles
   S.cbox(5.6, fy, 23, [0, fy / 2, -0.4]);         // sous le plancher (inaccessible)
   for (const s of [-1, 1]) S.cbox(0.4, 3.2, 16, [s * (iw + 0.2), fy + 1.6, 3.5]);
-  S.cbox(iw * 2, 0.3, 16, [0, cy + 0.15, 3.5]);
+  S.cbox(iw * 2, 0.3, 14.8, [0, cy + 0.15, 3.8]);
   S.cbox(3.8, 3.2, 0.3, [0, fy + 1.6, -10.3]);
   for (const s of [-1, 1]) S.cbox(0.3, 3.2, 6.5, [s * 1.75, fy + 1.6, -7.2]);
   for (const s of [-1, 1]) S.cbox(2.4, 2.2, 13, [s * 4.3, 3.0, 4.4]);
@@ -239,7 +279,10 @@ function buildHeron(ctx) {
     const f = new THREE.PlaneGeometry(iw * 2, 17.5).toNonIndexed(); f.rotateX(-Math.PI / 2);
     f.applyMatrix4(Builder.matrix([0, fy, 2.6])); f.applyMatrix4(S.M); ctx.builder.addCollider(f);
     const c = new THREE.PlaneGeometry(3.4, 6).toNonIndexed(); c.rotateX(-Math.PI / 2);
-    c.applyMatrix4(Builder.matrix([0, fy + 0.31, -7])); c.applyMatrix4(S.M); ctx.builder.addCollider(c);
+    c.applyMatrix4(Builder.matrix([0, fy + 0.95, -7.6])); c.applyMatrix4(S.M); ctx.builder.addCollider(c);
+    // marches : rampe de collision
+    const st = new THREE.PlaneGeometry(1.6, Math.hypot(0.95, 1.3)).toNonIndexed(); st.rotateX(-Math.PI / 2);
+    st.applyMatrix4(Builder.matrix([0, fy + 0.5, -4.25], [Math.atan2(0.95, 1.3), 0, 0])); st.applyMatrix4(S.M); ctx.builder.addCollider(st);
   }
   // train d'atterrissage
   S.gear(0, -8.2, 2.3, mats, { r: 0.12 });
@@ -248,12 +291,15 @@ function buildHeron(ctx) {
   S.footprint(9.0, 2.5, 0, 3.5);
 
   // lumière intérieure chaude
-  if (ctx.quality.name !== 'low') {
-    const l = new THREE.PointLight(0xffd9b0, 6, 9, 2);
-    l.position.copy(S.local(0, 4.3, 5));
+  {
+    const l = new THREE.PointLight(0xffd9b0, 9, 11, 2);
+    l.position.copy(S.local(0, 4.4, 3));
     ctx.scene.add(l);
+    const c = new THREE.PointLight(0x9fd6ff, 2.5, 4, 2);
+    c.position.copy(S.local(0, 3.6, -8.4));
+    ctx.scene.add(c);
   }
-  S.interior = { floorY: fy, rampTop: S.local(0, fy, 11.3), rampBottom: S.local(0, 0, 15.6), seat: S.local(-0.8, fy + 0.9, -7.0), cockpit: S.local(0, fy + 1.6, -7.5) };
+  S.interior = { floorY: fy, rampTop: S.local(0, fy, 11.3), rampBottom: S.local(0, 0, 15.6), seat: S.local(-0.8, fy + 1.35, -7.0), cockpit: S.local(0, fy + 2.2, -7.5), cockpitFloor: fy + 0.95 };
   return S;
 }
 
