@@ -1,0 +1,23 @@
+{
+  "name": "sillage-hangar-demo",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "shots": "node tools/screenshots.mjs"
+  },
+  "dependencies": {
+    "n8ao": "^2.0.2",
+    "postprocessing": "^6.39.6",
+    "three": "^0.187.0",
+    "three-mesh-bvh": "^0.9.18"
+  },
+  "devDependencies": {
+    "@gltf-transform/core": "^4.5.1",
+    "@gltf-transform/functions": "^4.5.1",
+    "vite": "^8.3.8"
+  }
+}
