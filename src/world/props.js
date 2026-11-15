@@ -54,14 +54,11 @@ function stencil(lines, width, color = '#e8e2d2', wear = 1, size = 120) {
 export function container(ctx, x, y, z, ry, color, label) {
   const { builder: B, mats, scene } = ctx;
   const L = new Local(B, x, y, z, ry, scene);
-  const body = mats.paint(color, { grime: 0.9, scratch: 0.8, rust: 0.6, floor: 0.5 });
-  const frame = mats.paint(0x2f3336, { grime: 0.8, rust: 0.5 });
+  const body = mats.cladding(color, { grime: 0.9, rust: 0.6 });
+  const frame = mats.paint(0x2f3336, { grime: 0.8, rust: 0.5, plain: true, rough: 0.6 });
   const w = 2.45, h = 2.6, d = 6.0;
-  L.box(w - 0.1, h - 0.1, d - 0.1, body, [0, h / 2, 0], null, { tex: 3 });
+  L.box(w - 0.1, h - 0.1, d - 0.1, body, [0, h / 2, 0], null, { tex: 1.6 });
   // nervures (tôle ondulée)
-  for (let k = -d / 2 + 0.25; k < d / 2 - 0.2; k += 0.3) {
-    for (const s of [-1, 1]) L.box(0.05, h - 0.3, 0.12, body, [s * (w / 2 - 0.03), h / 2, k], null, { cast: false });
-  }
   // cadre et pièces de coin
   for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
     L.box(0.16, h, 0.16, frame, [sx * (w / 2 - 0.08), h / 2, sz * (d / 2 - 0.08)]);
@@ -83,8 +80,8 @@ export function crate(ctx, x, y, z, ry, s = 1, kind = 0) {
   const { builder: B, mats } = ctx;
   const L = new Local(B, x, y, z, ry, ctx.scene);
   const colors = [0x5c6b4a, 0x6a6e70, 0x3d4a5a, 0x8a5a2a, 0x2c3134];
-  const body = mats.paint(colors[kind % colors.length], { grime: 0.85, scratch: 0.9, rust: 0.2 });
-  const edge = mats.paint(0x232628, { grime: 0.7 });
+  const body = mats.paint(colors[kind % colors.length], { grime: 0.85, scratch: 0.9, rust: 0.2, plain: true, rough: 0.7 });
+  const edge = mats.paint(0x232628, { grime: 0.7, plain: true, rough: 0.6 });
   const w = 1.2 * s, h = 0.9 * s, d = 0.9 * s;
   L.box(w, h, d, body, [0, h / 2, 0], null, { tex: 1.5 });
   // arêtes renforcées
@@ -125,7 +122,7 @@ export function barrel(ctx, x, y, z, color = 0x2b5e8c, tipped = false) {
 export function toolChest(ctx, x, z, ry, color = 0xa3241b) {
   const { builder: B, mats } = ctx;
   const L = new Local(B, x, 0, z, ry, ctx.scene);
-  const body = mats.paint(color, { grime: 0.7, scratch: 0.9, rust: 0.05 });
+  const body = mats.paint(color, { grime: 0.7, scratch: 0.9, rust: 0.05, plain: true, rough: 0.45 });
   const dark = mats.smooth(0x1b1c1d, 0.5, 0.6);
   const chrome = mats.smooth(0xc8ccce, 0.2, 1);
   L.box(1.1, 0.95, 0.55, body, [0, 0.55, 0]);
@@ -172,7 +169,7 @@ export function workbench(ctx, x, z, ry) {
 export function terminal(ctx, x, z, ry, kind = 'pad', label = 'AIRE 02') {
   const { builder: B, mats } = ctx;
   const L = new Local(B, x, 0, z, ry, ctx.scene);
-  const body = mats.paint(0x3b4147, { grime: 0.7 });
+  const body = mats.paint(0x3b4147, { grime: 0.7, plain: true, rough: 0.5 });
   L.box(0.6, 1.0, 0.45, body, [0, 0.5, 0]);
   L.box(0.7, 0.55, 0.12, body, [0, 1.25, -0.05], [-0.35, 0, 0]);
   L.box(0.7, 0.06, 0.5, mats.paint(0xc89a1e), [0, 0.03, 0], null, { cast: false });
@@ -211,7 +208,7 @@ function drawPadScreen(c, w, h, t, kind, label) {
 export function groundPower(ctx, x, z, ry, cableTo) {
   const { builder: B, mats } = ctx;
   const L = new Local(B, x, 0, z, ry, ctx.scene);
-  const body = mats.paint(0xc89a1e, { grime: 0.9, scratch: 0.9, rust: 0.2 });
+  const body = mats.paint(0xc89a1e, { grime: 0.9, scratch: 0.9, rust: 0.2, plain: true, rough: 0.55 });
   L.box(1.4, 1.0, 2.2, body, [0, 0.75, 0], null, { tex: 1.5 });
   L.box(1.45, 0.08, 2.25, mats.paint(0x2c3134), [0, 1.28, 0], null, { cast: false });
   for (let k = 0; k < 6; k++) L.box(1.42, 0.03, 0.04, mats.metal(0x222222), [0, 0.6 + k * 0.08, 0.6], null, { cast: false });
@@ -331,14 +328,14 @@ export function buildProps(ctx) {
   let ci = 0;
   for (let i = 0; i < 3; i++) {
     for (let j = 0; j < 2; j++) {
-      const x = STORAGE.x - 4.6 + j * 2.7, z = STORAGE.z - 2 + i * 0 + 0;
+      const x = STORAGE.x - 6.0 + j * 2.7, z = STORAGE.z - 2;
       const stack = i === 0 ? 3 : i === 1 ? 2 : 1;
       for (let k = 0; k < stack; k++) container(ctx, x + (k % 2) * 0.08 - 0.04, k * 2.6, z + i * 0.0 + (i - 1) * 0, 0, colors[ci++ % colors.length], labels[ci % labels.length]);
       if (i > 0) break;
     }
   }
   // seconde rangée de conteneurs le long du mur du fond (couchés selon x)
-  for (let i = 0; i < 2; i++) for (let k = 0; k < (i ? 1 : 2); k++) container(ctx, 7 + i * 6.3, k * 2.6, Z_BACK - 2.6, Math.PI / 2, colors[(ci++ + 2) % colors.length], labels[(ci + 3) % labels.length]);
+  for (let k = 0; k < 2; k++) container(ctx, 12, k * 2.6, Z_BACK - 2.0, Math.PI / 2, colors[(ci++ + 2) % colors.length], labels[(ci + 3) % labels.length]);
   // caisses et palettes devant
   const crateSpots = [[STORAGE.x + 2.5, STORAGE.z - 4], [STORAGE.x + 4.2, STORAGE.z - 4.2], [STORAGE.x + 3.3, STORAGE.z - 1.5], [STORAGE.x + 1.5, STORAGE.z + 2], [STORAGE.x + 4.5, STORAGE.z + 1]];
   crateSpots.forEach(([x, z], i) => {
@@ -365,13 +362,12 @@ export function buildProps(ctx) {
 
   // --- zone maintenance (aire 04, chasseur)
   const f = PADS.p4;
-  toolChest(ctx, f.x - 5.0, f.z + 2.5, Math.PI / 2 + 0.2);
-  toolChest(ctx, f.x - 5.2, f.z + 4.0, Math.PI / 2 - 0.1, 0x2a5c8a);
+  toolChest(ctx, f.x + 1.0, f.z + 7.2, Math.PI + 0.2);
+  toolChest(ctx, f.x - 0.6, f.z + 7.4, Math.PI - 0.1, 0x2a5c8a);
   workbench(ctx, HX - 1.2, 19.5, -Math.PI / 2);
   gasRack(ctx, HX - 0.8, 23.5, -Math.PI / 2);
-  terminal(ctx, f.x - 6.5, f.z - 2.0, Math.PI / 2, 'diag', 'AIRE 04');
-  for (const [dx, dz] of [[-7.5, -7], [-7.5, 7], [7.5, -7], [7.5, 7], [0, -9.5]]) cone(ctx, f.x + dx, f.z + dz);
-  ladder(ctx, f.x + 2.2, f.z - 1.0, -Math.PI / 2, 2.6);
+  terminal(ctx, f.x - 4.0, f.z + 7.0, Math.PI, 'diag', 'AIRE 04');
+  for (const [dx, dz] of [[-9.5, -4], [-9.5, 4], [-6, -7.5], [9.2, -2]]) cone(ctx, f.x + dx, f.z + dz);
 
   // --- aire 02 (joueur) et 03 (cargo)
   terminal(ctx, PADS.p2.x + 8.5, PADS.p2.z + 9.5, -Math.PI / 4, 'pad', 'AIRE 02');

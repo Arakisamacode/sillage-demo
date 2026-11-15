@@ -54,6 +54,7 @@ export function buildGallery(ctx) {
       makeDoor(ctx, -HX - 0.3, z, w, h, 'SAS 2 · HANGAR 07'),
       makeDoor(ctx, G.x1 + 0.3, z, w, h, 'SAS 2 · GALERIE'),
     ];
+    ctx.doors = [...ctx.airlockDoors];
     // panneau d'état
     const st = new Screen(256, 96, (c, cw, ch, t) => {
       c.fillStyle = '#081016'; c.fillRect(0, 0, cw, ch);
@@ -113,7 +114,7 @@ export function buildGallery(ctx) {
     B.box(W, 0.03, 0.03, mats.emissive(0x9fd9ff, 3), [cx, 0.62, z + 0.4], null, { cast: false });
     B.colliderBox(W, 1.1, 0.2, [cx, 0.55, z + 0.9]);
     // bancs face à la vue
-    for (let x = G.x0 + 6; x < G.x1 - 4; x += 10) bench(ctx, x, z + 3.2, 0, 3.0, mats.plastic(0x6b4a33, 0.6));
+    for (let x = G.x0 + 6; x < G.x1 - 4; x += 10) bench(ctx, x, z + 3.2, Math.PI, 3.0, mats.plastic(0x6b4a33, 0.6));
   }
 
   // ------------------------------------------------------------------ murs est/ouest
@@ -125,11 +126,22 @@ export function buildGallery(ctx) {
     B.box(0.5, G.h, a1 - a0, wall, [x + 0.25, G.h / 2, (a0 + a1) / 2], null, { collide: true, tex: 3 });
     B.box(0.5, G.h, b1 - b0, wall, [x + 0.25, G.h / 2, (b0 + b1) / 2], null, { collide: true, tex: 3 });
     B.box(0.5, G.h - AIRLOCK.h, w + 1, wall, [x + 0.25, (G.h + AIRLOCK.h) / 2, z], null, { tex: 3 });
-    // ouest : couloir vers le module habitat (porte fermée)
-    B.box(0.5, G.h, D, wall, [G.x0 - 0.25, G.h / 2, cz], null, { collide: true, tex: 3 });
-    B.box(0.1, 3.2, 3.2, mats.metal(0x5a5f63, { rough: 0.4 }), [G.x0 + 0.02, 1.6, cz - 4], null, { cast: false });
-    B.box(0.12, 0.2, 3.4, mats.emissive(0xff5040, 2.5), [G.x0 + 0.03, 3.4, cz - 4], null, { cast: false });
+    // ouest : porte coulissante vers le module habitat + court couloir sombre
+    const dz = cz - 4, dw = 3.2, dh = 3.2;
+    const za = dz - dw / 2 - 0.4, zb = dz + dw / 2 + 0.4;
+    B.box(0.5, G.h, za - G.z0, wall, [G.x0 - 0.25, G.h / 2, (G.z0 + za) / 2], null, { collide: true, tex: 3 });
+    B.box(0.5, G.h, G.z1 - zb, wall, [G.x0 - 0.25, G.h / 2, (zb + G.z1) / 2], null, { collide: true, tex: 3 });
+    B.box(0.5, G.h - dh, zb - za, wall, [G.x0 - 0.25, (G.h + dh) / 2, dz], null, { tex: 3 });
+    for (const s of [-1, 1]) B.box(0.6, dh, 0.4, dark, [G.x0 - 0.2, dh / 2, dz + s * (dw / 2 + 0.2)], null, { collide: true });
+    B.box(5, 0.3, dw + 1, dark, [G.x0 - 2.8, dh + 0.15, dz]);
+    for (const s of [-1, 1]) B.box(5, dh, 0.3, dark, [G.x0 - 2.8, dh / 2, dz + s * (dw / 2 + 0.15)], null, { collide: true });
+    B.box(0.3, dh, dw + 1, dark, [G.x0 - 5.2, dh / 2, dz], null, { collide: true });
+    B.box(4.6, 0.05, 0.3, mats.emissive(0xffc890, 1.2), [G.x0 - 2.8, dh - 0.05, dz], null, { cast: false });
+    B.box(5, 0.05, dw, mats.metal(0x2a2c2e), [G.x0 - 2.8, 0.01, dz], null, { cast: false, collide: true });
+    ctx.habitatDoor = makeDoor(ctx, G.x0 - 0.2, dz, dw, dh, 'MODULE HABITAT');
   }
+
+  ctx.doors.push(ctx.habitatDoor);
 
   // ------------------------------------------------------------------ boutiques (nord)
   for (const s of SHOPS) shop(ctx, s, wall, wallDark, trim);

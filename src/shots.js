@@ -12,5 +12,12 @@ export const SHOTS = {
   storage: { pos: [10, 1.7, 8], look: [26, 3, 22], fov: 70 },
   gallery: { pos: [-48, 1.7, 0], look: [-90, 2, -10], fov: 70 },
   gallerywin: { pos: [-70, 1.7, 4], look: [-74, 3, -24], fov: 70 },
+  chars: { pos: [0, 1.5, 2.2], look: [0, 0.95, -4], fov: 60 },
+  weld: { pos: [9.5, 1.7, 26.5], look: [14.3, 1.8, 20.5], fov: 60 },
+  fuel: { pos: [8.5, 1.7, 7.5], look: [14, 1.0, 14], fov: 65 },
+  forklift: { pos: [24, 2.2, 3], look: [15, 1.0, 4], fov: 65 },
+  hangarlife: { pos: [-22, 1.7, -12], look: [-29, 1.2, 3], fov: 65 },
+  gallerylife: { pos: [-46, 1.7, -3], look: [-80, 1.2, -7], fov: 65 },
+  shops: { pos: [-70, 1.7, -2], look: [-80, 2.0, 10], fov: 70 },
   cockpit: { pos: [-13, 3.2, -22], look: [-13, 3, -40], fov: 70 },
 };

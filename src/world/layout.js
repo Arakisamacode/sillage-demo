@@ -13,7 +13,7 @@ export const GALLERY = { x0: -102, x1: -42, z0: -24, z1: 10, h: 10 };
 export const PADS = {
   p2: { name: 'AIRE 02', x: -13, z: -16, r: 12, heading: 0 },  // vaisseau du joueur
   p3: { name: 'AIRE 03', x: 13.5, z: -14, r: 14, heading: 0 }, // gros cargo
-  p4: { name: 'AIRE 04', x: 15, z: 15, r: 10, heading: Math.PI }, // chasseur en maintenance
+  p4: { name: 'AIRE 04', x: 12, z: 18, r: 9, heading: Math.PI / 2 }, // chasseur en maintenance
   p5: { name: 'AIRE 05', x: -14, z: 14, r: 10, heading: Math.PI * 0.5 }, // navette passagers
 };
 

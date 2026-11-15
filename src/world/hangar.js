@@ -109,8 +109,8 @@ export function buildHangar(ctx) {
   // ------------------------------------------------------------------ passerelles
   for (const side of [-1, 1]) catwalk(B, mats, side, grating, steel, yellow);
   backCatwalk(B, mats, grating, steel, yellow);
-  stairs(B, mats, 1, 25.5, grating, steel, yellow, -1);   // est, vers le fond
-  stairs(B, mats, -1, -36, grating, steel, yellow, 1);   // ouest, côté baie
+  stairs(B, mats, 1, -36, grating, steel, yellow, -1);   // est, côté baie
+  stairs(B, mats, -1, -36, grating, steel, yellow, -1);  // ouest, côté baie
 
   // ------------------------------------------------------------------ réseaux : tuyaux, gaines, chemins de câbles
   for (const side of [-1, 1]) {
@@ -356,7 +356,9 @@ function catwalk(B, mats, side, grating, steel, yellow) {
     const L = Math.hypot(w, 1.8);
     B.add(metricBox(0.1, L, 0.1, 2), steel, Builder.matrix([x + side * 0.5, CAT_Y - 1.2, z], [0, 0, side * Math.atan2(w, 1.8)]), { cast: false });
   }
-  railing(B, mats, [x - side * w / 2, CAT_Y, z0], [x - side * w / 2, CAT_Y, z1], steel, yellow);
+  // garde-corps interrompu au débouché de l'escalier (z -37.6 .. -35.4)
+  railing(B, mats, [x - side * w / 2, CAT_Y, z0], [x - side * w / 2, CAT_Y, -37.6], steel, yellow);
+  railing(B, mats, [x - side * w / 2, CAT_Y, -35.4], [x - side * w / 2, CAT_Y, z1], steel, yellow);
 }
 
 function backCatwalk(B, mats, grating, steel, yellow) {
@@ -390,7 +392,7 @@ export function railing(B, mats, a, b, steel, yellow, h = 1.1) {
 function stairs(B, mats, side, zTop, grating, steel, yellow, dirZ) {
   // escalier droit le long du mur, du sol à CAT_Y
   const steps = 22, rise = CAT_Y / steps, run = 0.28;
-  const x = side * (HX - 1.4 - 1.2 - 2.4 - 0.7);
+  const x = side * (HX - 1.4 - 2.4 - 0.66);
   const w = 1.3;
   for (let i = 0; i < steps; i++) {
     const y = (i + 1) * rise;
@@ -399,7 +401,7 @@ function stairs(B, mats, side, zTop, grating, steel, yellow, dirZ) {
     B.add(g, grating, Builder.matrix([x, y, z]), { cast: false });
   }
   const L = Math.hypot(steps * run, CAT_Y);
-  const ang = Math.atan2(CAT_Y, steps * run) * dirZ;
+  const ang = -Math.atan2(CAT_Y, steps * run) * dirZ;
   for (const s of [-1, 1]) {
     B.box(0.08, 0.3, L, steel, [x + s * w / 2, CAT_Y / 2, zTop - dirZ * steps * run / 2], [ang, 0, 0]);
     B.box(0.05, 0.05, L, yellow, [x + s * (w / 2 + 0.02), CAT_Y / 2 + 1.0, zTop - dirZ * steps * run / 2], [ang, 0, 0], { cast: false });
@@ -411,6 +413,9 @@ function stairs(B, mats, side, zTop, grating, steel, yellow, dirZ) {
   // palier vers la passerelle
   const lg = new THREE.PlaneGeometry(w + 0.3, 1.4); lg.rotateX(-Math.PI / 2);
   const lm = Builder.matrix([x, CAT_Y, zTop + dirZ * 0.7]);
+  // passerelle de liaison vers la coursive
+  const lk = new THREE.PlaneGeometry(1.0, 1.6); lk.rotateX(-Math.PI / 2);
+  B.add(lk, grating, Builder.matrix([x + side * 1.1, CAT_Y, zTop + dirZ * 0.7]), { collide: true, cast: false });
   B.add(lg, grating, lm, { collide: true });
   // poteaux
   B.box(0.15, CAT_Y, 0.15, steel, [x, CAT_Y / 2, zTop + dirZ * 1.3]);
@@ -550,8 +555,8 @@ function floorMarkings(quality) {
   // voie véhicules (jaune double) en boucle
   paint('#d8a420', 0.85);
   const lane = (x0, z0, x1, z1) => { ctx.lineWidth = 0.14 * ppm; ctx.strokeRect(X(x0), Z(z0), (x1 - x0) * ppm, (z1 - z0) * ppm); };
-  lane(-HX + 5.4, -33, HX - 5.4, Z_BACK - 4);
-  lane(-HX + 5.0, -33.4, HX - 5.0, Z_BACK - 3.6);
+  lane(-HX + 6.8, -33, HX - 6.8, Z_BACK - 4);
+  lane(-HX + 6.4, -33.4, HX - 6.4, Z_BACK - 3.6);
   // flèches de circulation
   const arrow = (x, z, ang) => {
     ctx.save(); ctx.translate(X(x), Z(z)); ctx.rotate(ang); ctx.beginPath();
@@ -559,7 +564,7 @@ function floorMarkings(quality) {
     ctx.lineTo(-0.25 * ppm, 1.2 * ppm); ctx.lineTo(-0.25 * ppm, -0.4 * ppm); ctx.lineTo(-0.7 * ppm, -0.4 * ppm); ctx.closePath(); ctx.fill(); ctx.restore();
   };
   paint('#e8e4d8', 0.8);
-  for (const z of [-20, 0, 18]) { arrow(HX - 6.6, z, Math.PI); arrow(-HX + 6.6, z, 0); }
+  for (const z of [-20, 0, 18]) { arrow(HX - 8.0, z, Math.PI); arrow(-HX + 8.0, z, 0); }
   for (const x of [-12, 0, 12]) { arrow(x, Z_BACK - 4.9, Math.PI / 2); arrow(x, -32.2, -Math.PI / 2); }
 
   // aires d'atterrissage
@@ -642,7 +647,7 @@ function floorMarkings(quality) {
     }
   };
   for (let k = 0; k < 26; k++) {
-    const z0 = -32 + rand() * 4, sx = HX - 6 + (rand() - 0.5) * 1.2;
+    const z0 = -32 + rand() * 4, sx = HX - 6.6 + (rand() - 0.5) * 1.2;
     tire([[sx, Z_BACK - 4], [sx, 10], [sx - 0.5, -10], [sx, z0]], 0.22 + rand() * 0.1, 0.05 + rand() * 0.06);
     const tx = 10 + rand() * 6;
     tire([[STORAGE.x - 3, STORAGE.z - 6], [tx + 4, 2], [tx, -6]], 0.22, 0.04 + rand() * 0.05);

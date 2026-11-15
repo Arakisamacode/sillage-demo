@@ -216,10 +216,10 @@ function buildHeron(ctx) {
   // rampe : panneau incliné + vérins
   const rampLen = Math.hypot(fy, 4.3), ang = Math.atan2(fy, 4.3);
   const ramp = new THREE.Group();
-  S.box(iw * 2 - 0.1, 0.14, rampLen, mats.metal(0x5a5e60, { rough: 0.55 }), [0, fy / 2 + 0.02, 11.3 + 2.15], [-ang, 0, 0], { tex: 1 });
-  for (let k = 0; k < 8; k++) S.box(iw * 2 - 0.3, 0.04, 0.05, mats.metal(0x2a2c2e), [0, fy / 2 + 0.11 + (k - 3.5) * -0.2 * Math.sin(ang), 11.3 + 2.15 + (k - 3.5) * 0.5 * Math.cos(ang)], [-ang, 0, 0], { cast: false });
+  S.box(iw * 2 - 0.1, 0.14, rampLen, mats.metal(0x5a5e60, { rough: 0.55 }), [0, fy / 2 + 0.02, 11.3 + 2.15], [ang, 0, 0], { tex: 1 });
+  for (let k = 0; k < 8; k++) S.box(iw * 2 - 0.3, 0.04, 0.05, mats.metal(0x2a2c2e), [0, fy / 2 + 0.11 - (k - 3.5) * 0.5 * Math.sin(ang), 11.3 + 2.15 + (k - 3.5) * 0.5 * Math.cos(ang)], [ang, 0, 0], { cast: false });
   for (const s of [-1, 1]) {
-    S.box(0.06, 0.3, rampLen, mats.paint(0xc89a1e), [s * (iw - 0.05), fy / 2 + 0.18, 11.3 + 2.15], [-ang, 0, 0], { cast: false });
+    S.box(0.06, 0.3, rampLen, mats.paint(0xc89a1e), [s * (iw - 0.05), fy / 2 + 0.18, 11.3 + 2.15], [ang, 0, 0], { cast: false });
     S.cyl(0.06, 0.06, 2.0, mats.smooth(0xc8ccce, 0.2, 1), [s * (iw - 0.25), fy * 0.7 + 0.2, 12.3], [Math.PI / 2 - 0.9, 0, 0]);
   }
   // collisions : ventre, parois, plafond, cockpit, rampe, nacelles
@@ -233,7 +233,7 @@ function buildHeron(ctx) {
   {
     const g = new THREE.PlaneGeometry(iw * 2 - 0.1, rampLen + 0.1).toNonIndexed();
     g.rotateX(-Math.PI / 2);
-    const m = Builder.matrix([0, fy / 2 + 0.09, 11.3 + 2.15], [-ang, 0, 0]);
+    const m = Builder.matrix([0, fy / 2 + 0.09, 11.3 + 2.15], [ang, 0, 0]);
     g.applyMatrix4(m); g.applyMatrix4(S.M);
     ctx.builder.addCollider(g);
     const f = new THREE.PlaneGeometry(iw * 2, 17.5).toNonIndexed(); f.rotateX(-Math.PI / 2);
@@ -330,9 +330,9 @@ function buildMulet(ctx) {
   S.box(iw * 2, cy - fy, 0.2, hull2, [0, (fy + cy) / 2, -10]);
   // porte arrière (rampe large)
   const rampLen = Math.hypot(fy, 5.2), ang = Math.atan2(fy, 5.2);
-  S.box(iw * 2 - 0.2, 0.18, rampLen, mats.metal(0x5a5e60, { rough: 0.5 }), [0, fy / 2 + 0.02, 15.5 + 2.6], [-ang, 0, 0], { tex: 2 });
+  S.box(iw * 2 - 0.2, 0.18, rampLen, mats.metal(0x5a5e60, { rough: 0.5 }), [0, fy / 2 + 0.02, 15.5 + 2.6], [ang, 0, 0], { tex: 2 });
   for (const s of [-1, 1]) {
-    S.box(0.1, 0.25, rampLen, yellow, [s * (iw - 0.15), fy / 2 + 0.2, 15.5 + 2.6], [-ang, 0, 0], { cast: false });
+    S.box(0.1, 0.25, rampLen, yellow, [s * (iw - 0.15), fy / 2 + 0.2, 15.5 + 2.6], [ang, 0, 0], { cast: false });
     S.cyl(0.09, 0.09, 3.0, mats.smooth(0xc8ccce, 0.2, 1), [s * (iw - 0.4), fy * 0.8 + 0.5, 16.5], [Math.PI / 2 - 1.0, 0, 0]);
   }
   // pieds d'atterrissage
@@ -345,7 +345,7 @@ function buildMulet(ctx) {
   S.cbox(10, 7, 6, [0, 5, -13]);
   {
     const g = new THREE.PlaneGeometry(iw * 2 - 0.2, rampLen + 0.1).toNonIndexed(); g.rotateX(-Math.PI / 2);
-    g.applyMatrix4(Builder.matrix([0, fy / 2 + 0.11, 15.5 + 2.6], [-ang, 0, 0])); g.applyMatrix4(S.M); ctx.builder.addCollider(g);
+    g.applyMatrix4(Builder.matrix([0, fy / 2 + 0.11, 15.5 + 2.6], [ang, 0, 0])); g.applyMatrix4(S.M); ctx.builder.addCollider(g);
     const f = new THREE.PlaneGeometry(iw * 2, 25).toNonIndexed(); f.rotateX(-Math.PI / 2);
     f.applyMatrix4(Builder.matrix([0, fy, 2.5])); f.applyMatrix4(S.M); ctx.builder.addCollider(f);
   }
