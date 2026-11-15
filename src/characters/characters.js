@@ -3,6 +3,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 import { Retargeter } from './retarget.js';
 import { loadBinary } from '../core/binary.js';
+import { buildGarment, skinMaterial } from './garment.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 // Bibliothèque de personnages : « Universal Base Characters » de Quaternius (CC0) habillés
@@ -132,13 +133,20 @@ export class CharacterLibrary {
     scene.traverse((o) => { if (o.isBone) bones[o.name] = o; });
     const wp = (b) => bones[b].getWorldPosition(new THREE.Vector3());
     const zones = { neck: wp('neck_01').y + 0.035, wrist: Math.abs(wp('hand_l').x) - 0.03, hip: wp('pelvis').y + 0.04 };
+    let bodyMesh = null;
     scene.traverse((o) => {
       if (!o.isMesh) return;
       o.castShadow = !!this.q.npcShadows; o.receiveShadow = true; o.frustumCulled = false;
       const m = o.material;
       m.envMapIntensity = 0.7;
-      if (/Superhero/.test(m.name)) { o.name = 'body'; suitify(m, zones); }
+      if (/Superhero/.test(m.name)) { o.name = 'body'; skinMaterial(m, zones); bodyMesh = o; }
     });
+    // vêtement généré (veste, pantalon, bottes) lié au même squelette
+    if (bodyMesh) {
+      const garment = buildGarment(bodyMesh, zones);
+      garment.castShadow = !!this.q.npcShadows; garment.receiveShadow = true;
+      bodyMesh.parent.add(garment);
+    }
     const head = bones.Head;
     const height = head.getWorldPosition(new THREE.Vector3()).y + 0.13;
     // matrice monde -> repère de l'os de tête (pour y accrocher les coiffures)
@@ -168,7 +176,7 @@ export class Character {
     this.model.traverse((o) => { if (o.isBone) this.bones[o.name] = o; });
     // tenue : matériau du corps propre à l'instance (mêmes shaders, autres couleurs)
     this.model.traverse((o) => {
-      if (o.name !== 'body') return;
+      if (o.name !== 'body' && o.name !== 'garment') return;
       const src = o.material;
       o.material = src.clone();
       o.material.onBeforeCompile = src.onBeforeCompile;
@@ -186,7 +194,7 @@ export class Character {
       if (f.accent !== undefined) u.uAccent.value.set(f.accent);
       u.uZones.value.w = f.gloves ? 1 : 0;
       u.uOpts.value.set(f.hivis ? 1 : 0, f.belt === false ? 0 : 1, f.zip === false ? 0 : 1, 0);
-      this.body = o;
+      if (o.name === 'body') this.body = o;
     });
     this.bones.Neck = this.bones.neck_01;
     this.handR = this.bones.hand_r;

@@ -101,205 +101,364 @@ function greebles(S, mat, x0, x1, y, z0, z1, n, seedv) {
   }
 }
 
-// =============================================================================== Héron (joueur)
+// =============================================================================== Héron Mk II (joueur)
+// Explorateur bi-pont de 34 m : soute inférieure à grille de fret (rampe arrière, caisses, rover),
+// escalier intérieur, pont supérieur habité (passerelle vitrée, cabines, cuisine, salon, baie technique).
+
+function rover(S, mats, x, y, z, ry) {
+  const body = mats.paint(0xd6d2c8, { grime: 0.6, scratch: 0.7, plain: true, rough: 0.5 });
+  const dark = mats.paint(0x24282b, { plain: true, rough: 0.6 });
+  const tire = mats.rubber();
+  const M = new THREE.Matrix4().compose(new THREE.Vector3(x, y, z), new THREE.Quaternion().setFromEuler(new THREE.Euler(0, ry, 0)), new THREE.Vector3(1, 1, 1));
+  const put = (g, m, p, r, opts = {}) => S.B.add(g, m, Builder.matrix(p, r), { ...opts, parent: new THREE.Matrix4().multiplyMatrices(S.M, M) });
+  put(metricBox(1.9, 0.45, 3.4, 1.5), body, [0, 0.75, 0]);
+  put(metricBox(1.7, 0.35, 1.2, 1.5), body, [0, 1.1, -1.05], [0.25, 0, 0]);
+  put(metricBox(1.95, 0.12, 3.5, 1), dark, [0, 0.5, 0]);
+  for (const sx of [-1, 1]) {
+    for (const sz of [-1.15, 0, 1.15]) {
+      put(new THREE.CylinderGeometry(0.36, 0.36, 0.32, 16), tire, [sx * 1.05, 0.36, sz], [0, 0, Math.PI / 2]);
+      put(new THREE.CylinderGeometry(0.2, 0.2, 0.34, 10), mats.smooth(0x8a8e90, 0.35, 0.9), [sx * 1.05, 0.36, sz], [0, 0, Math.PI / 2], { cast: false });
+    }
+    // arceau de sécurité
+    put(metricBox(0.07, 1.0, 0.07, 1), dark, [sx * 0.85, 1.45, 0.35]);
+    put(metricBox(0.07, 1.0, 0.07, 1), dark, [sx * 0.85, 1.45, 1.3]);
+    put(metricBox(0.07, 0.07, 1.0, 1), dark, [sx * 0.85, 1.95, 0.82]);
+    put(new THREE.BoxGeometry(0.22, 0.1, 0.05), mats.emissive(0xfff2dd, 4), [sx * 0.65, 0.95, -1.72], null, { cast: false });
+  }
+  put(metricBox(1.77, 0.07, 0.07, 1), dark, [0, 1.95, 0.35]);
+  put(metricBox(1.77, 0.07, 0.07, 1), dark, [0, 1.95, 1.3]);
+  for (const sx of [-0.4, 0.4]) {
+    put(metricBox(0.5, 0.12, 0.5, 1), mats.plastic(0x2a2a2a, 0.7), [sx, 1.05, 0.85]);
+    put(metricBox(0.5, 0.55, 0.1, 1), mats.plastic(0x2a2a2a, 0.7), [sx, 1.35, 1.12], [-0.15, 0, 0]);
+  }
+  put(metricBox(1.4, 0.4, 0.8, 1), mats.paint(0x5c6b4a, { plain: true, rough: 0.7 }), [0, 1.15, 1.85]);
+  S.footprint(1.1, 1.9, x, z);
+  S.cbox(2.1, 1.6, 3.6, [x, y + 0.8, z]);
+}
 
 function buildHeron(ctx) {
   const pad = PADS.p2;
   const S = new ShipCtx(ctx, pad, 'heron');
   const { mats } = ctx;
-  const hull = mats.paint(0xc9c6bd, { grime: 0.75, scratch: 0.8, rust: 0.05 });
-  const hull2 = mats.paint(0x3d4347, { grime: 0.7 });
-  const accent = mats.paint(0xc0571e, { grime: 0.6 });
+  // -------------------------------------------------- matériaux
+  const hull = mats.paint(0xd2cfc7, { grime: 0.75, scratch: 0.6, rust: 0.0, plain: true, rough: 0.45 });
+  const hullDS = hull.clone(); hullDS.side = THREE.DoubleSide; hullDS.onBeforeCompile = hull.onBeforeCompile; hullDS.customProgramCacheKey = hull.customProgramCacheKey;
+  const belly = mats.paint(0x34393d, { grime: 0.7 });
+  const trim = mats.paint(0x1e2226, { grime: 0.5, plain: true, rough: 0.45 });
+  const accent = mats.paint(0xc8561e, { grime: 0.4, plain: true, rough: 0.4 });
   const metal = mats.metal(0x55595c);
-  const glass = new THREE.MeshStandardMaterial({ color: 0x0b1015, roughness: 0.05, metalness: 1.0, envMapIntensity: 1.4 });
-
-  // fuselage : partie avant ouverte sur le dessus (verrière ajustée), partie arrière complète
+  const chrome = mats.smooth(0xc8ccce, 0.25, 1.0, { grime: 0.3, floor: 0.2 });
+  const glass = new THREE.MeshStandardMaterial({ color: 0x18242c, roughness: 0.03, metalness: 0.9, transparent: true, opacity: 0.35, side: THREE.DoubleSide, envMapIntensity: 1.7, depthWrite: false });
+  // intérieur
+  const deckM = mats.diamond(0x8c9093);
+  const floorUp = mats.paint(0x3a3f44, { plain: true, rough: 0.55, grime: 0.3, floor: 0 });
+  const wallIn = mats.paint(0xc9c7c0, { plain: true, rough: 0.6, grime: 0.35 });
+  const wallDark = mats.paint(0x2a2f33, { plain: true, rough: 0.55 });
+  const holdWall = mats.metal(0x6a6e70, { rough: 0.6 });
+  const yellow = mats.paint(0xd0a01c, { plain: true, rough: 0.5, grime: 0.6 });
+  const fabric = mats.plastic(0x3b4650, 0.85);
+  const leather = mats.plastic(0x5a2f1f, 0.6);
+  const light = mats.emissive(0xfff1de, 2.2);
+  const blue = mats.emissive(0x3ec7ff, 2.0);
+  // -------------------------------------------------- coque
+  const L = 0.15; // épaisseur
   const ST = [
-    { z: -12.2, w: 0.25, h: 0.2, y: 3.5, n: 2.2 },
-    { z: -10.5, w: 2.0, h: 1.3, y: 3.45, n: 2.3, fb: 0.2 },
-    { z: -7.5, w: 3.9, h: 2.4, y: 3.45, n: 2.6, fb: 0.35 },
-    { z: -3, w: 4.8, h: 2.1, y: 3.55, n: 3.0, fb: 0.15 },
-    { z: 4, w: 4.9, h: 2.05, y: 3.6, n: 3.2, fb: 0.12 },
-    { z: 9, w: 4.4, h: 1.95, y: 3.7, n: 3.2, fb: 0.1 },
-    { z: 11.3, w: 3.9, h: 1.75, y: 3.75, n: 3.4, fb: 0.0 },
+    { z: -19.0, w: 0.35, h: 0.35, y: 5.7, n: 2.4 },
+    { z: -17.4, w: 2.3, h: 1.75, y: 5.75, n: 2.8, fb: 0.1 },
+    { z: -14.8, w: 3.7, h: 2.85, y: 5.35, n: 3.2, fb: 0.15 },
+    { z: -11.0, w: 4.45, h: 3.45, y: 5.0, n: 3.6, fb: 0.15 },
+    { z: -6.0, w: 4.6, h: 3.55, y: 4.95, n: 3.8, fb: 0.15 },
+    { z: 9.0, w: 4.6, h: 3.55, y: 4.95, n: 3.8, fb: 0.15 },
+    { z: 13.0, w: 4.4, h: 3.35, y: 5.0, n: 3.6, fb: 0.12 },
+    { z: 15.0, w: 4.1, h: 3.1, y: 5.1, n: 3.4, fb: 0.1 },
   ];
-  const hullDS = hull.clone(); hullDS.side = THREE.DoubleSide;
-  hullDS.onBeforeCompile = hull.onBeforeCompile; hullDS.customProgramCacheKey = hull.customProgramCacheKey;
-  const gap = 1.22;
-  const front = ST.slice(0, 4);
-  S.add(loft(front, { radial: 40, steps: 7, texSize: 5, arc: [Math.PI / 2 + gap, Math.PI / 2 - gap + Math.PI * 2] }), hullDS);
-  S.add(loft(ST.slice(3), { radial: 48, steps: 7, texSize: 5 }), hullDS);
-  // verrière : même section que la coque, sur l'ouverture
-  const canopyGlass = new THREE.MeshStandardMaterial({ color: 0x1a2a33, roughness: 0.04, metalness: 0.9, transparent: true, opacity: 0.38, side: THREE.DoubleSide, envMapIntensity: 1.6, depthWrite: false });
-  const can = new THREE.Mesh(loft(front.slice(1), { radial: 16, steps: 7, arc: [Math.PI / 2 - gap, Math.PI / 2 + gap] }), canopyGlass);
+  const gap = 1.3; // ouverture de la verrière (autour du sommet)
+  const nose = ST.slice(0, 4);
+  // partie avant ouverte sur le dessus + verrière ajustée
+  S.add(loft(nose, { radial: 48, steps: 7, texSize: 5, arc: [Math.PI / 2 + gap, Math.PI / 2 - gap + Math.PI * 2] }), hullDS);
+  S.add(loft(ST.slice(3), { radial: 64, steps: 6, texSize: 5 }), hullDS);
+  const can = new THREE.Mesh(loft(nose.slice(1), { radial: 20, steps: 7, arc: [Math.PI / 2 - gap, Math.PI / 2 + gap] }), glass);
   can.renderOrder = 3;
   S.group.add(can);
-  // cadre de verrière
-  for (const k of [-1, 1]) {
+  // montants de verrière (profil exact de la coque)
+  const onHull = (st, t, k = 1.008) => {
+    const c = Math.cos(t), s = Math.sin(t);
+    return [Math.sign(c) * Math.pow(Math.abs(c), 2 / st.n) * st.w * k, st.y + Math.sign(s) * Math.pow(Math.abs(s), 2 / st.n) * st.h * k];
+  };
+  for (const tt of [Math.PI / 2 - gap, Math.PI / 2 - 0.45, Math.PI / 2 + 0.45, Math.PI / 2 + gap]) {
     const pts = [];
-    for (let i = 0; i <= 12; i++) {
-      const zz = -10.4 + (i / 12) * 7.3;
-      const st = interpStation(front, zz);
-      const t = Math.PI / 2 + k * gap;
-      const c = Math.cos(t), sn = Math.sin(t);
-      pts.push([Math.sign(c) * Math.pow(Math.abs(c), 2 / st.n) * st.w, st.y + Math.pow(Math.abs(sn), 2 / st.n) * st.h, zz]);
-    }
-    ctx.builder.tube(pts.map((p) => S.local(...p).toArray()), 0.07, hull2, { radial: 6, cast: false });
+    for (let i = 0; i <= 14; i++) { const zz = -17.3 + (i / 14) * 6.2; const st = interpStation(nose, zz); const [x, y] = onHull(st, tt); pts.push(S.local(x, y, zz).toArray()); }
+    ctx.builder.tube(pts, 0.075, trim, { radial: 6, cast: false });
   }
-  for (const zz of [-8.6, -6.2, -4.0]) {
-    const st = interpStation(front, zz);
-    const pts = [];
-    for (let i = 0; i <= 10; i++) {
-      const t = Math.PI / 2 - gap + (i / 10) * gap * 2;
-      const c = Math.cos(t), sn = Math.sin(t);
-      pts.push(S.local(Math.sign(c) * Math.pow(Math.abs(c), 2 / st.n) * st.w * 1.01, st.y + Math.pow(Math.abs(sn), 2 / st.n) * st.h * 1.01, zz).toArray());
-    }
-    ctx.builder.tube(pts, 0.06, hull2, { radial: 6, cast: false });
+  for (const zz of [-15.6, -13.2]) {
+    const st = interpStation(nose, zz); const pts = [];
+    for (let i = 0; i <= 12; i++) { const [x, y] = onHull(st, Math.PI / 2 - gap + (i / 12) * gap * 2); pts.push(S.local(x, y, zz).toArray()); }
+    ctx.builder.tube(pts, 0.07, trim, { radial: 6, cast: false });
   }
-  // bande de couleur basse (sous-coque sombre)
-  const belly = loft([
-    { z: -9.5, w: 2.4, h: 0.7, y: 2.75, n: 3, fb: 0.0 },
-    { z: -3, w: 4.6, h: 0.9, y: 2.55, n: 4, fb: 0.0 },
-    { z: 9, w: 4.2, h: 0.85, y: 2.6, n: 4, fb: 0.0 },
-    { z: 11.25, w: 3.75, h: 0.7, y: 2.62, n: 4, fb: 0.0 },
-  ], { radial: 40, steps: 5, texSize: 2, arc: [Math.PI * 1.02, Math.PI * 1.98] });
-  S.add(belly, hull2);
-  // dos : arête dorsale, carénages, antennes
-  S.box(0.6, 0.35, 12, hull, [0, 5.55, 3.8], [0.01, 0, 0], { tex: 3 });
-  greebles(S, metal, -1.4, 1.4, 5.5, -2, 10, 22, 4242);
-  S.cyl(0.02, 0.02, 1.2, metal, [0.6, 6.1, 7]);
-  S.cyl(0.02, 0.02, 0.8, metal, [-0.5, 6.0, 8.5]);
-  // nacelles moteur
-  for (const s of [-1, 1]) {
-    const nac = loft([
-      { z: -2.0, w: 0.3, h: 0.3, y: 3.0, x: s * 4.3, n: 2 },
-      { z: -0.5, w: 0.95, h: 0.9, y: 3.0, x: s * 4.3, n: 2.2 },
-      { z: 6, w: 1.1, h: 1.05, y: 3.0, x: s * 4.3, n: 2.4 },
-      { z: 10.8, w: 1.0, h: 0.95, y: 3.0, x: s * 4.3, n: 2.3 },
-    ], { radial: 28, steps: 5 });
-    S.add(nac, hull);
-    S.add(nozzle(0.85, 1.4), metal, [s * 4.3, 3.0, 10.7]);
-    // fond de tuyère légèrement incandescent (moteurs en refroidissement)
-    S.add(new THREE.CircleGeometry(0.62, 20), mats.emissive(0xff6a2a, 0.9), [s * 4.3, 3.0, 10.9], null, { cast: false });
-    // entrée d'air
-    S.add(new THREE.CircleGeometry(0.55, 20), mats.metal(0x111315), [s * 4.3, 3.0, -1.55], [0, Math.PI, 0], { cast: false });
-    // pylône
-    S.box(1.6, 0.5, 6.5, hull2, [s * 3.3, 3.05, 4.5]);
-    // ailes
-    const wg = wing([[0, -2.5], [4.6, 3.6], [4.6, 6.4], [0, 7.4]], 0.32);
-    const wm = new THREE.Matrix4().makeScale(s, 1, 1);
-    wg.applyMatrix4(wm);
-    if (s < 0) flipFaces(wg.index ? wg : wg);
-    S.add(wg, hull, [s * 4.6, 2.85, 0]);
-    // bandes orange en bout d'aile
-    S.box(0.5, 0.36, 2.8, accent, [s * 9.0, 2.85, 5.0], null, { tex: 1 });
-    // dérive inclinée
-    const fin = wing([[0, 0], [2.6, 3.0], [2.6, 4.6], [0, 6.0]], 0.22);
+  // ventre sombre (bande inférieure) et liseré orange sur la ligne de flottaison
+  S.add(loft([
+    { z: -17.0, w: 2.32, h: 1.2, y: 5.2, n: 3 }, { z: -11, w: 4.48, h: 3.1, y: 4.6, n: 3.8 },
+    { z: 9, w: 4.63, h: 3.25, y: 4.6, n: 3.8 }, { z: 15.02, w: 4.12, h: 2.8, y: 4.8, n: 3.4 },
+  ], { radial: 48, steps: 6, texSize: 3, arc: [Math.PI * 1.08, Math.PI * 1.92] }), belly);
+  for (const sx of [-1, 1]) {
+    // arête de chine (ressaut horizontal) + liseré
+    S.box(0.35, 0.22, 26, trim, [sx * 4.66, 4.9, 1.5], null, { tex: 2 });
+    S.box(0.04, 0.12, 25, accent, [sx * 4.85, 4.9, 1.5], null, { cast: false, tex: 1 });
+    // hublots du pont supérieur (vitrage émissif chaud)
+    for (let z = -6.5; z <= 9; z += 1.55) S.box(0.06, 0.38, 0.8, mats.emissive(0xffd9a8, 1.5), [sx * 4.56, 6.45, z], null, { cast: false });
+    // panneaux de service et grilles
+    for (const z of [-3, 3.5, 10]) S.box(0.05, 0.9, 1.6, metal, [sx * 4.62, 3.1, z], null, { cast: false });
+    S.box(0.05, 0.5, 2.6, mats.vent(), [sx * 4.6, 7.3, 6], null, { cast: false });
+  }
+  // lignes de panneaux en relief sur les flancs (coque quasi plane entre y = 2,6 et 7,4)
+  for (const sx of [-1, 1]) {
+    for (const yy of [3.3, 5.9, 7.35]) S.box(0.03, 0.035, 21, trim, [sx * 4.62, yy, 1.0], null, { cast: false });
+    for (let z = -9.5; z <= 12; z += 3.6) S.box(0.03, 4.3, 0.035, trim, [sx * 4.62, 5.0, z], null, { cast: false });
+    // trappes, prises d'air, feux d'accostage
+    S.box(0.05, 0.6, 1.0, mats.paint(0xc8c4bc, { plain: true, rough: 0.4 }), [sx * 4.63, 7.0, -8], null, { cast: false });
+    S.box(0.05, 0.12, 0.12, mats.emissive(0xffffff, 6), [sx * 4.64, 4.2, -14 + 0], null, { cast: false });
+  }
+  // dos : épine dorsale, dôme de capteurs, antennes, ailerons
+  S.box(1.4, 0.5, 18, hull, [0, 8.65, 2.5], null, { tex: 4 });
+  S.cyl(0.6, 0.75, 0.45, trim, [0, 9.05, -4], null, { seg: 24 });
+  S.add(new THREE.SphereGeometry(0.55, 20, 10, 0, Math.PI * 2, 0, Math.PI / 2), mats.smooth(0x9aa4aa, 0.2, 0.6), [0, 9.25, -4]);
+  S.cyl(0.03, 0.03, 1.6, metal, [0.5, 9.6, 6]);
+  S.cyl(0.03, 0.03, 1.1, metal, [-0.4, 9.4, 8]);
+  greebles(S, metal, -1.5, 1.5, 8.9, -1, 12, 26, 9090);
+  for (const sx of [-1, 1]) {
+    const fin = wing([[0, 0], [3.0, 3.4], [3.0, 5.0], [0, 6.4]], 0.24);
     fin.rotateZ(-Math.PI / 2);
-    S.add(fin, hull, [s * 4.3, 3.9, 4.2], [0, 0, s * 0.42]);
-    S.navLight([s * 9.25, 2.85, 5.0], s < 0 ? 0xff2010 : 0x20ff40, 0);
-    S.navLight([s * 5.6, 6.4, 9.2], 0xffffff, 1.0 + s * 0.3);
-    // trappes de visite ouvertes sur une nacelle (côté droit)
-    if (s > 0) {
-      S.box(0.06, 0.6, 1.0, hull, [s * 5.55, 2.4, 2.0], [0, 0, 0.9]);
-      S.box(0.02, 0.5, 0.9, mats.metal(0x1a1b1c), [s * 5.38, 2.9, 2.0], [0, 0, 0.2]);
-    }
+    S.add(fin, hull, [sx * 1.5, 8.6, 7.2], [0, 0, sx * 0.38]);
+    S.navLight([sx * 2.6, 11.4, 11.5], 0xffffff, 1.0 + sx * 0.4);
+  }
+  // ailes et pods de poussée verticale
+  for (const sx of [-1, 1]) {
+    const wg = wing([[0, -3.5], [5.6, 2.2], [5.6, 5.4], [0, 6.5]], 0.38);
+    wg.applyMatrix4(new THREE.Matrix4().makeScale(sx, 1, 1));
+    if (sx < 0) flipFaces(wg);
+    S.add(wg, hull, [sx * 4.4, 3.75, 0]);
+    S.box(0.6, 0.42, 3.4, accent, [sx * 10.0, 3.75, 3.8], null, { tex: 1 });
+    // pod VTOL en bout d'aile
+    S.add(loft([{ z: 0.5, w: 0.3, h: 0.3, x: sx * 10.3, y: 3.75, n: 2 }, { z: 1.6, w: 0.85, h: 0.85, x: sx * 10.3, y: 3.75, n: 2.4 }, { z: 6.2, w: 0.85, h: 0.85, x: sx * 10.3, y: 3.75, n: 2.4 }, { z: 7.0, w: 0.5, h: 0.5, x: sx * 10.3, y: 3.75, n: 2 }], { radial: 24, steps: 4 }), hull);
+    S.add(new THREE.CircleGeometry(0.62, 20), mats.emissive(0x7fb8ff, 0.8), [sx * 10.3, 2.86, 3.8], [Math.PI / 2, 0, 0], { cast: false });
+    S.navLight([sx * 11.15, 3.75, 3.8], sx < 0 ? 0xff2010 : 0x20ff40, 0);
+  }
+  // moteurs principaux
+  for (const sx of [-1, 1]) {
+    const x = sx * 3.0, y = 6.6;
+    S.add(loft([
+      { z: 4.5, w: 0.4, h: 0.4, x, y, n: 2 }, { z: 6.0, w: 1.35, h: 1.35, x, y, n: 2.2 },
+      { z: 14.5, w: 1.45, h: 1.45, x, y, n: 2.2 }, { z: 16.6, w: 1.3, h: 1.3, x, y, n: 2.2 },
+    ], { radial: 32, steps: 5, texSize: 4 }), hull);
+    S.add(nozzle(1.15, 1.6), metal, [x, y, 16.4]);
+    S.add(new THREE.CircleGeometry(0.9, 24), mats.emissive(0xff7a3a, 1.1), [x, y, 16.6], null, { cast: false });
+    S.box(0.8, 0.12, 9, trim, [x, y + 1.45, 10.5], null, { tex: 2 });
+    S.cbox(3.0, 3.0, 12, [x, y, 10.5]);
   }
   // marquages
-  S.decal(['HÉRON · HL-2207'], 4.2, [-2.66 - 0.23, 3.7, 1.2], -Math.PI / 2, { color: '#2a2e31', size: 120, wear: 0.4 });
-  S.decal(['HL-2207'], 3.2, [2.89, 3.7, 1.2], Math.PI / 2, { color: '#2a2e31', size: 120, wear: 0.4 });
-  // bande orange longitudinale
-  for (const s of [-1, 1]) S.box(0.04, 0.2, 13, accent, [s * 4.86, 3.1, 2.5], null, { cast: false, tex: 1 });
+  S.decal(['HÉRON MK II'], 3.6, [-4.88, 5.6, -2.0], -Math.PI / 2, { color: '#2a2e31', size: 120, wear: 0.3 });
+  S.decal(['HL-2207'], 2.4, [4.88, 5.6, -2.0], Math.PI / 2, { color: '#2a2e31', size: 120, wear: 0.3 });
+  S.decal(['HL-2207'], 3.0, [0, 9.0, 1.0], 0, { color: '#2a2e31', size: 120, wear: 0.3, rotX: -Math.PI / 2 });
 
-  // ---------------------------------------------------------------- intérieur (soute + cockpit)
-  const iw = 1.95, fy = 2.05, cy = 4.85;
-  const floorM = mats.metal(0x4b4f52, { rough: 0.6 });
-  const wallM = mats.paint(0xa8aaa6, { grime: 0.4, floor: 0.6 });
-  const darkM = mats.paint(0x2b2f32);
-  S.box(iw * 2 + 0.2, 0.12, 17.5, floorM, [0, fy - 0.06, 2.6], null, { tex: 2 });
-  for (const s of [-1, 1]) {
-    S.box(0.12, cy - fy, 15.2, wallM, [s * iw, (fy + cy) / 2, 3.7], null, { tex: 2 });
-    // casiers, banquettes, filets
-    for (let z = -3; z < 9; z += 1.3) S.box(0.35, 1.9, 1.2, darkM, [s * (iw - 0.22), fy + 1.15, z], null, { cast: false });
-    S.box(0.5, 0.45, 3.0, mats.plastic(0x5b2d1c, 0.8), [s * (iw - 0.3), fy + 0.22, 9.2]);
-    // nervures
-    for (let z = -4; z <= 11; z += 2.5) S.box(0.2, cy - fy, 0.18, darkM, [s * (iw - 0.06), (fy + cy) / 2, z], null, { cast: false });
+  // -------------------------------------------------- pont inférieur : soute
+  const fy = 2.0, cy = 4.85, hw = 3.55;   // plancher, plafond, demi-largeur
+  const hz0 = -6, hz1 = 14.4;             // étendue de la soute
+  S.box(hw * 2, 0.14, hz1 - hz0, deckM, [0, fy - 0.07, (hz0 + hz1) / 2], null, { tex: 2 });
+  for (const sx of [-1, 1]) {
+    S.box(0.12, cy - fy, hz1 - hz0, holdWall, [sx * hw, (fy + cy) / 2, (hz0 + hz1) / 2], null, { tex: 3 });
+    // rails d'arrimage, nervures, lampes
+    S.box(0.08, 0.06, hz1 - hz0 - 0.4, yellow, [sx * (hw - 0.08), fy + 1.0, (hz0 + hz1) / 2], null, { cast: false });
+    for (let z = hz0 + 1; z < hz1; z += 2.2) {
+      S.box(0.25, cy - fy, 0.22, wallDark, [sx * (hw - 0.12), (fy + cy) / 2, z], null, { cast: false });
+      S.box(0.06, 0.35, 0.6, light, [sx * (hw - 0.07), cy - 0.6, z + 1.1], null, { cast: false });
+    }
   }
-  S.box(iw * 2, 0.12, 15.2, wallM, [0, cy, 3.7], null, { tex: 2 });
-  // bandeaux lumineux au plafond
-  S.box(0.25, 0.04, 12, mats.emissive(0xfff0dc, 4), [0, cy - 0.08, 3.5], null, { cast: false });
-  // cloison cockpit avec passage
-  S.box(0.9, cy - fy, 0.15, darkM, [-1.45, (fy + cy) / 2, -3.9]);
-  S.box(0.9, cy - fy, 0.15, darkM, [1.45, (fy + cy) / 2, -3.9]);
-  S.box(2.0, 0.6, 0.15, darkM, [0, cy - 0.3, -3.9]);
-  // cockpit surélevé (vue par la verrière) : marches, plancher, sièges, consoles
-  const cf = fy + 0.95;
-  S.box(3.4, 0.12, 6.0, floorM, [0, cf - 0.06, -7.6]);
-  for (let k = 0; k < 3; k++) S.box(1.6, 0.08, 0.42, floorM, [0, fy + 0.3 * (k + 1) - 0.04, -4.05 - k * 0.42], null, { cast: false });
-  S.box(3.4, 0.95, 0.1, darkM, [0, fy + 0.47, -4.6 + 0.0], null, { cast: false });
-  for (const x of [-0.8, 0.8]) {
+  // plafond de soute avec trémie au-dessus de l'escalier (x -3,55..-2,3 ; z -4,4..0,4)
+  const holeX = -2.3, hzA = -4.4, hzB = 0.4;
+  S.box(hw - holeX, 0.15, hz1 - hz0, wallDark, [(hw + holeX) / 2, cy + 0.07, (hz0 + hz1) / 2], null, { cast: false });
+  S.box(holeX + hw, 0.15, hzA - hz0, wallDark, [(holeX - hw) / 2, cy + 0.07, (hz0 + hzA) / 2], null, { cast: false });
+  S.box(holeX + hw, 0.15, hz1 - hzB, wallDark, [(holeX - hw) / 2, cy + 0.07, (hzB + hz1) / 2], null, { cast: false });
+  for (let z = hz0 + 2; z < hz1; z += 3) S.box(1.6, 0.04, 0.3, light, [0, cy - 0.02, z], null, { cast: false });
+  // cloison avant de soute (porte de la baie machines)
+  S.box(hw * 2, cy - fy, 0.18, wallDark, [0, (fy + cy) / 2, hz0]);
+  S.box(1.2, 2.1, 0.05, mats.paint(0x6a6e70, { plain: true }), [1.4, fy + 1.05, hz0 + 0.1], null, { cast: false });
+  S.box(0.25, 0.08, 0.04, mats.emissive(0xff5040, 3), [1.4, fy + 2.25, hz0 + 0.12], null, { cast: false });
+  // grille de fret (marquages) et caisses arrimées
+  for (let i = 0; i <= 4; i++) S.box(0.05, 0.01, 9.6, yellow, [-1.2 + i * 1.2 - 0.0, fy + 0.005, 8.2], null, { cast: false, receive: true });
+  for (let k = 0; k <= 8; k++) S.box(4.85, 0.01, 0.05, yellow, [1.2, fy + 0.005, 3.4 + k * 1.2], null, { cast: false, receive: true });
+  const crateCols = [0x5c6b4a, 0x3d4a5a, 0x8a5a2a, 0x6a6e70];
+  const crates = [[2.4, 4.0, 1.1, 0], [2.4, 5.2, 1.1, 1], [1.2, 4.0, 1.1, 2], [2.4, 4.0, 1.1, 3, 1], [2.4, 7.6, 1.1, 1], [1.2, 7.6, 1.1, 0], [2.4, 10.0, 1.1, 2], [2.4, 11.2, 1.1, 3], [2.4, 10.0, 1.1, 0, 1]];
+  for (const [x, z, sz, c, lvl] of crates) {
+    const y = fy + (lvl ? sz : 0);
+    S.box(sz, sz, sz, mats.paint(crateCols[c], { plain: true, rough: 0.7, grime: 0.8 }), [x, y + sz / 2, z]);
+    S.box(sz + 0.02, 0.06, sz + 0.02, trim, [x, y + sz - 0.03, z], null, { cast: false });
+    S.box(0.08, sz + 0.02, sz + 0.02, mats.plastic(0xc8901a, 0.7), [x, y + sz / 2, z], null, { cast: false });
+    if (!lvl) S.cbox(sz, sz * 2, sz, [x, y + sz, z]);
+  }
+  // sangles d'arrimage du bloc arrière
+  ctx.builder.cable(S.local(3.4, fy + 1.0, 9.4).toArray(), S.local(0.6, fy + 0.02, 9.4).toArray(), -0.4, 0.02, mats.plastic(0xc8901a, 0.6));
+  // rover garé côté bâbord
+  rover(S, mats, -1.6, fy, 6.5, Math.PI);
+  // escalier vers le pont supérieur (bâbord avant, monte vers l'avant)
+  const sx0 = -2.9, sw = 1.2, sBot = 0.4, sTop = -4.4; // z
+  const upY = 5.2;
+  const nSteps = 14, rise = (upY - fy) / nSteps, run = (sBot - sTop) / nSteps;
+  for (let i = 0; i < nSteps; i++) {
+    S.box(sw, 0.06, run + 0.04, deckM, [sx0, fy + (i + 1) * rise - 0.03, sBot - (i + 0.5) * run], null, { cast: false, tex: 1 });
+    S.box(sw, rise, 0.03, wallDark, [sx0, fy + (i + 0.5) * rise, sBot - i * run], null, { cast: false });
+  }
+  const sAng = Math.atan2(upY - fy, sBot - sTop), sLen = Math.hypot(upY - fy, sBot - sTop);
+  S.box(0.05, 0.05, sLen, yellow, [sx0 + sw / 2 + 0.05, (fy + upY) / 2 + 0.95, (sBot + sTop) / 2], [sAng, 0, 0], { cast: false });
+  for (const k of [0.15, 0.5, 0.85]) S.box(0.04, 0.95, 0.04, metal, [sx0 + sw / 2 + 0.05, fy + (upY - fy) * k + 0.47, sBot - (sBot - sTop) * k], null, { cast: false });
+
+  // -------------------------------------------------- pont supérieur
+  const ty = 7.85;                       // plafond
+  const uz0 = -9.0, uz1 = 12.6;          // du pied de la passerelle au fond
+  // plancher avec trémie de l'escalier
+  const slab = (x0, x1, z0, z1, m = floorUp) => S.box(x1 - x0, 0.2, z1 - z0, m, [(x0 + x1) / 2, upY - 0.1, (z0 + z1) / 2], null, { tex: 2 });
+  slab(-hw, hw, uz0, sTop);
+  slab(sx0 + sw / 2, hw, sTop, sBot);
+  slab(-hw, hw, sBot, uz1);
+  // plafond, lampes, parois latérales intérieures
+  S.box(hw * 2, 0.15, uz1 - uz0, wallIn, [0, ty, (uz0 + uz1) / 2], null, { cast: false });
+  for (let z = uz0 + 1; z < uz1; z += 2.4) S.box(0.3, 0.03, 1.4, light, [0, ty - 0.08, z], null, { cast: false });
+  for (const sx of [-1, 1]) S.box(0.12, ty - upY, uz1 - uz0, wallIn, [sx * hw, (upY + ty) / 2, (uz0 + uz1) / 2], null, { tex: 2 });
+  // habillage des coursives : plinthe sombre, main courante lumineuse, corniche
+  for (const sx of [-1, 1]) {
+    const x = sx * 0.94;
+    S.box(0.04, 0.9, uz1 - uz0 - 0.4, wallDark, [x, upY + 0.45, (uz0 + uz1) / 2], null, { cast: false });
+    S.box(0.05, 0.035, uz1 - uz0 - 0.4, mats.emissive(0x9fdcff, 1.6), [x, upY + 0.92, (uz0 + uz1) / 2], null, { cast: false });
+    S.box(0.06, 0.12, uz1 - uz0 - 0.4, wallDark, [x, ty - 0.25, (uz0 + uz1) / 2], null, { cast: false });
+  }
+  S.box(hw * 2, ty - upY, 0.15, wallIn, [0, (upY + ty) / 2, uz1]);
+  // garde-corps autour de la trémie
+  S.box(0.05, 0.05, sBot - sTop, yellow, [sx0 + sw / 2 + 0.05, upY + 1.0, (sTop + sBot) / 2], null, { cast: false });
+  S.box(sw, 0.05, 0.05, yellow, [sx0, upY + 1.0, sBot + 0.02], null, { cast: false });
+  for (const z of [sTop + 0.1, (sTop + sBot) / 2, sBot]) S.box(0.04, 1.0, 0.04, metal, [sx0 + sw / 2 + 0.05, upY + 0.5, z], null, { cast: false });
+  // cloisons : couloir central x ∈ [-1, 1], pièces de part et d'autre
+  const wall = (x, z0, z1, doorZ) => {
+    if (doorZ === undefined) { S.box(0.1, ty - upY, z1 - z0, wallIn, [x, (upY + ty) / 2, (z0 + z1) / 2], null, { tex: 2 }); S.cbox(0.12, ty - upY, z1 - z0, [x, (upY + ty) / 2, (z0 + z1) / 2]); return; }
+    wall(x, z0, doorZ - 0.5); wall(x, doorZ + 0.5, z1);
+    S.box(0.1, ty - upY - 2.1, 1.0, wallIn, [x, (upY + 2.1 + ty) / 2, doorZ]);
+    S.box(0.12, 2.1, 0.06, wallDark, [x, upY + 1.05, doorZ - 0.5], null, { cast: false });
+    S.box(0.12, 2.1, 0.06, wallDark, [x, upY + 1.05, doorZ + 0.5], null, { cast: false });
+  };
+  const xwall = (z, x0, x1) => { S.box(x1 - x0, ty - upY, 0.1, wallIn, [(x0 + x1) / 2, (upY + ty) / 2, z], null, { tex: 2 }); S.cbox(x1 - x0, ty - upY, 0.12, [(x0 + x1) / 2, (upY + ty) / 2, z]); };
+  // tribord (x > 0) : cabine 1 (z -9..-4), salon (z -4..4), baie technique (z 6.5..12.6)
+  wall(1.0, uz0, -4, -6.5); xwall(-4, 1.0, hw);
+  wall(1.0, 4, 6.5); wall(1.0, 6.5, uz1, 9.5); xwall(6.5, 1.0, hw);
+  // bâbord (x < 0) : cabine 2 (z -9..-4.6), cuisine (z 0.8..6.5), infirmerie / baie (6.5..12.6)
+  wall(-1.0, uz0, sTop - 1.4, -7.4); xwall(sTop - 1.4, -hw, -1.0);   // palier d'arrivée de l'escalier
+  wall(-1.0, sBot + 0.4, 6.5, 3.6); xwall(6.5, -hw, -1.0); wall(-1.0, 6.5, uz1, 9.5);
+  // cabine 1 (tribord avant) : couchette, casier, écran
+  S.box(1.9, 0.45, 0.9, wallDark, [2.55, upY + 0.22, -8.0]);
+  S.box(1.9, 0.18, 0.85, fabric, [2.55, upY + 0.54, -8.0]);
+  S.box(0.5, 0.15, 0.35, mats.plastic(0xe8e4dc, 0.8), [3.2, upY + 0.7, -8.0]);
+  S.box(0.6, 1.9, 0.5, wallDark, [3.2, upY + 0.95, -4.4]);
+  S.box(0.7, 0.4, 0.03, blue, [2.3, upY + 1.6, -8.9], null, { cast: false });
+  // cabine 2 (bâbord avant) : lits superposés
+  for (const yy of [0.35, 1.45]) { S.box(1.9, 0.12, 0.85, wallDark, [-2.55, upY + yy, -7.9]); S.box(1.85, 0.15, 0.8, fabric, [-2.55, upY + yy + 0.13, -7.9]); }
+  S.box(0.05, 1.7, 0.05, metal, [-1.6, upY + 0.85, -7.5], null, { cast: false });
+  // salon (tribord) : banquette en L, table basse, écran mural
+  S.box(0.75, 0.42, 5.0, leather, [3.05, upY + 0.21, 0.2]);
+  S.box(0.2, 0.55, 5.0, leather, [3.4, upY + 0.65, 0.2]);
+  S.box(1.8, 0.42, 0.75, leather, [2.2, upY + 0.21, 2.45]);
+  S.cyl(0.55, 0.55, 0.05, mats.smooth(0x2a2e31, 0.25, 0.4), [2.0, upY + 0.42, 0.0], null, { seg: 24 });
+  S.cyl(0.08, 0.1, 0.4, metal, [2.0, upY + 0.2, 0.0], null, { seg: 8 });
+  S.box(1.8, 1.0, 0.04, mats.emissive(0x86c8ff, 1.2), [2.3, upY + 1.5, -3.9], null, { cast: false });
+  S.cbox(0.9, 0.6, 5.0, [3.1, upY + 0.3, 0.2]);
+  // cuisine (bâbord) : plan de travail, éléments hauts, table et bancs
+  S.box(0.65, 0.95, 4.8, wallIn, [-3.2, upY + 0.47, 3.7]);
+  S.box(0.68, 0.05, 4.8, mats.smooth(0x5a5f63, 0.25, 0.6), [-3.2, upY + 0.97, 3.7], null, { cast: false });
+  S.box(0.4, 0.6, 4.8, wallIn, [-3.35, upY + 2.0, 3.7]);
+  S.box(0.3, 0.2, 0.3, mats.smooth(0xb8bcbe, 0.2, 1), [-3.2, upY + 1.1, 2.4], null, { cast: false });
+  S.box(0.05, 0.03, 4.6, light, [-3.1, upY + 1.68, 3.7], null, { cast: false });
+  S.box(1.0, 0.05, 1.8, mats.smooth(0x3a2a1e, 0.4, 0), [-1.95, upY + 0.75, 3.6]);
+  S.cyl(0.06, 0.08, 0.72, metal, [-1.95, upY + 0.36, 3.6], null, { seg: 8 });
+  S.box(0.35, 0.42, 1.8, fabric, [-1.3, upY + 0.21, 3.6]);
+  S.cbox(0.7, 1.0, 4.8, [-3.2, upY + 0.5, 3.7]);
+  S.cbox(1.0, 0.8, 1.8, [-1.95, upY + 0.4, 3.6]);
+  // baie technique (arrière) : armoires, écrans, réservoirs
+  for (const sx of [-1, 1]) {
+    for (let z = 7.2; z < 12.3; z += 1.1) {
+      S.box(0.6, 1.9, 1.0, wallDark, [sx * 3.15, upY + 0.95, z]);
+      S.box(0.03, 0.12, 0.6, sx < 0 ? mats.emissive(0x50ff80, 2) : mats.emissive(0xffa030, 2), [sx * 2.84, upY + 1.4, z], null, { cast: false });
+    }
+    S.cbox(0.6, 2, 5.4, [sx * 3.15, upY + 1, 9.7]);
+  }
+  S.cyl(0.35, 0.35, 1.6, mats.smooth(0x7a7e80, 0.35, 0.9), [0, upY + 0.8, 11.6], null, { seg: 18 });
+  // passerelle de commandement (sous la verrière) : plancher surélevé, sièges, consoles
+  const bf = upY + 0.25;
+  S.box(hw * 2 - 0.6, 0.2, 7.5, floorUp, [0, bf - 0.1, -12.6], null, { tex: 2 });
+  S.box(hw * 2 - 0.6, 0.25, 0.15, wallDark, [0, upY + 0.12, -8.9], null, { cast: false });
+  for (const x of [-1.1, 1.1]) {
     const seat = mats.plastic(0x222426, 0.7);
-    S.box(0.6, 0.15, 0.6, seat, [x, cf + 0.45, -7.0]);
-    S.box(0.6, 0.9, 0.15, seat, [x, cf + 0.95, -6.65], [-0.2, 0, 0]);
-    S.cyl(0.08, 0.1, 0.4, metal, [x, cf + 0.2, -7.0]);
-    S.box(0.9, 0.55, 0.6, darkM, [x, cf + 0.55, -8.6], [0.4, 0, 0]);
-    S.box(0.45, 0.3, 0.02, mats.emissive(0x3ec7ff, 2.2), [x - 0.2, cf + 0.88, -8.42], [-0.6, 0, 0], { cast: false });
-    S.box(0.35, 0.28, 0.02, mats.emissive(0xffa040, 1.8), [x + 0.22, cf + 0.88, -8.42], [-0.6, 0, 0], { cast: false });
-    // manches et manettes
-    S.cyl(0.03, 0.03, 0.35, metal, [x + 0.25, cf + 0.6, -7.45], [0.2, 0, 0], { seg: 6 });
+    S.box(0.62, 0.15, 0.62, seat, [x, bf + 0.48, -12.6]);
+    S.box(0.62, 1.0, 0.16, seat, [x, bf + 1.0, -12.25], [-0.15, 0, 0]);
+    S.box(0.22, 0.25, 0.2, seat, [x, bf + 1.6, -12.15], null, { cast: false });
+    S.cyl(0.08, 0.1, 0.42, metal, [x, bf + 0.21, -12.6]);
+    S.box(1.0, 0.7, 0.7, wallDark, [x, bf + 0.55, -14.3], [0.45, 0, 0]);
+    S.box(0.5, 0.3, 0.02, blue, [x - 0.22, bf + 0.9, -14.08], [-0.65, 0, 0], { cast: false });
+    S.box(0.4, 0.28, 0.02, mats.emissive(0xffa040, 1.8), [x + 0.25, bf + 0.9, -14.08], [-0.65, 0, 0], { cast: false });
+    S.cyl(0.03, 0.03, 0.35, metal, [x + 0.35, bf + 0.68, -13.2], [0.2, 0, 0], { seg: 6 });
   }
-  S.box(3.0, 0.35, 0.7, darkM, [0, cf + 0.55, -9.4], [0.5, 0, 0]);
-  // cadre de porte arrière
-  S.box(0.25, cy - fy + 0.3, 0.3, darkM, [-iw - 0.05, (fy + cy) / 2, 11.25]);
-  S.box(0.25, cy - fy + 0.3, 0.3, darkM, [iw + 0.05, (fy + cy) / 2, 11.25]);
-  S.box(iw * 2 + 0.4, 0.4, 0.3, darkM, [0, cy + 0.1, 11.25]);
-  // rampe : panneau incliné + vérins
-  const rampLen = Math.hypot(fy, 4.3), ang = Math.atan2(fy, 4.3);
-  const ramp = new THREE.Group();
-  S.box(iw * 2 - 0.1, 0.14, rampLen, mats.metal(0x5a5e60, { rough: 0.55 }), [0, fy / 2 + 0.02, 11.3 + 2.15], [ang, 0, 0], { tex: 1 });
-  for (let k = 0; k < 8; k++) S.box(iw * 2 - 0.3, 0.04, 0.05, mats.metal(0x2a2c2e), [0, fy / 2 + 0.11 - (k - 3.5) * 0.5 * Math.sin(ang), 11.3 + 2.15 + (k - 3.5) * 0.5 * Math.cos(ang)], [ang, 0, 0], { cast: false });
-  for (const s of [-1, 1]) {
-    S.box(0.06, 0.3, rampLen, mats.paint(0xc89a1e), [s * (iw - 0.05), fy / 2 + 0.18, 11.3 + 2.15], [ang, 0, 0], { cast: false });
-    S.cyl(0.06, 0.06, 2.0, mats.smooth(0xc8ccce, 0.2, 1), [s * (iw - 0.25), fy * 0.7 + 0.2, 12.3], [Math.PI / 2 - 0.9, 0, 0]);
+  S.box(2.4, 0.9, 0.6, wallDark, [0, bf + 0.45, -10.4]);
+  S.box(1.6, 0.03, 0.4, mats.emissive(0x66d0ff, 0.25), [0, bf + 0.92, -10.4], null, { cast: false });
+  // rampe arrière (soute)
+  const rampLen = Math.hypot(fy, 4.6), rAng = Math.atan2(fy, 4.6);
+  S.box(hw * 2 - 0.3, 0.16, rampLen, mats.metal(0x5a5e60, { rough: 0.5 }), [0, fy / 2 + 0.02, hz1 + 2.3], [rAng, 0, 0], { tex: 1 });
+  for (const sx of [-1, 1]) {
+    S.box(0.08, 0.28, rampLen, yellow, [sx * (hw - 0.25), fy / 2 + 0.2, hz1 + 2.3], [rAng, 0, 0], { cast: false });
+    S.cyl(0.07, 0.07, 2.4, chrome, [sx * (hw - 0.5), fy * 0.75 + 0.3, hz1 + 1.0], [Math.PI / 2 - 0.85, 0, 0]);
   }
-  // collisions : ventre, parois, plafond, cockpit, rampe, nacelles
-  S.cbox(5.6, fy, 23, [0, fy / 2, -0.4]);         // sous le plancher (inaccessible)
-  for (const s of [-1, 1]) S.cbox(0.4, 3.2, 16, [s * (iw + 0.2), fy + 1.6, 3.5]);
-  S.cbox(iw * 2, 0.3, 14.8, [0, cy + 0.15, 3.8]);
-  S.cbox(3.8, 3.2, 0.3, [0, fy + 1.6, -10.3]);
-  for (const s of [-1, 1]) S.cbox(0.3, 3.2, 6.5, [s * 1.75, fy + 1.6, -7.2]);
-  for (const s of [-1, 1]) S.cbox(2.4, 2.2, 13, [s * 4.3, 3.0, 4.4]);
-  // pente de la rampe (surface de marche) + garde-corps
-  {
-    const g = new THREE.PlaneGeometry(iw * 2 - 0.1, rampLen + 0.1).toNonIndexed();
-    g.rotateX(-Math.PI / 2);
-    const m = Builder.matrix([0, fy / 2 + 0.09, 11.3 + 2.15], [ang, 0, 0]);
-    g.applyMatrix4(m); g.applyMatrix4(S.M);
-    ctx.builder.addCollider(g);
-    const f = new THREE.PlaneGeometry(iw * 2, 17.5).toNonIndexed(); f.rotateX(-Math.PI / 2);
-    f.applyMatrix4(Builder.matrix([0, fy, 2.6])); f.applyMatrix4(S.M); ctx.builder.addCollider(f);
-    const c = new THREE.PlaneGeometry(3.4, 6).toNonIndexed(); c.rotateX(-Math.PI / 2);
-    c.applyMatrix4(Builder.matrix([0, fy + 0.95, -7.6])); c.applyMatrix4(S.M); ctx.builder.addCollider(c);
-    // marches : rampe de collision
-    const st = new THREE.PlaneGeometry(1.6, Math.hypot(0.95, 1.3)).toNonIndexed(); st.rotateX(-Math.PI / 2);
-    st.applyMatrix4(Builder.matrix([0, fy + 0.5, -4.25], [Math.atan2(0.95, 1.3), 0, 0])); st.applyMatrix4(S.M); ctx.builder.addCollider(st);
-  }
+  // cadre de porte arrière (soute) et fermeture du pont supérieur
+  S.box(0.3, cy - fy + 0.4, 0.4, trim, [-hw - 0.05, (fy + cy) / 2, hz1 + 0.2]);
+  S.box(0.3, cy - fy + 0.4, 0.4, trim, [hw + 0.05, (fy + cy) / 2, hz1 + 0.2]);
+  S.box(hw * 2 + 0.4, 0.4, 0.4, trim, [0, cy + 0.15, hz1 + 0.2]);
+  S.add(new THREE.CircleGeometry(4.1, 40, 0, Math.PI), hull, [0, 5.1, 15.0], null, {});
   // train d'atterrissage
-  S.gear(0, -8.2, 2.3, mats, { r: 0.12 });
-  for (const s of [-1, 1]) S.gear(s * 2.6, 5.5, 1.9, mats, { r: 0.16, pad: 1.2 });
-  S.footprint(4.6, 11.5, 0, 0);
-  S.footprint(9.0, 2.5, 0, 3.5);
+  for (const [x, z] of [[-2.4, -11], [2.4, -11], [-3.2, 9.5], [3.2, 9.5]]) S.gear(x, z, 1.55, mats, { r: 0.17, pad: 1.4 });
 
-  // lumière intérieure chaude
-  {
-    const l = new THREE.PointLight(0xffd9b0, 9, 11, 2);
-    l.position.copy(S.local(0, 4.4, 3));
-    ctx.scene.add(l);
-    const c = new THREE.PointLight(0x9fd6ff, 2.5, 4, 2);
-    c.position.copy(S.local(0, 3.6, -8.4));
-    ctx.scene.add(c);
+  // -------------------------------------------------- collisions
+  const plane = (w, d, pos, rot) => { const g = new THREE.PlaneGeometry(w, d).toNonIndexed(); g.rotateX(-Math.PI / 2); g.applyMatrix4(Builder.matrix(pos, rot)); g.applyMatrix4(S.M); ctx.builder.addCollider(g); };
+  plane(hw * 2, hz1 - hz0, [0, fy, (hz0 + hz1) / 2]);
+  plane(hw * 2 - 0.4, rampLen + 0.1, [0, fy / 2 + 0.1, hz1 + 2.3], [rAng, 0, 0]);
+  plane(sw, sLen + 0.1, [sx0, (fy + upY) / 2 + 0.03, (sBot + sTop) / 2], [sAng, 0, 0]);
+  plane(hw * 2, sTop - uz0, [0, upY, (uz0 + sTop) / 2]);
+  plane(hw - (sx0 + sw / 2), sBot - sTop, [(hw + sx0 + sw / 2) / 2, upY, (sTop + sBot) / 2]);
+  plane(hw * 2, uz1 - sBot, [0, upY, (sBot + uz1) / 2]);
+  plane(hw * 2 - 0.6, 7.5, [0, bf, -12.6]);
+  S.cbox(hw * 2, 0.3, 4, [0, upY + 0.1, -8.95 - 0.0]); // marche vers la passerelle (rebord bas)
+  S.cbox(9.4, fy, 31, [0, fy / 2, -1.5]);                            // ventre
+  for (const sx of [-1, 1]) {
+    S.cbox(0.4, cy - fy, hz1 - hz0, [sx * (hw + 0.2), (fy + cy) / 2, (hz0 + hz1) / 2]);
+    S.cbox(0.4, ty - upY, 22, [sx * (hw + 0.2), (upY + ty) / 2, 1.5]);
+    S.cbox(6.5, 1.0, 9, [sx * 7.6, 3.75, 2.0]);                     // ailes
+    S.cbox(0.3, 1.1, sBot - sTop, [sx0 + sw / 2 + 0.12, upY + 0.55, (sTop + sBot) / 2]);
   }
-  S.interior = { floorY: fy, rampTop: S.local(0, fy, 11.3), rampBottom: S.local(0, 0, 15.6), seat: S.local(-0.8, fy + 1.35, -7.0), cockpit: S.local(0, fy + 2.2, -7.5), cockpitFloor: fy + 0.95 };
+  S.cbox(hw * 2, 0.3, 30, [0, ty + 0.15, 0]);
+  S.cbox(hw * 2, cy - fy, 0.3, [0, (fy + cy) / 2, hz0]);
+  S.cbox(hw - holeX, 0.3, hz1 - hz0, [(hw + holeX) / 2, cy + 0.15, (hz0 + hz1) / 2]);
+  S.cbox(holeX + hw, 0.3, hzA - hz0, [(holeX - hw) / 2, cy + 0.15, (hz0 + hzA) / 2]);
+  S.cbox(holeX + hw, 0.3, hz1 - hzB, [(holeX - hw) / 2, cy + 0.15, (hzB + hz1) / 2]);
+  S.cbox(hw * 2 + 1, ty - upY, 0.3, [0, (upY + ty) / 2, uz1 + 0.1]);
+  S.cbox(8, 4, 0.4, [0, bf + 1.5, -15.6]);
+  for (const sx of [-1, 1]) S.cbox(0.4, 3, 7, [sx * 3.4, bf + 1.4, -12.4]);
+  // le joueur ne passe pas sous la soute ouverte entre la rampe et les moteurs
+  S.footprint(4.8, 17.5, 0, -1.5);
+  S.footprint(10.8, 4.6, 0, 2.0);
+
+  // -------------------------------------------------- lumières intérieures
+  const lights = ctx.quality.name === 'low' ? [[0, 4.4, 6, 10]] : [[0, 4.4, 2, 9], [0, 4.4, 10, 9], [0, 7.4, -3, 7], [0, 7.4, 6, 7]];
+  for (const [x, y, z, i] of lights) { const l = new THREE.PointLight(0xffe4c4, i, 11, 2); l.position.copy(S.local(x, y, z)); ctx.scene.add(l); }
+  const bl = new THREE.PointLight(0x9fd6ff, 2.5, 5, 2); bl.position.copy(S.local(0, bf + 1.2, -13.5)); ctx.scene.add(bl);
+
+  const seatPos = S.local(-1.1, bf + 0.3, -12.6);
+  S.interior = {
+    floorY: fy, cockpitFloor: bf, rampTop: S.local(0, fy, hz1), rampBottom: S.local(0, 0, hz1 + 4.8),
+    seat: { pos: seatPos, yaw: pad.heading + Math.PI, eye: S.local(-1.1, bf + 1.45, -12.75), exit: S.local(-1.1, bf + 0.05, -11.2) },
+    seatTrigger: S.local(-1.1, bf, -11.8),
+  };
   return S;
 }
 

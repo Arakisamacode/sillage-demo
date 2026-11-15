@@ -25,6 +25,11 @@ export const SHOTS = {
   sittest: { pos: [-84.5, 1.3, -17.4], look: [-86, 0.6, -21.0], fov: 55 },
   weldclose: { pos: [17.5, 2.6, 24.5], look: [14.3, 2.3, 20.5], fov: 55 },
   lineup: { pos: [0, 1.55, 0.6], look: [0, 1.05, -4], fov: 62 },
-  portrait: { pos: [-2.2, 1.6, -2.2], look: [-1.5, 1.35, -4], fov: 40 },
+  portrait: { pos: [-1.5, 1.3, -1.2], look: [-1.5, 1.05, -4], fov: 45 },
+  heronext: { pos: [6, 2.0, 13], look: [-13, 4.5, -11], fov: 62 },
+  heronfront: { pos: [0, 2.4, -41], look: [-13, 5.2, -18], fov: 62 },
+  heronhold: { pos: [-11.6, 3.6, 0.2], look: [-14.2, 3.0, -17], fov: 70 },
+  heronupper: { pos: [-13, 6.9, -3.2], look: [-13, 6.3, -19], fov: 70 },
+  heronbridge: { pos: [-13, 7.1, -22.2], look: [-13, 6.6, -33], fov: 70 },
   cockpit: { pos: [-13, 3.2, -22], look: [-13, 3, -40], fov: 70 },
 };

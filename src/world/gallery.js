@@ -75,14 +75,15 @@ export function buildGallery(ctx) {
   {
     const fg = new THREE.PlaneGeometry(W, D); fg.rotateX(-Math.PI / 2);
     const fm = Builder.matrix([cx, 0, cz]); worldUV(fg, 3, fm);
-    const floorMat = mats.ph('large_grey_tiles', 0x9a9690, { grime: 0.35, rough: 0.7, metal: 0 });
+    const floorMat = mats.stationFloor();
     B.add(fg, floorMat, fm, { collide: true, cast: false });
-    // bandes de carrelage sombre (cheminements)
+    // cheminements : bandes sombres bordées de liserés lumineux encastrés
     for (const z of [G.z0 + 5.5, G.z1 - 7.5]) {
-      const g = new THREE.PlaneGeometry(W, 1.2); g.rotateX(-Math.PI / 2);
-      const m = Builder.matrix([cx, 0.004, z]); worldUV(g, 1.5, m);
-      B.add(g, mats.tiles(0x5d5a55), m, { cast: false });
+      B.box(W, 0.012, 1.4, mats.paint(0x22262a, { plain: true, rough: 0.35, grime: 0.2, floor: 0 }), [cx, 0.006, z], null, { cast: false, receive: true });
+      for (const s of [-1, 1]) B.box(W, 0.014, 0.05, mats.emissive(0x8fd3ff, 2.4), [cx, 0.007, z + s * 0.72], null, { cast: false });
     }
+    // joints transversaux tous les 6 m (alignés sur les caissons du plafond)
+    for (let x = G.x0 + 6; x < G.x1; x += 6) B.box(0.04, 0.01, D - 1, mats.metal(0x4a4f54, { rough: 0.4 }), [x, 0.005, cz], null, { cast: false });
     // plafond à caissons + gorges lumineuses
     B.box(W, 0.4, D, mats.paint(0x3c4044), [cx, G.h + 0.2, cz], null, { cast: false, tex: 4 });
     for (let x = G.x0 + 3; x < G.x1; x += 6) {
@@ -248,7 +249,7 @@ function shop(ctx, s, wall, wallDark, trim) {
   // intérieur
   const L = new Local(B, x, 0, z0, 0, scene);
   const floorM = s.id === 'pieces' ? mats.metal(0x55595c, { rough: 0.6 }) : mats.tiles(s.id === 'pharma' ? 0xe8efe8 : 0xb8b0a4);
-  L.box(w, 0.05, depth, floorM, [0, 0.025, depth / 2], null, { cast: false, tex: 2 });
+  L.box(w, 0.05, depth + 0.6, floorM, [0, 0.025, depth / 2 - 0.3], null, { cast: false, tex: 2, collide: true });
   L.box(w, h, 0.3, wall, [0, h / 2, depth + 0.15], null, { tex: 3 });
   for (const sx of [-1, 1]) L.box(0.3, h, depth, wall, [sx * (w / 2 + 0.15), h / 2, depth / 2], null, { tex: 3 });
   L.box(w + 0.6, 0.3, depth, mats.paint(0x2c3034), [0, h + 0.15, depth / 2]);

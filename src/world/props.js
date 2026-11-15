@@ -370,11 +370,11 @@ export function buildProps(ctx) {
   for (const [dx, dz] of [[-9.5, -4], [-9.5, 4], [-6, -7.5], [9.2, -2]]) cone(ctx, f.x + dx, f.z + dz);
 
   // --- aire 02 (joueur) et 03 (cargo)
-  terminal(ctx, PADS.p2.x + 8.5, PADS.p2.z + 9.5, -Math.PI / 4, 'pad', 'AIRE 02');
+  terminal(ctx, PADS.p2.x + 9.5, PADS.p2.z + 13.5, -Math.PI / 4, 'pad', 'AIRE 02');
   terminal(ctx, PADS.p3.x - 9.0, PADS.p3.z + 10.5, Math.PI / 4, 'cargo', 'AIRE 03');
   terminal(ctx, PADS.p5.x + 7.5, PADS.p5.z - 7.5, Math.PI * 0.75, 'pad', 'AIRE 05');
   if (ships) {
-    groundPower(ctx, PADS.p2.x + 4.8, PADS.p2.z + 7.5, 0.3, ships.heron.local(2.9, 2.2, 4));
+    groundPower(ctx, PADS.p2.x + 7.6, PADS.p2.z + 9.5, 0.3, ships.heron.local(4.6, 2.4, 8));
     groundPower(ctx, PADS.p3.x - 9.5, PADS.p3.z - 3, -0.2, ships.mulet.local(-5.0, 2.5, -3));
   }
   // --- coin pause près du sas

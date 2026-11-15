@@ -53,7 +53,7 @@ export function worldSpots(ctx, scenes) {
     patrolHangar: [ga(-27.5, -36), ga(-27.5, -18), ga(-27.5, 6), ga(-27, 24), ga(-8, 26.5), ga(6, 23.5), ga(27.5, 10), ga(27.5, -12), ga(27, -36), ga(10, -38), ga(-10, -38)],
     patrolGallery: [ga(-46, -16), ga(-60, -18), ga(-78, -18), ga(-97, -16), ga(-97, 4), ga(-80, 6), ga(-64, 6), ga(-48, 5)],
     clean: [ga(-48, -12), ga(-60, -12), ga(-70, -13), ga(-86, -12), ga(-96, -6), ga(-94, 5), ga(-76, 5.5), ga(-60, 5.5), ga(-50, 2)],
-    heron: { ramp: ships.heron.interior.rampBottom, gearL: ships.heron.local(-4.0, 0, 4.0), gearR: ships.heron.local(4.0, 0, 4.0), nose: ships.heron.local(0, 0, -10.0) },
+    heron: { ramp: ships.heron.interior.rampBottom, nose: ships.heron.local(0, 0, -20.0) },
     mulet: {
       ramp: ships.mulet.cargo.rampBottom, foot: ships.mulet.local(0, 0, 22.5),
       inspect: [ships.mulet.local(-7.5, 0, -12), ships.mulet.local(0, 0, -18.5), ships.mulet.local(7.6, 0, -12), ships.mulet.local(8.8, 0, 8)],

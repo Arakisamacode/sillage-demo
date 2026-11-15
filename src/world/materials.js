@@ -226,6 +226,18 @@ export class Materials {
     return (this.cache.deck = m);
   }
 
+  /** Sol de galerie : dalles composites métallisées, satinées (reflets), joints fins. */
+  stationFloor() {
+    if (this.cache.stationFloor) return this.cache.stationFloor;
+    const m = new THREE.MeshStandardMaterial({
+      color: 0xa9b0b6, map: this.tex.deck_a, normalMap: this.tex.deck_n, roughnessMap: this.tex.deck_orm,
+      aoMap: this.tex.deck_orm, roughness: 0.55, metalness: 0.55, aoMapIntensity: 0.6,
+      normalScale: new THREE.Vector2(0.6, 0.6),
+    });
+    this.addWear(m, { grime: 0.25, floor: 0.0, scratch: 0.15, scale: 0.1 });
+    return (this.cache.stationFloor = m);
+  }
+
   concrete(color = 0xb8b4ac) {
     const key = 'concrete' + color;
     if (this.cache[key]) return this.cache[key];
