@@ -10,7 +10,7 @@ export function buildHangar(ctx) {
   const { scene, mats, builder: B, quality } = ctx;
   seed(1234);
 
-  const wallPaint = mats.cladding(0x8a9094, { rust: 0.2 });
+  const wallPaint = mats.cladding(0xc4cacf, { rust: 0.05, grime: 0.45 });
   const wallLow = mats.diamond(0x9a9c9e);
   const trim = mats.paint(0x2c3134, { grime: 0.8 });
   const steel = mats.metal(0x6b6f72);
@@ -30,7 +30,7 @@ export function buildHangar(ctx) {
   const floorGeo = new THREE.PlaneGeometry(floorW, floorD, 1, 1);
   floorGeo.rotateX(-Math.PI / 2);
   floorGeo.translate(0, 0, (Z_BACK + Z_BAY) / 2);
-  worldUV(floorGeo, 4.5);
+  worldUV(floorGeo, 8);
   const floor = new THREE.Mesh(floorGeo, mats.deck());
   floor.receiveShadow = true;
   scene.add(floor);
@@ -545,7 +545,7 @@ function floorMarkings(quality) {
   const paint = (color, alpha = 0.9) => { ctx.fillStyle = color; ctx.strokeStyle = color; ctx.globalAlpha = alpha; };
 
   // voies piétonnes le long des murs (bande verte + pointillés blancs)
-  paint('#3f8f5a', 0.55);
+  paint('#2f6f9f', 0.45);
   ctx.fillRect(X(-HX + 1.6), Z(Z_BAY + 3), 2.2 * ppm, Z(Z_BACK - 1) - Z(Z_BAY + 3));
   ctx.fillRect(X(HX - 3.8), Z(Z_BAY + 3), 2.2 * ppm, Z(Z_BACK - 1) - Z(Z_BAY + 3));
   paint('#e8e4d8', 0.85);
@@ -553,7 +553,7 @@ function floorMarkings(quality) {
     for (let z = Z_BAY + 3; z < Z_BACK - 2; z += 1.6) ctx.fillRect(X(x) - 0.06 * ppm, Z(z), 0.12 * ppm, 0.8 * ppm);
   }
   // voie véhicules (jaune double) en boucle
-  paint('#d8a420', 0.85);
+  paint('#f2f4f6', 0.9);
   const lane = (x0, z0, x1, z1) => { ctx.lineWidth = 0.14 * ppm; ctx.strokeRect(X(x0), Z(z0), (x1 - x0) * ppm, (z1 - z0) * ppm); };
   lane(-HX + 6.8, -33, HX - 6.8, Z_BACK - 4);
   lane(-HX + 6.4, -33.4, HX - 6.4, Z_BACK - 3.6);
@@ -572,7 +572,7 @@ function floorMarkings(quality) {
     const p = PADS[k];
     const cx = X(p.x), cz = Z(p.z), r = p.r * ppm;
     ctx.save();
-    paint('#d8a420', 0.8);
+    paint('#5fb4ff', 0.85);
     ctx.lineWidth = 0.35 * ppm;
     ctx.beginPath(); ctx.arc(cx, cz, r, 0, Math.PI * 2); ctx.stroke();
     ctx.lineWidth = 0.12 * ppm;

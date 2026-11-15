@@ -24,14 +24,14 @@ export function buildLighting(ctx) {
     tex.mapping = THREE.EquirectangularReflectionMapping;
     const env = pmrem.fromEquirectangular(tex).texture;
     scene.environment = env;
-    scene.environmentIntensity = 0.55;
+    scene.environmentIntensity = 0.85;
     scene.environmentRotation = new THREE.Euler(0, 1.2, 0);
     tex.dispose();
     out.env = env;
   }).catch((e) => console.warn('HDRI', e));
 
   // ------------------------------------------------------------- lumière planétaire (froide)
-  const sun = new THREE.DirectionalLight(0x9fbfff, 3.6);
+  const sun = new THREE.DirectionalLight(0xc4d6ff, 4.2);
   sun.position.copy(KEY_DIR).multiplyScalar(120).add(new THREE.Vector3(0, 0, -10));
   sun.target.position.set(0, 0, -10);
   sun.castShadow = quality.shadows;
@@ -45,11 +45,11 @@ export function buildLighting(ctx) {
   out.sun = sun;
 
   // ciel bleu de rebond faible, sol chaud
-  const hemi = new THREE.HemisphereLight(0x8094b4, 0x3a2c1e, 0.38);
+  const hemi = new THREE.HemisphereLight(0xb8c8de, 0x4a4a48, 0.75);
   scene.add(hemi);
 
   // ------------------------------------------------------------- plafonniers : rampes linéaires émissives
-  const lampMat = mats.emissive(0xffc58a, 7);
+  const lampMat = mats.emissive(0xe8f2ff, 7);
   const housing = mats.paint(0x2c3134);
   const fixtures = [];
   for (const z of [-33, -21, -9, 3, 15, 25]) {
@@ -72,7 +72,7 @@ export function buildLighting(ctx) {
   let shadowsLeft = quality.spotShadows;
   for (let i = 0; i < nSpots; i++) {
     const [x, z, big] = spotDefs[i];
-    const s = new THREE.SpotLight(0xffb36b, big ? 3800 : 2200, 60, big ? 0.7 : 0.6, 0.75, 2);
+    const s = new THREE.SpotLight(0xf0f4ff, big ? 5200 : 3200, 60, big ? 0.8 : 0.7, 0.7, 2);
     s.position.set(x, H - 4.2, z);
     s.target.position.set(x, 0, z);
     if (big && shadowsLeft > 0) {

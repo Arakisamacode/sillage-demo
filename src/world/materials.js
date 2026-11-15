@@ -217,10 +217,11 @@ export class Materials {
   deck() {
     if (this.cache.deck) return this.cache.deck;
     // sol : scan Poly Haven « hangar_concrete_floor » (béton de hangar taché)
+    // sol : pont métallique peint gris clair (plaques, joints), légèrement satiné
     const m = new THREE.MeshStandardMaterial({
-      color: 0xd8d4cc, map: this.tex.hangar_concrete_floor_diff, normalMap: this.tex.hangar_concrete_floor_nor,
-      roughnessMap: this.tex.hangar_concrete_floor_arm, aoMap: this.tex.hangar_concrete_floor_arm,
-      roughness: 0.95, metalness: 0, aoMapIntensity: 0.8,
+      color: 0xe2e6ea, map: this.tex.deck_a, normalMap: this.tex.deck_n, roughnessMap: this.tex.deck_orm,
+      aoMap: this.tex.deck_orm, roughness: 0.75, metalness: 0.2, aoMapIntensity: 0.7,
+      normalScale: new THREE.Vector2(0.7, 0.7),
     });
     this.addWear(m, { grime: 0.6, floor: 0.0, scratch: 0.1, scale: 0.08, rust: 0.0 });
     return (this.cache.deck = m);
@@ -230,7 +231,7 @@ export class Materials {
   stationFloor() {
     if (this.cache.stationFloor) return this.cache.stationFloor;
     const m = new THREE.MeshStandardMaterial({
-      color: 0xa9b0b6, map: this.tex.deck_a, normalMap: this.tex.deck_n, roughnessMap: this.tex.deck_orm,
+      color: 0xd2d8dc, map: this.tex.deck_a, normalMap: this.tex.deck_n, roughnessMap: this.tex.deck_orm,
       aoMap: this.tex.deck_orm, roughness: 0.55, metalness: 0.55, aoMapIntensity: 0.6,
       normalScale: new THREE.Vector2(0.6, 0.6),
     });

@@ -21,7 +21,7 @@ export function buildGallery(ctx) {
   seed(4242);
   const G = GALLERY;
   const cx = (G.x0 + G.x1) / 2, cz = (G.z0 + G.z1) / 2, W = G.x1 - G.x0, D = G.z1 - G.z0;
-  const wall = mats.plaster(0xcfc9bd);
+  const wall = mats.paint(0xd4d9dd, { grime: 0.3, scratch: 0.3, rust: 0, rough: 0.6 });
   const wallDark = mats.paint(0x3a3e42, { grime: 0.6 });
   const trim = mats.metal(0x8c9094, { rough: 0.35, grime: 0.3 });
   const dark = mats.paint(0x24282b);
@@ -49,6 +49,11 @@ export function buildGallery(ctx) {
       B.box(0.7, 0.5, w + 1.2, dark, [x, h + 0.25, z]);
       for (const s of [-1, 1]) B.box(0.7, h, 0.5, dark, [x, h / 2, z + s * (w / 2 + 0.25)], null, { collide: true });
       B.box(0.72, 0.18, w + 1.2, mats.paint(0xc89a1e), [x, h + 0.05, z], null, { cast: false });
+    }
+    const oliveA = mats.paint(0x7a7a3a, { plain: true, rough: 0.5, grime: 0.5 });
+    for (const x of [-HX - 0.05, G.x1 + 0.05]) {
+      for (const s2 of [-1, 1]) B.box(0.8, h + 1.4, 0.6, oliveA, [x, (h + 1.4) / 2, z + s2 * (w / 2 + 0.7)], null, { collide: true });
+      B.box(0.8, 0.6, w + 2.0, oliveA, [x, h + 1.1, z]);
     }
     ctx.airlockDoors = [
       makeDoor(ctx, -HX - 0.3, z, w, h, 'SAS 2 · HANGAR 07'),
@@ -90,7 +95,20 @@ export function buildGallery(ctx) {
       B.box(0.5, 0.7, D, wallDark, [x, G.h - 0.35, cz], null, { cast: false });
     }
     for (let x = G.x0 + 6; x < G.x1 - 1; x += 6) {
-      B.box(0.25, 0.05, D - 4, mats.emissive(0xffe6c8, 3.2), [x, G.h - 0.72, cz - 1], null, { cast: false });
+      B.box(0.12, 0.05, D - 14, mats.emissive(0xe6f0ff, 4.0), [x, G.h - 0.72, cz - 1], null, { cast: false });
+    }
+    // plafond à pans inclinés le long des deux façades, bordés de bandes LED (lignes obliques)
+    const panel = mats.paint(0xc9ced2, { plain: true, rough: 0.5, grime: 0.25, floor: 0 });
+    const led = mats.emissive(0xe6f0ff, 5.0);
+    for (const [zEdge, dir] of [[G.z1, -1], [G.z0, 1]]) {
+      const ang = 0.55, len = 5.2;
+      const zc = zEdge + dir * Math.cos(ang) * len / 2, yc = G.h - 0.3 - Math.sin(ang) * len / 2;
+      B.box(W, 0.12, len, panel, [cx, yc, zc], [dir * -ang, 0, 0], { cast: false, tex: 3 });
+      for (let x = G.x0 + 3; x < G.x1; x += 6) {
+        B.box(0.1, 0.06, len, led, [x, yc - 0.07, zc], [dir * -ang, 0, 0], { cast: false });
+        B.box(0.3, 0.2, len, wallDark, [x + 0.25, yc - 0.06, zc], [dir * -ang, 0, 0], { cast: false });
+      }
+      B.box(W, 0.05, 0.08, led, [cx, G.h - 0.3 - Math.sin(ang) * len - 0.05, zEdge + dir * Math.cos(ang) * len], null, { cast: false });
     }
   }
 
@@ -269,6 +287,12 @@ function shop(ctx, s, wall, wallDark, trim) {
     L.box(2.8, 0.25, 0.2, trim, [sx * 2.7, 0.12, 0.05], null, { cast: false });
   }
   L.box(w, 0.12, 0.2, trim, [0, h - 0.06, 0.05]);
+  // cadre structurel vert olive autour de la devanture + bandeau d'enseigne
+  const olive = mats.paint(0x7a7a3a, { plain: true, rough: 0.5, grime: 0.5 });
+  for (const sx of [-1, 1]) L.box(0.45, h + 1.6, 0.5, olive, [sx * (w / 2 + 0.05), (h + 1.6) / 2, -0.15]);
+  L.box(w + 0.9, 0.35, 0.5, olive, [0, h + 1.6, -0.15]);
+  L.box(w + 0.9, 0.18, 0.55, olive, [0, h + 0.05, -0.15]);
+  for (const sx of [-1, 1]) L.box(0.06, h + 1.4, 0.06, mats.emissive(0xe6f0ff, 2.2), [sx * (w / 2 - 0.2), (h + 1.4) / 2, -0.42], null, { cast: false });
   // enseigne néon
   const nt = neonTexture(s.name, s.color, { size: 110 });
   const nh = 1.05, nw = Math.min(nh * nt.aspect, 7.6);

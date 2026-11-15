@@ -38,7 +38,7 @@ async function boot() {
   const renderer = new Renderer($('view'), quality);
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x000000);
-  scene.fog = new THREE.FogExp2(0x262a30, 0.0095);
+  scene.fog = new THREE.FogExp2(0x6a7480, 0.0042);
   const camera = new THREE.PerspectiveCamera(touch ? 72 : 70, innerWidth / innerHeight, 0.05, 12000);
   camera.position.set(0, 1.7, 20);
 
@@ -73,7 +73,8 @@ async function boot() {
   builder.finalize();
   ctx.fx = buildFX(ctx);
   const player = new Player(ctx, builder.collisionGeometry());
-  player.setAvatar(lib.create('UM_light', { height: 1.8, hair: 'Hair_SimpleParted', hairColor: 0x3a2618, outfit: { top: 0x3c4650, accent: 0xd86a20, hivis: true, gloves: true } }));
+  player.setAvatar(lib.create('UM_light', { height: 1.82, hair: 'Hair_Buzzed', hairColor: 0x2a1d14, outfit: { top: 0x2b3036, bottom: 0x2b3036, boot: 0x16181a, accent: 0x6f86a8, gloves: true, zip: false }, armor: { plate: 0x3a4148, under: 0x1b1e21, accent: 0x6e6a3a, light: 0x5fe6c8 } }));
+  player.thirdPerson = true; player.camDist = 2.6;
   if (shotName === 'lineup' || shotName === 'portrait') {
     const roles = [['mécanicien', 'M'], ['pilote', 'F'], ['sécurité', 'M'], ['client', 'F'], ['ravitailleur', 'M'], ['client', 'M'], ['entretien', 'F']];
     roles.forEach(([r, g], i) => crowd.spawn(r, g, function* (a) {
@@ -97,7 +98,7 @@ async function boot() {
     for (const v of [scenes.forklift.obj.group, scenes.tug.obj.group]) v.traverse((o) => { o.castShadow = false; });
   }
   renderer.setupPost(scene, camera);
-  renderer.setExposure(1.0);
+  renderer.setExposure(1.15);
   renderer.resize();
   addEventListener('resize', () => renderer.resize());
   const input = new Input($('view'));

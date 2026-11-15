@@ -424,6 +424,8 @@ export class Crowd {
       outfit: opts.outfit ?? outfitFor(role),
       hair: pick(HAIRS[g]), hairColor: pick(HAIR_COLORS),
       formal: role === 'commerçant',
+      armor: role === 'sécurité' ? { plate: 0x2a3138, under: 0x16191c, accent: 0x3e5a7a, light: 0x6fb8ff } : null,
+      armorShadows: !!this.ctx.quality.npcShadows,
     });
     this.ctx.scene.add(c.root);
     const a = new Agent(this, c, role, routine, { walkSpeed: opts.walk, x: opts.x, z: opts.z, yaw: opts.yaw });

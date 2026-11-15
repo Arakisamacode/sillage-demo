@@ -4,6 +4,7 @@ import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 import { Retargeter } from './retarget.js';
 import { loadBinary } from '../core/binary.js';
 import { buildGarment, skinMaterial } from './garment.js';
+import { buildArmor } from './armor.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 // Bibliothèque de personnages : « Universal Base Characters » de Quaternius (CC0) habillés
@@ -154,6 +155,20 @@ export class CharacterLibrary {
     this.templates[name] = { scene, height, skel: name.slice(0, 2), headInv, zones };
   }
 
+  /** Pièces d'armure (géométries en repère d'os), mises en cache par corps et par couleurs. */
+  armorFor(name, colors) {
+    const key = name + JSON.stringify(colors);
+    this._armor = this._armor || {};
+    if (!this._armor[key]) {
+      const t = this.templates[name];
+      t.scene.updateMatrixWorld(true);
+      const bones = {};
+      t.scene.traverse((o) => { if (o.isBone) bones[o.name] = o; });
+      this._armor[key] = buildArmor(bones, colors);
+    }
+    return this._armor[key];
+  }
+
   create(name, opts = {}) {
     return new Character(this, name, opts);
   }
@@ -197,6 +212,13 @@ export class Character {
       if (o.name === 'body') this.body = o;
     });
     this.bones.Neck = this.bones.neck_01;
+    if (opts.armor) {
+      for (const p of lib.armorFor(name, opts.armor)) {
+        const m = new THREE.Mesh(p.mesh.geometry, p.mesh.material);
+        m.castShadow = opts.armorShadows ?? true; m.receiveShadow = true;
+        this.bones[p.bone].add(m);
+      }
+    }
     this.handR = this.bones.hand_r;
     // coiffure accrochée à l'os de tête
     if (opts.hair && lib.hairs[opts.hair]) {

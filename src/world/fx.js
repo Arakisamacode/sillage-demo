@@ -36,7 +36,7 @@ export function buildFX(ctx) {
   if (quality.beams) {
     const dir = PLANET_DIR.clone().negate(); // sens de propagation
     const mat = new THREE.ShaderMaterial({
-      uniforms: { uColor: { value: new THREE.Color(0.11, 0.165, 0.27) }, uTime: time, uFade: { value: 1.6 }, uNoise: { value: noise } },
+      uniforms: { uColor: { value: new THREE.Color(0.05, 0.07, 0.11) }, uTime: time, uFade: { value: 1.6 }, uNoise: { value: noise } },
       vertexShader: beamVS, fragmentShader: beamFS, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
     });
     // ouvertures : vitrages latéraux et bandeau haut (entre meneaux)
@@ -75,7 +75,7 @@ export function buildFX(ctx) {
   // cônes sous les plafonniers (lumière chaude dans la poussière)
   if (quality.beams && ctx.lights) {
     const mat = new THREE.ShaderMaterial({
-      uniforms: { uColor: { value: new THREE.Color(0.07, 0.045, 0.022) }, uTime: time, uFade: { value: 1.2 }, uNoise: { value: noise } },
+      uniforms: { uColor: { value: new THREE.Color(0.02, 0.022, 0.026) }, uTime: time, uFade: { value: 1.2 }, uNoise: { value: noise } },
       vertexShader: beamVS, fragmentShader: beamFS, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
     });
     const cone = new THREE.CylinderGeometry(0.4, 5.5, 16, 20, 1, true);
