@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { Builder } from './builder.js';
 import { metricBox } from './materials.js';
 import { loft, wing, nozzle, flipFaces } from './shipkit.js';
+import { platedHull } from './hullkit.js';
 import { PADS } from './layout.js';
 import { paintedText, decalMaterial } from './signage.js';
 
@@ -31,6 +32,15 @@ class ShipCtx {
   }
   box(w, h, d, mat, pos, rot, opts = {}) { return this.add(metricBox(w, h, d, opts.tex ?? 2), mat, pos, rot, opts); }
   cyl(rt, rb, h, mat, pos, rot, opts = {}) { return this.add(new THREE.CylinderGeometry(rt, rb, h, opts.seg ?? 16, 1, opts.open ?? false), mat, pos, rot, opts); }
+  /** coque blindée : sous-structure + plaques (+ plaques alternées), ajoutée aussi aux collisions */
+  plated(stations, opts, m) {
+    const h = platedHull(stations, opts);
+    this.add(h.under, m.under, [0, 0, 0], null, { cast: true });
+    this.add(h.plates, m.plate, [0, 0, 0], null, { cast: true });
+    this.add(h.alt, m.alt || m.plate, [0, 0, 0], null, { cast: true });
+    if (opts.collide !== false) { const c = h.under.clone(); c.applyMatrix4(this.M); this.B.addCollider(c); }
+    return h;
+  }
   /** boîte de collision en coordonnées locales */
   cbox(w, h, d, pos) {
     const p = new THREE.Vector3(...pos).applyMatrix4(this.M);
@@ -91,6 +101,13 @@ function interpStation(st, z) {
   }
   return { n: 2.5, ...st[st.length - 1] };
 }
+
+const ds = (m) => { const c = m.clone(); c.side = THREE.DoubleSide; c.onBeforeCompile = m.onBeforeCompile; c.customProgramCacheKey = m.customProgramCacheKey; return c; };
+const hullMats = (mats, plate, alt) => ({
+  plate: ds(mats.paint(plate, { grime: 0.85, scratch: 0.9, rust: 0.05 })),
+  alt: ds(mats.paint(alt, { grime: 0.9, scratch: 0.9, rust: 0.08 })),
+  under: ds(mats.metal(0x24282b, { rough: 0.6, grime: 0.9 })),
+});
 
 function greebles(S, mat, x0, x1, y, z0, z1, n, seedv) {
   let s = seedv;
@@ -160,105 +177,94 @@ function buildHeron(ctx) {
   const leather = mats.plastic(0x5a2f1f, 0.6);
   const light = mats.emissive(0xfff1de, 2.2);
   const blue = mats.emissive(0x3ec7ff, 2.0);
-  // -------------------------------------------------- coque
-  const L = 0.15; // épaisseur
+  // -------------------------------------------------- coque blindée à facettes
+  const HM = hullMats(mats, 0xd4d1c9, 0x3e4448);
   const ST = [
-    { z: -19.0, w: 0.35, h: 0.35, y: 5.7, n: 2.4 },
-    { z: -17.4, w: 2.3, h: 1.75, y: 5.75, n: 2.8, fb: 0.1 },
-    { z: -14.8, w: 3.7, h: 2.85, y: 5.35, n: 3.2, fb: 0.15 },
-    { z: -11.0, w: 4.45, h: 3.45, y: 5.0, n: 3.6, fb: 0.15 },
-    { z: -6.0, w: 4.6, h: 3.55, y: 4.95, n: 3.8, fb: 0.15 },
-    { z: 9.0, w: 4.6, h: 3.55, y: 4.95, n: 3.8, fb: 0.15 },
-    { z: 13.0, w: 4.4, h: 3.35, y: 5.0, n: 3.6, fb: 0.12 },
-    { z: 15.0, w: 4.1, h: 3.1, y: 5.1, n: 3.4, fb: 0.1 },
+    { z: -19.0, w: 0.5, h: 0.4, y: 5.6, n: 2.6 },
+    { z: -17.2, w: 2.4, h: 1.8, y: 5.7, n: 3.2, fb: 0.1 },
+    { z: -14.6, w: 3.8, h: 2.9, y: 5.35, n: 3.6, fb: 0.15 },
+    { z: -11.0, w: 4.45, h: 3.45, y: 5.0, n: 4, fb: 0.15 },
+    { z: -6.0, w: 4.6, h: 3.55, y: 4.95, n: 4.2, fb: 0.15 },
+    { z: 9.0, w: 4.6, h: 3.55, y: 4.95, n: 4.2, fb: 0.15 },
+    { z: 13.0, w: 4.4, h: 3.35, y: 5.0, n: 4, fb: 0.12 },
+    { z: 15.0, w: 4.1, h: 3.1, y: 5.1, n: 3.8, fb: 0.1 },
   ];
-  const gap = 1.3; // ouverture de la verrière (autour du sommet)
+  const gap = 1.2;
   const nose = ST.slice(0, 4);
-  // partie avant ouverte sur le dessus + verrière ajustée
-  S.add(loft(nose, { radial: 48, steps: 7, texSize: 5, arc: [Math.PI / 2 + gap, Math.PI / 2 - gap + Math.PI * 2] }), hullDS);
-  S.add(loft(ST.slice(3), { radial: 64, steps: 6, texSize: 5 }), hullDS);
-  const can = new THREE.Mesh(loft(nose.slice(1), { radial: 20, steps: 7, arc: [Math.PI / 2 - gap, Math.PI / 2 + gap] }), glass);
+  S.plated(nose, { facets: 12, steps: 4, arc: [Math.PI / 2 + gap, Math.PI / 2 - gap + Math.PI * 2], plateEvery: [3, 1], altBelow: 3.4, altRandom: 0.03, seed: 11 }, HM);
+  S.plated(ST.slice(3), { facets: 16, steps: 5, plateEvery: [3, 1], altBelow: 3.3, altRandom: 0.03, missing: 0.03, seed: 12, collide: false }, HM);
+  // verrière à vitrages plans + montants épais sur chaque arête
+  const cg = platedHull(nose.slice(1), { facets: 4, steps: 3, arc: [Math.PI / 2 - gap, Math.PI / 2 + gap] });
+  const can = new THREE.Mesh(cg.under, glass);
   can.renderOrder = 3;
   S.group.add(can);
-  // montants de verrière (profil exact de la coque)
-  const onHull = (st, t, k = 1.008) => {
-    const c = Math.cos(t), s = Math.sin(t);
-    return [Math.sign(c) * Math.pow(Math.abs(c), 2 / st.n) * st.w * k, st.y + Math.sign(s) * Math.pow(Math.abs(s), 2 / st.n) * st.h * k];
-  };
-  for (const tt of [Math.PI / 2 - gap, Math.PI / 2 - 0.45, Math.PI / 2 + 0.45, Math.PI / 2 + gap]) {
-    const pts = [];
-    for (let i = 0; i <= 14; i++) { const zz = -17.3 + (i / 14) * 6.2; const st = interpStation(nose, zz); const [x, y] = onHull(st, tt); pts.push(S.local(x, y, zz).toArray()); }
-    ctx.builder.tube(pts, 0.075, trim, { radial: 6, cast: false });
-  }
-  for (const zz of [-15.6, -13.2]) {
-    const st = interpStation(nose, zz); const pts = [];
-    for (let i = 0; i <= 12; i++) { const [x, y] = onHull(st, Math.PI / 2 - gap + (i / 12) * gap * 2); pts.push(S.local(x, y, zz).toArray()); }
-    ctx.builder.tube(pts, 0.07, trim, { radial: 6, cast: false });
-  }
-  // ventre sombre (bande inférieure) et liseré orange sur la ligne de flottaison
-  S.add(loft([
-    { z: -17.0, w: 2.32, h: 1.2, y: 5.2, n: 3 }, { z: -11, w: 4.48, h: 3.1, y: 4.6, n: 3.8 },
-    { z: 9, w: 4.63, h: 3.25, y: 4.6, n: 3.8 }, { z: 15.02, w: 4.12, h: 2.8, y: 4.8, n: 3.4 },
-  ], { radial: 48, steps: 6, texSize: 3, arc: [Math.PI * 1.08, Math.PI * 1.92] }), belly);
+  const P = cg.points;
+  for (let i = 0; i < P[0].length; i++) ctx.builder.tube(P.map((r) => S.local(r[i].x, r[i].y + 0.02, r[i].z).toArray()), 0.085, trim, { radial: 6, cast: false, smooth: false });
+  for (let j = 0; j < P.length; j += 3) ctx.builder.tube(P[j].map((p) => S.local(p.x, p.y + 0.02, p.z).toArray()), 0.07, trim, { radial: 6, cast: false, smooth: false });
   for (const sx of [-1, 1]) {
     // arête de chine (ressaut horizontal) + liseré
-    S.box(0.35, 0.22, 26, trim, [sx * 4.66, 4.9, 1.5], null, { tex: 2 });
-    S.box(0.04, 0.12, 25, accent, [sx * 4.85, 4.9, 1.5], null, { cast: false, tex: 1 });
-    // hublots du pont supérieur (vitrage émissif chaud)
-    for (let z = -6.5; z <= 9; z += 1.55) S.box(0.06, 0.38, 0.8, mats.emissive(0xffd9a8, 1.5), [sx * 4.56, 6.45, z], null, { cast: false });
-    // panneaux de service et grilles
-    for (const z of [-3, 3.5, 10]) S.box(0.05, 0.9, 1.6, metal, [sx * 4.62, 3.1, z], null, { cast: false });
-    S.box(0.05, 0.5, 2.6, mats.vent(), [sx * 4.6, 7.3, 6], null, { cast: false });
+    S.box(0.4, 0.26, 26, trim, [sx * 4.72, 4.95, 1.5], null, { tex: 2 });
+    S.box(0.04, 0.1, 25, accent, [sx * 4.93, 4.95, 1.5], null, { cast: false, tex: 1 });
+    // hublots encadrés du pont supérieur
+    for (let z = -6.5; z <= 9; z += 1.55) {
+      S.box(0.08, 0.5, 0.92, trim, [sx * 4.7, 6.45, z], null, { cast: false });
+      S.box(0.06, 0.36, 0.76, mats.emissive(0xffd9a8, 1.4), [sx * 4.75, 6.45, z], null, { cast: false });
+    }
+    // trappes de service, grilles, feux
+    for (const z of [-3, 3.5, 10]) { S.box(0.1, 0.95, 1.65, HM.alt, [sx * 4.66, 3.0, z], null, { cast: false }); S.box(0.1, 0.18, 0.3, yellow, [sx * 4.72, 3.35, z - 0.6], null, { cast: false }); }
+    S.box(0.08, 0.5, 2.6, mats.vent(), [sx * 4.62, 7.4, 6], null, { cast: false });
+    S.box(0.06, 0.14, 0.14, mats.emissive(0xffffff, 6), [sx * 4.75, 4.2, -14], null, { cast: false });
+    // propulseurs de manœuvre (RCS) : blocs de 3 tuyères
+    for (const [z, y] of [[-12, 6.6], [11.5, 3.0]]) {
+      S.box(0.3, 0.5, 0.6, HM.alt, [sx * 4.55, y, z]);
+      for (const dz of [-0.15, 0.15]) S.cyl(0.07, 0.1, 0.18, metal, [sx * 4.75, y + 0.1, z + dz], [0, 0, Math.PI / 2], { seg: 8, cast: false });
+    }
   }
-  // lignes de panneaux en relief sur les flancs (coque quasi plane entre y = 2,6 et 7,4)
-  for (const sx of [-1, 1]) {
-    for (const yy of [3.3, 5.9, 7.35]) S.box(0.03, 0.035, 21, trim, [sx * 4.62, yy, 1.0], null, { cast: false });
-    for (let z = -9.5; z <= 12; z += 3.6) S.box(0.03, 4.3, 0.035, trim, [sx * 4.62, 5.0, z], null, { cast: false });
-    // trappes, prises d'air, feux d'accostage
-    S.box(0.05, 0.6, 1.0, mats.paint(0xc8c4bc, { plain: true, rough: 0.4 }), [sx * 4.63, 7.0, -8], null, { cast: false });
-    S.box(0.05, 0.12, 0.12, mats.emissive(0xffffff, 6), [sx * 4.64, 4.2, -14 + 0], null, { cast: false });
-  }
-  // dos : épine dorsale, dôme de capteurs, antennes, ailerons
-  S.box(1.4, 0.5, 18, hull, [0, 8.65, 2.5], null, { tex: 4 });
-  S.cyl(0.6, 0.75, 0.45, trim, [0, 9.05, -4], null, { seg: 24 });
-  S.add(new THREE.SphereGeometry(0.55, 20, 10, 0, Math.PI * 2, 0, Math.PI / 2), mats.smooth(0x9aa4aa, 0.2, 0.6), [0, 9.25, -4]);
+  // dos : épine dorsale blindée, dôme de capteurs, antennes, ailerons
+  S.plated([{ z: -3, w: 0.2, h: 0.2, y: 8.5, n: 3 }, { z: -1.5, w: 0.75, h: 0.35, y: 8.6, n: 4 }, { z: 11, w: 0.75, h: 0.4, y: 8.6, n: 4 }, { z: 12.5, w: 0.3, h: 0.2, y: 8.5, n: 3 }], { facets: 8, steps: 2, plateEvery: [1, 1], seed: 13, collide: false }, HM);
+  S.cyl(0.6, 0.75, 0.45, trim, [0, 9.05, -4], null, { seg: 12 });
+  S.add(new THREE.SphereGeometry(0.55, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2), mats.smooth(0x9aa4aa, 0.2, 0.6), [0, 9.25, -4]);
   S.cyl(0.03, 0.03, 1.6, metal, [0.5, 9.6, 6]);
   S.cyl(0.03, 0.03, 1.1, metal, [-0.4, 9.4, 8]);
-  greebles(S, metal, -1.5, 1.5, 8.9, -1, 12, 26, 9090);
+  greebles(S, metal, -0.6, 0.6, 9.0, -1, 11, 18, 9090);
   for (const sx of [-1, 1]) {
-    const fin = wing([[0, 0], [3.0, 3.4], [3.0, 5.0], [0, 6.4]], 0.24);
-    fin.rotateZ(-Math.PI / 2);
-    S.add(fin, hull, [sx * 1.5, 8.6, 7.2], [0, 0, sx * 0.38]);
-    S.navLight([sx * 2.6, 11.4, 11.5], 0xffffff, 1.0 + sx * 0.4);
+    S.plated([{ z: 6.0, w: 0.12, h: 0.4, y: 9.4, x: sx * 1.6, n: 6 }, { z: 7.0, w: 0.14, h: 1.2, y: 9.9, x: sx * 1.9, n: 6 }, { z: 11.6, w: 0.14, h: 1.3, y: 10.0, x: sx * 2.1, n: 6 }, { z: 12.4, w: 0.1, h: 0.9, y: 10.1, x: sx * 2.2, n: 6 }], { facets: 6, steps: 2, plateEvery: [1, 1], seed: 14 + sx, collide: false }, HM);
+    S.navLight([sx * 2.2, 11.1, 12.0], 0xffffff, 1.0 + sx * 0.4);
   }
-  // ailes et pods de poussée verticale
+  // ailes en caisson blindé, enracinées dans la coque
   for (const sx of [-1, 1]) {
-    const wg = wing([[0, -3.5], [5.6, 2.2], [5.6, 5.4], [0, 6.5]], 0.38);
-    wg.applyMatrix4(new THREE.Matrix4().makeScale(sx, 1, 1));
-    if (sx < 0) flipFaces(wg);
-    S.add(wg, hull, [sx * 4.4, 3.75, 0]);
-    S.box(0.6, 0.42, 3.4, accent, [sx * 10.0, 3.75, 3.8], null, { tex: 1 });
+    S.plated([
+      { z: -3.2, w: 0.4, h: 0.12, y: 3.75, x: sx * 5.0, n: 8 },
+      { z: -1.2, w: 2.6, h: 0.26, y: 3.75, x: sx * 6.6, n: 8 },
+      { z: 4.6, w: 3.3, h: 0.3, y: 3.75, x: sx * 7.2, n: 8 },
+      { z: 6.4, w: 2.6, h: 0.18, y: 3.75, x: sx * 7.4, n: 8 },
+    ], { facets: 8, steps: 3, plateEvery: [1, 1], seed: 20 + sx, altRandom: 0.15 }, HM);
+    // volets de bord de fuite (séparés par un jour), point d'emport, feux
+    S.box(4.6, 0.12, 0.7, HM.alt, [sx * 7.6, 3.7, 6.9], [0.12, 0, 0]);
+    S.box(0.2, 0.35, 1.8, metal, [sx * 8.4, 3.38, 1.0]);
+    S.cyl(0.11, 0.11, 2.4, mats.metal(0x2a2c2e), [sx * 8.4, 3.1, 0.6], [Math.PI / 2, 0, 0], { seg: 8 });
+    S.box(0.5, 0.35, 3.0, accent, [sx * 10.25, 3.75, 3.9], null, { tex: 1 });
     // pod VTOL en bout d'aile
-    S.add(loft([{ z: 0.5, w: 0.3, h: 0.3, x: sx * 10.3, y: 3.75, n: 2 }, { z: 1.6, w: 0.85, h: 0.85, x: sx * 10.3, y: 3.75, n: 2.4 }, { z: 6.2, w: 0.85, h: 0.85, x: sx * 10.3, y: 3.75, n: 2.4 }, { z: 7.0, w: 0.5, h: 0.5, x: sx * 10.3, y: 3.75, n: 2 }], { radial: 24, steps: 4 }), hull);
-    S.add(new THREE.CircleGeometry(0.62, 20), mats.emissive(0x7fb8ff, 0.8), [sx * 10.3, 2.86, 3.8], [Math.PI / 2, 0, 0], { cast: false });
-    S.navLight([sx * 11.15, 3.75, 3.8], sx < 0 ? 0xff2010 : 0x20ff40, 0);
+    S.plated([{ z: 0.6, w: 0.35, h: 0.35, x: sx * 10.3, y: 3.75, n: 3 }, { z: 1.6, w: 0.85, h: 0.85, x: sx * 10.3, y: 3.75, n: 3 }, { z: 6.2, w: 0.85, h: 0.85, x: sx * 10.3, y: 3.75, n: 3 }, { z: 7.0, w: 0.5, h: 0.5, x: sx * 10.3, y: 3.75, n: 3 }], { facets: 10, steps: 2, plateEvery: [1, 1], seed: 30 + sx }, HM);
+    S.cyl(0.62, 0.62, 0.2, mats.metal(0x1c1e20), [sx * 10.3, 2.95, 3.8], null, { seg: 14 });
+    S.add(new THREE.CircleGeometry(0.5, 14), mats.emissive(0x7fb8ff, 0.8), [sx * 10.3, 2.84, 3.8], [Math.PI / 2, 0, 0], { cast: false });
+    S.navLight([sx * 11.2, 3.75, 3.8], sx < 0 ? 0xff2010 : 0x20ff40, 0);
   }
-  // moteurs principaux
+  // moteurs principaux intégrés à la coque (nacelles blindées, tuyères, suie)
   for (const sx of [-1, 1]) {
     const x = sx * 3.0, y = 6.6;
-    S.add(loft([
-      { z: 4.5, w: 0.4, h: 0.4, x, y, n: 2 }, { z: 6.0, w: 1.35, h: 1.35, x, y, n: 2.2 },
-      { z: 14.5, w: 1.45, h: 1.45, x, y, n: 2.2 }, { z: 16.6, w: 1.3, h: 1.3, x, y, n: 2.2 },
-    ], { radial: 32, steps: 5, texSize: 4 }), hull);
-    S.add(nozzle(1.15, 1.6), metal, [x, y, 16.4]);
-    S.add(new THREE.CircleGeometry(0.9, 24), mats.emissive(0xff7a3a, 1.1), [x, y, 16.6], null, { cast: false });
-    S.box(0.8, 0.12, 9, trim, [x, y + 1.45, 10.5], null, { tex: 2 });
+    S.plated([
+      { z: 4.0, w: 0.5, h: 0.5, x, y, n: 2.6 }, { z: 6.0, w: 1.4, h: 1.4, x, y, n: 2.6 },
+      { z: 14.4, w: 1.5, h: 1.5, x, y, n: 2.6 }, { z: 16.2, w: 1.35, h: 1.35, x, y, n: 2.6 },
+    ], { facets: 12, steps: 3, plateEvery: [1, 1], seed: 40 + sx }, HM);
+    S.add(nozzle(1.15, 1.6), mats.metal(0x3a3d40, { rough: 0.45 }), [x, y, 16.0]);
+    for (let k = 0; k < 3; k++) S.cyl(1.2 - k * 0.2, 1.2 - k * 0.2, 0.06, mats.metal(0x1a1b1c), [x, y, 16.6 + k * 0.02], [Math.PI / 2, 0, 0], { seg: 16, cast: false });
+    S.add(new THREE.CircleGeometry(0.75, 20), mats.emissive(0xff7a3a, 0.9), [x, y, 16.62], null, { cast: false });
     S.cbox(3.0, 3.0, 12, [x, y, 10.5]);
   }
   // marquages
-  S.decal(['HÉRON MK II'], 3.6, [-4.88, 5.6, -2.0], -Math.PI / 2, { color: '#2a2e31', size: 120, wear: 0.3 });
-  S.decal(['HL-2207'], 2.4, [4.88, 5.6, -2.0], Math.PI / 2, { color: '#2a2e31', size: 120, wear: 0.3 });
-  S.decal(['HL-2207'], 3.0, [0, 9.0, 1.0], 0, { color: '#2a2e31', size: 120, wear: 0.3, rotX: -Math.PI / 2 });
+  S.decal(['HÉRON MK II'], 3.6, [-4.97, 5.6, -2.0], -Math.PI / 2, { color: '#2a2e31', size: 120, wear: 0.6 });
+  S.decal(['HL-2207'], 2.4, [4.97, 5.6, -2.0], Math.PI / 2, { color: '#2a2e31', size: 120, wear: 0.6 });
 
   // -------------------------------------------------- pont inférieur : soute
   const fy = 2.0, cy = 4.85, hw = 3.55;   // plancher, plafond, demi-largeur
@@ -475,14 +481,14 @@ function buildMulet(ctx) {
   const glass = new THREE.MeshStandardMaterial({ color: 0x0b1015, roughness: 0.08, metalness: 1.0 });
   const fy = 2.3, iw = 3.6, cy = 7.6;
   // corps principal anguleux
-  const body = loft([
+  const HMm = hullMats(mats, 0xa3a88f, 0x4a504a);
+  S.plated([
     { z: -15.5, w: 2.6, h: 2.0, y: 4.6, n: 3 },
     { z: -13, w: 4.6, h: 3.1, y: 4.9, n: 5, fb: 0.1 },
     { z: -8, w: 5.0, h: 3.4, y: 5.0, n: 7, fb: 0.15 },
     { z: 12, w: 5.0, h: 3.4, y: 5.0, n: 7, fb: 0.15 },
     { z: 15.5, w: 4.8, h: 3.2, y: 5.0, n: 7, fb: 0.15 },
-  ], { radial: 56, steps: 6, texSize: 5 });
-  S.add(body, hull);
+  ], { facets: 16, steps: 4, plateEvery: [3, 1], altBelow: 2.6, altRandom: 0.05, missing: 0.04, seed: 50 }, HMm);
   // passerelle de commandement surélevée
   const bridge = loft([
     { z: -14.2, w: 0.8, h: 0.3, y: 8.3, n: 3 },
@@ -494,20 +500,15 @@ function buildMulet(ctx) {
   S.box(4.6, 0.12, 0.8, glass, [0, 8.85, -13.2], [0.75, 0, 0], { cast: false });
   for (const x of [-1.6, 1.6]) S.box(1.4, 0.7, 0.08, glass, [x * 1.05, 8.7, -12.5], [0, x * 0.35, 0], { cast: false });
   // côtes de renfort et bandes de danger
-  for (let z = -10; z <= 12; z += 2.75) {
-    const rib = loft([{ z: z - 0.12, w: 5.12, h: 3.5, y: 5.0, n: 7, fb: 0.15 }, { z: z + 0.12, w: 5.12, h: 3.5, y: 5.0, n: 7, fb: 0.15 }], { radial: 56, steps: 1 });
-    S.add(rib, hull2, [0, 0, 0], null, { cast: false });
-  }
   // conteneurs/modules latéraux et moteurs
   for (const s of [-1, 1]) {
     S.box(1.4, 2.6, 18, hull2, [s * 5.6, 4.6, 1.5], null, { tex: 3 });
     for (const z of [-4, 10]) {
-      const pod = loft([
+      S.plated([
         { z: z - 2.5, w: 0.4, h: 0.4, y: 5.2, x: s * 7.3, n: 2 },
         { z: z - 1.5, w: 1.3, h: 1.3, y: 5.2, x: s * 7.3, n: 2.2 },
         { z: z + 2.8, w: 1.35, h: 1.35, y: 5.2, x: s * 7.3, n: 2.2 },
-      ], { radial: 24, steps: 4 });
-      S.add(pod, hull);
+      ], { facets: 12, steps: 2, plateEvery: [1, 1], seed: 60 + z, collide: false }, HMm);
       S.add(nozzle(1.1, 1.3), metal, [s * 7.3, 5.2, z + 2.7]);
       S.add(new THREE.CircleGeometry(0.85, 20), mats.metal(0x0d0e0f), [s * 7.3, 5.2, z + 2.9], null, { cast: false });
       S.box(1.8, 0.6, 2.0, hull2, [s * 6.4, 5.2, z + 0.5]);
@@ -576,15 +577,15 @@ function buildFaucon(ctx) {
   const red = mats.paint(0x8c1e18, { grime: 0.5 });
   const metal = mats.metal(0x55595c);
   const glass = new THREE.MeshStandardMaterial({ color: 0x1a1408, roughness: 0.05, metalness: 1.0, envMapIntensity: 1.5 });
-  const fus = loft([
+  const HMf = hullMats(mats, 0x5a6168, 0x2c3034);
+  S.plated([
     { z: -8.0, w: 0.12, h: 0.12, y: 2.2, n: 2 },
     { z: -6.0, w: 0.8, h: 0.6, y: 2.25, n: 2.4, fb: 0.2 },
     { z: -3.0, w: 1.5, h: 1.0, y: 2.35, n: 2.6, fb: 0.3 },
     { z: 1.0, w: 1.8, h: 1.05, y: 2.4, n: 3, fb: 0.35 },
     { z: 5.5, w: 1.9, h: 0.95, y: 2.45, n: 3.2, fb: 0.35 },
     { z: 7.0, w: 1.7, h: 0.85, y: 2.45, n: 3.2 },
-  ], { radial: 40, steps: 7 });
-  S.add(fus, hull);
+  ], { facets: 12, steps: 3, plateEvery: [2, 1], altBelow: 1.9, altRandom: 0.08, seed: 70 }, HMf);
   const canopy = loft([
     { z: -4.5, w: 0.3, h: 0.1, y: 3.0, n: 2 },
     { z: -3.2, w: 0.65, h: 0.5, y: 3.05, n: 2.2 },
@@ -604,12 +605,11 @@ function buildFaucon(ctx) {
     fin.rotateZ(-Math.PI / 2);
     S.add(fin, hull, [s * 1.2, 2.9, 3.6], [0, 0, s * 0.3]);
     // moteurs
-    const eng = loft([
+    S.plated([
       { z: 1, w: 0.5, h: 0.5, y: 2.3, x: s * 0.95, n: 2 },
       { z: 3, w: 0.75, h: 0.75, y: 2.3, x: s * 0.95, n: 2 },
       { z: 7.6, w: 0.72, h: 0.72, y: 2.3, x: s * 0.95, n: 2 },
-    ], { radial: 22, steps: 4 });
-    S.add(eng, hull2);
+    ], { facets: 10, steps: 2, plateEvery: [1, 1], seed: 72 + s, collide: false }, HMf);
     S.add(nozzle(0.62, 0.9), metal, [s * 0.95, 2.3, 7.5]);
     S.add(new THREE.CircleGeometry(0.45, 18), mats.metal(0x0b0c0d), [s * 0.95, 2.3, 7.65], null, { cast: false });
     // canons sous l'aile
@@ -622,7 +622,7 @@ function buildFaucon(ctx) {
   for (let k = 0; k < 5; k++) ctx.builder.cable(S.local(-1.75, 1.8 + k * 0.08, 1.4 + k * 0.2).toArray(), S.local(-2.6, 0.02, 0.6 + k * 0.5).toArray(), 0.15, 0.02, k % 2 ? mats.rubber() : mats.plastic(0x2a6fbd));
   // plaque arrachée posée au sol
   S.box(1.4, 0.04, 1.0, hull, [-3.2, 0.02, 0.4], [0, 0.4, 0]);
-  S.decal(['FC-31'], 1.4, [1.82, 2.5, 1.5], Math.PI / 2, { color: '#c9c3b5', size: 120, wear: 0.9 });
+  S.decal(['FC-31'], 1.4, [1.98, 2.5, 1.5], Math.PI / 2, { color: '#c9c3b5', size: 120, wear: 0.9 });
   S.decal(['NE PAS MARCHER'], 1.2, [3.8, 2.29, 3.6], 0, { color: '#c9c3b5', size: 70, wear: 0.9, rotX: -Math.PI / 2 });
   S.gear(0, -4.5, 1.5, mats, { r: 0.08 });
   for (const s of [-1, 1]) S.gear(s * 1.3, 2.5, 1.35, mats, { r: 0.1 });
@@ -646,19 +646,19 @@ function buildNavette(ctx) {
   const metal = mats.metal(0x55595c);
   const glass = new THREE.MeshStandardMaterial({ color: 0x0a0e12, roughness: 0.05, metalness: 1.0 });
   const fy = 1.55, iw = 1.9;
-  const fus = loft([
+  const HMn = hullMats(mats, 0xdcdcd6, 0x1f4f7a);
+  S.plated([
     { z: -9.5, w: 0.5, h: 0.4, y: 3.0, n: 2.2 },
     { z: -7.8, w: 1.9, h: 1.4, y: 3.0, n: 2.5, fb: 0.3 },
     { z: -5, w: 2.4, h: 1.8, y: 3.0, n: 3.4, fb: 0.4 },
     { z: 6, w: 2.4, h: 1.8, y: 3.0, n: 3.4, fb: 0.4 },
     { z: 8.6, w: 2.0, h: 1.4, y: 3.1, n: 3, fb: 0.3 },
     { z: 9.6, w: 1.0, h: 0.7, y: 3.3, n: 2.5 },
-  ], { radial: 44, steps: 6 });
-  S.add(fus, hull);
+  ], { facets: 14, steps: 3, plateEvery: [3, 1], altBelow: 2.0, altRandom: 0.02, seed: 80 }, HMn);
   // bande bleue
-  for (const s of [-1, 1]) S.box(0.05, 0.35, 13, blue, [s * 2.42, 3.0, 0.5], null, { cast: false, tex: 1 });
+  for (const s of [-1, 1]) S.box(0.05, 0.35, 13, blue, [s * 2.55, 3.0, 0.5], null, { cast: false, tex: 1 });
   // hublots
-  for (let z = -4; z <= 5; z += 1.3) for (const s of [-1, 1]) S.box(0.06, 0.45, 0.6, glass, [s * 2.41, 3.55, z], null, { cast: false });
+  for (let z = -4; z <= 5; z += 1.3) for (const s of [-1, 1]) S.box(0.06, 0.45, 0.6, glass, [s * 2.55, 3.55, z], null, { cast: false });
   S.box(2.6, 0.7, 0.1, glass, [0, 3.7, -8.1], [0.9, 0, 0], { cast: false });
   // moteurs arrière et ailerons courts
   for (const s of [-1, 1]) {
@@ -669,10 +669,10 @@ function buildNavette(ctx) {
     S.navLight([s * 4.45, 2.2, 7.5], s < 0 ? 0xff2010 : 0x20ff40, 0);
   }
   greebles(S, metal, -1.2, 1.2, 4.75, -5, 7, 18, 31337);
-  S.decal(['ST-40 · LIGNE HALDEN — TERMINUS'], 4.2, [2.43, 2.5, 0.5], Math.PI / 2, { color: '#1f4f7a', size: 110, wear: 0.4 });
+  S.decal(['ST-40 · LIGNE HALDEN — TERMINUS'], 4.2, [2.58, 2.5, 0.5], Math.PI / 2, { color: '#1f4f7a', size: 110, wear: 0.4 });
   // porte latérale (côté +x = vers le sas une fois tournée) + escalier escamotable
-  S.box(0.08, 2.0, 1.3, hull2, [2.42, 2.55, -3.0], null, { cast: false });
-  S.box(0.06, 2.0, 1.2, mats.emissive(0xffe4c0, 1.6), [2.38, 2.55, -3.0], null, { cast: false });
+  S.box(0.1, 2.0, 1.3, hull2, [2.55, 2.55, -3.0], null, { cast: false });
+  S.box(0.06, 2.0, 1.2, mats.emissive(0xffe4c0, 1.6), [2.52, 2.55, -3.0], null, { cast: false });
   const steps = 5;
   for (let i = 0; i < steps; i++) S.box(0.35, 0.06, 1.1, metal, [2.6 + (steps - i) * 0.3, (i + 1) * (fy / steps), -3.0]);
   for (const s of [-1, 1]) S.box(1.7, 0.05, 0.05, mats.paint(0xc89a1e), [3.3, fy * 0.5 + 0.9, -3.0 + s * 0.55], [0, 0, -0.75]);

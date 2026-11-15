@@ -33,7 +33,7 @@ await page.evaluate(() => {
   window.__tp = (x, y, z, yaw) => { const p = A.player; p.pos.set(x, y, z); p.vel.set(0, 0, 0); p.yaw = yaw; p.pitch = 0; };
 });
 const walk = (s, mx, my, run, yaw) => page.evaluate(([s, mx, my, run, yaw]) => window.__walk(s, mx, my, run, yaw), [s, mx, my, !!run, yaw ?? null]);
-const shot = async (n) => { await page.evaluate(() => window.__app.renderer.render(1 / 30)); await page.screenshot({ path: `${out}/play_${n}.png` }); };
+const shot = async (n) => { await page.evaluate(() => window.__app.renderer.render(1 / 30)); await page.screenshot({ path: `${out}/play_${n}.png`, timeout: 180000 }); };
 
 console.log('1. marche 4 s vers l\'avant :', await walk(4, 0, 1));
 console.log('   course 3 s :', await walk(3, 0, 1, true));

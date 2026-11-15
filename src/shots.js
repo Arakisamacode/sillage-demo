@@ -32,5 +32,6 @@ export const SHOTS = {
   heronupper: { pos: [-13, 6.9, -3.2], look: [-13, 6.3, -19], fov: 70 },
   heronbridge: { pos: [-13, 7.1, -22.2], look: [-13, 6.6, -33], fov: 70 },
   tpgallery: { pos: [-50, 1.7, -2], look: [-80, 1.6, -2], fov: 70 },
+  pad5: { pos: [-4, 1.7, 4], look: [-15, 2.5, 14], fov: 65 },
   cockpit: { pos: [-13, 3.2, -22], look: [-13, 3, -40], fov: 70 },
 };
