@@ -26,6 +26,7 @@ import { ShopUI } from './ui/shop.js';
 import { buildOutposts } from './world/outposts.js';
 import { buildDerelict } from './world/derelict.js';
 import { buildBayCover, buildAirlockSign } from './world/baycover.js';
+import { buildHabitat, DECK_Y } from './world/habitat.js';
 import { Cargo, buildQuai } from './game/cargo.js';
 import { Missions } from './game/missions.js';
 import { Crew } from './game/crew.js';
@@ -81,6 +82,7 @@ async function boot() {
   ctx.derelict = buildDerelict(ctx);
   buildBayCover(ctx);
   buildAirlockSign(ctx);
+  ctx.habitat = buildHabitat(ctx);
   ctx.lights = buildLighting(ctx);
   const lib = new CharacterLibrary(manager, quality);
   const libReady = lib.load(undefined, (p) => progress(0.6 + 0.3 * p, 'Chargement des personnages'));
@@ -169,6 +171,28 @@ async function boot() {
       for (;;) yield { type: 'sit', x: st.x, z: st.z, yaw: st.yaw, dur: 999, talk: i % 2 === 1 };
     }));
   } else crowd.populate();
+  // habitants du pont habitat : barman, médecin, clients (animés seulement quand le joueur est sur le pont)
+  {
+    const HB = ctx.habitat, people = [];
+    const put = (model, opts, p, yaw, anim, outfit) => {
+      const c = lib.create(model, opts); c.root.position.copy(p); c.root.rotation.y = yaw;
+      if (outfit) c.setOutfit(outfit);
+      if (anim) c.play(anim, { fade: 0 });
+      scene.add(c.root); people.push(c); c.root.visible = false; return c;
+    };
+    put('UM_dark', { height: 1.84, hair: 'Hair_Beard' }, HB.bartender, -Math.PI / 2, 'talk', { top: 0x2a2224, bottom: 0x1c1c1e, accent: 0xffb84a, zip: true });
+    put('UF_light', { height: 1.7, hair: 'Hair_Buns' }, HB.doctor, Math.PI, null, { top: 0xe8eef0, bottom: 0xd8dee0, boot: 0xf0f0f0, accent: 0x3aa86a });
+    const seats = [...HB.chairs.slice(0, 4), HB.benches[1], HB.benches[4]];
+    const looks = [['UM_light', 'Hair_SimpleParted'], ['UF_dark', 'Hair_Long'], ['UM_dark', 'Hair_Buzzed'], ['UF_light', 'Hair_BuzzedFemale'], ['UM_light', 'Hair_Beard'], ['UF_dark', 'Hair_Buns']];
+    const tops = [0x6a4a32, 0x1a2436, 0x5d6168, 0xa89470, 0x2b3036, 0x7a2a24];
+    seats.forEach((st, i) => put(looks[i][0], { height: looks[i][0].startsWith('UF') ? 1.68 : 1.8, hair: looks[i][1] }, st.p, st.yaw, i % 2 ? 'sitTalk' : 'sit', { top: tops[i], accent: 0xc8b48a, belt: true }));
+    put('UM_light', { height: 1.78, hair: 'Hair_Buzzed' }, HB.stools[2].clone().add(new THREE.Vector3(-0.3, 0, 0)), Math.PI / 2, 'talk', { top: 0x3a4a2a, accent: 0xd0a040 });
+    ctx.updaters.push((dt) => {
+      const on = HB.onDeck(player.pos);
+      for (const l of HB.lights) l.visible = on;
+      for (const c of people) { c.root.visible = on; if (on) c.update(dt, null); }
+    });
+  }
   ctx.crowd = crowd; ctx.player = player; ctx.scenes = scenes;
   // ------------------------------------------------------------------ équipage (bureau de recrutement de la galerie)
   const crew = new Crew(ctx, { game, cargo, flight, crowd, missions, player, loadout: heronGear });
@@ -283,6 +307,37 @@ async function boot() {
     if (e === 'hired') { audio.blip(); }
     if (e === 'boarded') toast(`Équipage à bord : ${x} ${x > 1 ? 'personnes' : 'personne'}`);
   };
+  // ------------------------------------------------------------------ module habitat : ascenseurs, bar, infirmerie, cabine
+  const HB = ctx.habitat;
+  const fadeEl = $('fade');
+  const fadeDo = (fn, hold = 450) => { fadeEl.classList.add('on'); setTimeout(() => { fn(); setTimeout(() => fadeEl.classList.remove('on'), hold); }, 480); };
+  for (const cab of HB.cabins) {
+    const up = cab.y === 0;
+    interactables.push({ pos: cab.inside.clone(), r: 1.3, label: up ? 'E — Ascenseur : monter au pont habitat' : 'E — Ascenseur : descendre à la galerie', fn: () => {
+      const dest = HB.cabins.find((k) => k.c === cab.c && k.y !== cab.y);
+      audio.blip();
+      fadeDo(() => {
+        player.pos.set(dest.inside.x + 0.3, dest.y + 0.02, dest.inside.z); player.vel.set(0, 0, 0);
+        player.yaw = -Math.PI / 2; player.pitch = 0;
+        dest.door.forced = 2.5;
+        toast(up ? 'Pont habitat · bar La Comète, infirmerie, cabine 12' : 'Rez-de-chaussée · galerie marchande');
+      }, 700);
+    } });
+  }
+  const DRINKS = ['Thé fumé de Lys', 'Bière de soute', 'Café serré', 'Eau pétillante recyclée', 'Liqueur d\'aurélite (sans aurélite)'];
+  const GOSSIP = ['« Les cargos pirates passent souvent près de la ceinture d\'Ardent. »', '« Corvin paie bien le cuivre, ces temps-ci. »', '« Lys rachète le titane au prix fort. »', '« Une alerte au hangar 07 ? Ça arrive plus qu\'on ne croit. »', '« Embauchez un artilleur, la tourelle ne se sert pas toute seule. »'];
+  interactables.push({ pos: HB.bar, r: 1.6, label: 'E — Commander au bar (8 ¤)', fn: () => {
+    if (!game.pay(8)) return 'Crédits insuffisants';
+    audio.coffee(); toast(`${DRINKS[Math.floor(Math.random() * DRINKS.length)]} · ${GOSSIP[Math.floor(Math.random() * GOSSIP.length)]}`);
+  } });
+  interactables.push({ pos: HB.clinic, r: 1.6, label: 'E — Consultation à l\'infirmerie (250 ¤)', fn: () => {
+    if (!game.pay(250)) return 'Crédits insuffisants';
+    ctx.ground.hp = 100; game.d.owned.medpen = (game.d.owned.medpen || 0) + 1; game.save();
+    audio.blip(); toast('Soins complets · un stylo médical offert pour la route');
+  } });
+  interactables.push({ pos: HB.bunk, r: 2.4, label: 'E — Se reposer dans la cabine 12', fn: () => {
+    fadeDo(() => { ctx.ground.hp = 100; missions.persist(); game.save(); toast('Repos · santé au maximum · partie sauvegardée'); }, 1200);
+  } });
   interactables.push({ pos: ctx.quai.terminal, r: 1.5, label: 'E — Terminal des contrats de fret', fn: () => openUI(() => shop.openBoard(missions)) });
   missions.onEvent = (e, o, fee) => {
     if (e === 'complete') {

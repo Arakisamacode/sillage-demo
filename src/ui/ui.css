@@ -195,3 +195,6 @@ body.is-touch #nav { font-size: 10px; }
 body.is-touch #clock { display: none; }
 body.is-touch #credits { top: 12px; }
 body.is-touch #prompt { top: 21%; }
+
+#fade { position: fixed; inset: 0; background: #000; opacity: 0; pointer-events: none; transition: opacity .45s ease; z-index: 5; }
+#fade.on { opacity: 1; }

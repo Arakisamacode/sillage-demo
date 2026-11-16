@@ -119,6 +119,13 @@ qui servent de couverture. Le Héron s'y pose rampe face au pont.
 - **Récompenses** : 420 à 720 ¤ par pirate, puis le contrat de sécurité ou une prime de 1 500 ¤.
 - **À terre** : évacuation à bord, soins d'urgence (1 200 ¤), le raid échoue (le contrat reste ouvert).
 
+## Module habitat
+
+Au fond de la galerie marchande, la porte « MODULE HABITAT » mène par un couloir au hall des ascenseurs.
+Les deux cabines montent au **pont habitat** (E dans la cabine) : promenade avec baie vitrée sur la planète,
+**bar La Comète** (boissons à 8 ¤ et rumeurs utiles), **infirmerie** (soins complets à 250 ¤, un stylo
+médical offert) et **cabine 12** du joueur (repos : santé au maximum et sauvegarde).
+
 ## Alerte d'intrusion (hangar 07)
 
 De temps en temps (première alerte après 5 à 8 minutes à pied dans le hangar), des pirates franchissent

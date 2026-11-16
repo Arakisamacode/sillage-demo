@@ -153,7 +153,6 @@ export function buildGallery(ctx) {
     for (const s of [-1, 1]) B.box(0.6, dh, 0.4, dark, [G.x0 - 0.2, dh / 2, dz + s * (dw / 2 + 0.2)], null, { collide: true });
     B.box(5, 0.3, dw + 1, dark, [G.x0 - 2.8, dh + 0.15, dz]);
     for (const s of [-1, 1]) B.box(5, dh, 0.3, dark, [G.x0 - 2.8, dh / 2, dz + s * (dw / 2 + 0.15)], null, { collide: true });
-    B.box(0.3, dh, dw + 1, dark, [G.x0 - 5.2, dh / 2, dz], null, { collide: true });
     B.box(4.6, 0.05, 0.3, mats.emissive(0xffc890, 1.2), [G.x0 - 2.8, dh - 0.05, dz], null, { cast: false });
     B.box(5, 0.05, dw, mats.metal(0x2a2c2e), [G.x0 - 2.8, 0.01, dz], null, { cast: false, collide: true });
     ctx.habitatDoor = makeDoor(ctx, G.x0 - 0.2, dz, dw, dh, 'MODULE HABITAT');
