@@ -98,6 +98,28 @@ export function shopDecor(ctx, s, L, depth) {
     }
     spots.mannequins = [{ p: L.world(1.2, 0, 1.4), yaw: Math.PI }, { p: L.world(2.6, 0, 1.4), yaw: Math.PI }, { p: L.world(-3.0, 0, 1.2), yaw: Math.PI * 0.75 }];
   }
+  // rideau de fer : descend à la fermeture (horaires de la station), bloque l'entrée
+  {
+    const W8 = 8, Hs = 4.4;
+    const sh = new THREE.Mesh(new THREE.BoxGeometry(W8, Hs, 0.06), mats.cladding(0x5a5e62));
+    sh.position.copy(L.world(0, Hs / 2, -0.03)); scene.add(sh);
+    const band = new THREE.Mesh(new THREE.BoxGeometry(W8, 0.18, 0.08), mats.paint(0xd9a21b, { plain: true }));
+    scene.add(band);
+    const c = L.world(0, 0, 0);
+    const door = {
+      x: c.x, z: c.z, open: 1, shutter: true,
+      box: new THREE.Box3(new THREE.Vector3(c.x - W8 / 2, 0, c.z - 0.25), new THREE.Vector3(c.x + W8 / 2, Hs, c.z + 0.15)),
+      update(dt) {
+        const want = !ctx.time || ctx.time.open(s.id) ? 1 : 0;
+        this.open += Math.sign(want - this.open) * Math.min(Math.abs(want - this.open), dt * 0.35);
+        const k = 1 - 0.95 * this.open;
+        sh.scale.y = k; sh.position.y = Hs - (Hs * k) / 2;
+        band.position.set(sh.position.x, Hs - Hs * k + 0.09, sh.position.z - 0.02);
+        sh.visible = k > 0.08;
+      },
+    };
+    ctx.doors.push(door);
+  }
   // repères de la routine du vendeur : poste de caisse, étagère du fond
   spots.back = s.id === 'nouilles' ? L.world(-1.6, 0, 4.75) : L.world(-2.4, 0, 5.2);
   spots.backFace = L.world(s.id === 'nouilles' ? -1.6 : -2.4, 0, 7);

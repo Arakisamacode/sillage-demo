@@ -102,5 +102,75 @@ export function buildFurnish(ctx) {
   ctx.screens.push(news);
   const nm = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 1.35), news.material);
   nm.position.set(-111.75, Y + 3.3, -2.5); nm.rotation.y = Math.PI / 2; scene.add(nm);
+  // ------------------------------------------------------------------ hangar : terminal de diagnostic, casiers, annonces, racks de pièces
+  {
+    const diag = new Screen(320, 200, (c, w, h, t) => {
+      c.fillStyle = '#06121a'; c.fillRect(0, 0, w, h);
+      c.fillStyle = '#5fe6ff'; c.font = `700 16px ${FONT}`; c.fillText('HÉRON HL-2207 · DIAGNOSTIC', 12, 24);
+      c.strokeStyle = '#5fe6ff'; c.lineWidth = 2;
+      c.beginPath(); c.moveTo(160, 50); c.lineTo(200, 150); c.lineTo(160, 135); c.lineTo(120, 150); c.closePath(); c.stroke();
+      c.beginPath(); c.moveTo(80, 120); c.lineTo(240, 120); c.stroke();
+      const k = ((t || 0) * 0.5) % 1;
+      c.fillStyle = 'rgba(95,230,255,0.25)'; c.fillRect(0, 40 + k * 140, w, 6);
+      c.fillStyle = '#7dff9a'; c.font = `500 12px ${FONT}`; c.fillText('COQUE ✓   BOUCLIER ✓   RÉACTEURS ✓', 40, 185);
+    }, { period: 0.15, intensity: 1.5 });
+    ctx.screens.push(diag);
+    const x = -16.5, z = 9;
+    box(0.6, 1.0, 0.6, mats.metal(0x3a3e42), [x, 0.5, z], true);
+    box(0.12, 1.1, 1.6, mats.metal(0x2a2c30), [x, 1.6, z]);
+    const sc = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 0.95), diag.material);
+    sc.position.set(x + 0.07, 1.6, z); sc.rotation.y = Math.PI / 2; scene.add(sc);
+    B.addObstacle(x, z, 0.4, 0.8, 0);
+    out.diag = { pos: new THREE.Vector3(x + 0.9, 0, z) };
+  }
+  {
+    // casiers du personnel (mur ouest, près du coin pause)
+    const x = -31.55;
+    for (let i = 0; i < 6; i++) {
+      const z = 16.4 + i * 0.62;
+      box(0.55, 2.0, 0.6, mats.paint([0x3a4a5a, 0x4a5a3a, 0x5a4a3a][i % 3], { grime: 0.5 }), [x, 1.0, z], true);
+      box(0.02, 0.25, 0.12, mats.metal(0xa0a4a8), [x + 0.28, 1.2, z + 0.18]);
+      box(0.02, 0.4, 0.4, mats.vent(), [x + 0.28, 1.7, z]);
+    }
+    box(0.03, 0.06, 0.4, mats.emissive(0x7dff9a, 2.5), [x + 0.29, 1.95, 17.02]);
+    B.addObstacle(x, 17.95, 0.35, 1.9, 0);
+    out.locker = { pos: new THREE.Vector3(x + 1.1, 0, 17.0) };
+    // panneau d'annonces
+    const board = new Screen(256, 192, (c, w, h) => {
+      c.fillStyle = '#2a2018'; c.fillRect(0, 0, w, h);
+      const notes = [['#f2e6b0', 'RECHERCHE ARTILLEUR'], ['#bfe0ff', 'VENDS PIÈCES B2'], ['#ffd0c0', 'PRIMES : PIRATES À ARDENT'], ['#d8f0c8', 'COLOCATION CABINE 14']];
+      notes.forEach(([col, txt], i) => {
+        const x0 = 12 + (i % 2) * 122, y0 = 14 + Math.floor(i / 2) * 88;
+        c.fillStyle = col; c.fillRect(x0, y0, 110, 76); c.fillStyle = '#222'; c.font = `700 11px ${FONT}`;
+        txt.split(' ').reduce((acc, wd) => { const l = acc[acc.length - 1]; if ((l + ' ' + wd).length > 13) acc.push(wd); else acc[acc.length - 1] = (l + ' ' + wd).trim(); return acc; }, ['']).forEach((ln, k) => c.fillText(ln, x0 + 6, y0 + 20 + k * 14));
+        c.fillStyle = '#c83a2a'; c.beginPath(); c.arc(x0 + 55, y0 + 4, 4, 0, 7); c.fill();
+      });
+    }, { period: 1e9, intensity: 1.1 });
+    ctx.screens.push(board);
+    const bm = new THREE.Mesh(new THREE.PlaneGeometry(2.2, 1.65), board.material);
+    bm.position.set(-31.93, 2.0, 14.6); bm.rotation.y = Math.PI / 2; scene.add(bm);
+    box(0.08, 1.8, 2.4, mats.paint(0x5a4030, { plain: true }), [-31.98, 2.0, 14.6]);
+    out.board = { pos: new THREE.Vector3(-30.9, 0, 14.6) };
+  }
+  {
+    // racks de pièces et fûts (mur est et ouest)
+    const rack = (x, z, dir) => {
+      const fm = mats.metal(0x3a3e42, { rough: 0.6 }), yel = mats.paint(0xd9a21b, { plain: true });
+      for (const dz of [-2.05, 0, 2.05]) box(0.1, 3.0, 0.1, yel, [x, 1.5, z + dz]);
+      for (let k = 0; k < 4; k++) box(0.85, 0.06, 4.2, fm, [x, 0.18 + k * 0.95, z]);
+      B.colliderBox(0.85, 3.0, 4.2, [x, 1.5, z]);
+      for (let k = 0; k < 3; k++) for (let i = 0; i < 5; i++) {
+        const col = [0x8a5a2a, 0x3d4a5a, 0x5c6b4a, 0xb88a2a, 0x6a6e70][(i + k * 2) % 5];
+        if ((i + k) % 4 !== 3) box(0.6, 0.5, 0.65, mats.cladding(col), [x - dir * 0.05, 0.46 + k * 0.95, z - 1.65 + i * 0.82]);
+      }
+      B.addObstacle(x, z, 0.5, 2.2, 0);
+    };
+    rack(31.2, -24.8, 1); rack(-31.2, -21.5, -1);
+    const barrel = mats.paint(0x8a3a2a, { grime: 0.8, rust: 0.4 }), barrel2 = mats.paint(0x2f5e8a, { grime: 0.8, rust: 0.3 });
+    for (const [bx, bz] of [[28.6, -16.2], [-28.6, -16.4]]) {
+      for (let i = 0; i < 4; i++) B.cyl(0.32, 0.32, 0.95, i % 2 ? barrel2 : barrel, [bx + (i % 2) * 0.7, 0.48, bz + Math.floor(i / 2) * 0.7], null, { seg: 14, collide: true });
+      B.addObstacle(bx + 0.35, bz + 0.35, 0.8, 0.8, 0);
+    }
+  }
   return out;
 }

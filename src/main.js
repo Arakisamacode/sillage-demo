@@ -34,6 +34,7 @@ import { Crew } from './game/crew.js';
 import { Mining } from './game/mining.js';
 import { Combat } from './game/combat.js';
 import { Ground } from './game/ground.js';
+import { StationClock } from './game/clock.js';
 
 const params = new URLSearchParams(location.search);
 const HX_ = 32;
@@ -68,7 +69,7 @@ async function boot() {
   mats.preload();
   const builder = new Builder(scene);
   builder.cellSize = quality.name === 'low' ? 80 : 40;
-  const ctx = { scene, camera, renderer, quality, mats, builder, manager, updaters: [], screens: [] };
+  const ctx = { scene, camera, renderer, quality, mats, builder, manager, updaters: [], screens: [], time: new StationClock(8.6) };
 
   progress(0.05, 'Construction du hangar');
   await tick();
@@ -382,6 +383,16 @@ async function boot() {
   for (const tm of ctx.furnish.terminals) interactables.push({ pos: tm.pos, r: 1.4, label: 'E — Borne : plan de la station', fn: () => {
     audio.blip(); toast('Hangar 07 : est, par le sas · Boutiques : côté nord · Module habitat et ascenseurs : porte ouest · Contrats de fret : quai du hangar');
   } });
+  const F = ctx.furnish;
+  interactables.push({ pos: F.diag.pos, r: 1.4, label: 'E — Terminal de diagnostic du Héron', fn: () => {
+    audio.blip();
+    const sh = game.d.ship, hull = Math.round((game.d.hull ?? 6000) / 60);
+    const guns = ['wingL', 'wingR', 'chin'].map((k) => sh[k] && ITEM[sh[k]].name.split('«')[0].trim()).filter(Boolean).join(', ') || 'aucune arme';
+    toast(`Héron HL-2207 · coque ${hull} % · ${ITEM[sh.shield]?.name.split('«')[0].trim() || 'bouclier'} · ${guns}${sh.dorsal ? ' · tourelle' : ''}${sh.mining ? ' · laser de minage' : ''} · soute ${cargo.holdFree()} emplacements libres`);
+  } });
+  interactables.push({ pos: F.locker.pos, r: 1.3, label: 'E — Casier personnel (tenue, équipement)', fn: () => openUI(() => shop.openInventory()) });
+  const NOTICES = ['« Recherche artilleur expérimenté, convois vers Lys. Voir la Guilde des équipages. »', '« Vends pièces de canon B2, bon état. Demander Oriane, Équipement naval. »', '« Primes doublées sur les pirates de la ceinture d\'Ardent ce cycle. »', '« Colocation cabine 14, pont habitat. Calme exigé. »'];
+  interactables.push({ pos: F.board.pos, r: 1.4, label: 'E — Panneau d\'annonces', fn: () => { toast(NOTICES[Math.floor(Math.random() * NOTICES.length)]); } });
   /** Sièges pour le joueur : bancs de la galerie, chaises, banquettes et canapés du pont. */
   const playerSeat = (x, y, z, yaw, ref) => {
     const fw = new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw));
@@ -409,7 +420,12 @@ async function boot() {
     audio.blip(); toast('Soins complets · un stylo médical offert pour la route');
   } });
   interactables.push({ pos: HB.bunk, r: 2.4, label: 'E — Se reposer dans la cabine 12', fn: () => {
-    fadeDo(() => { ctx.ground.hp = 100; missions.persist(); game.save(); toast('Repos · santé au maximum · partie sauvegardée'); }, 1200);
+    fadeDo(() => {
+      ctx.ground.hp = 100; missions.persist(); game.save();
+      const h = ctx.time.hour;
+      if (h >= 19 || h < 6) { ctx.time.setHour(7); toast('Nuit de sommeil · réveil à 07:00 · santé au maximum · partie sauvegardée'); }
+      else toast('Repos · santé au maximum · partie sauvegardée');
+    }, 1400);
   } });
   interactables.push({ pos: ctx.quai.terminal, r: 1.5, label: 'E — Terminal des contrats de fret', fn: () => openUI(() => shop.openBoard(missions)) });
   missions.onEvent = (e, o, fee) => {
@@ -424,7 +440,8 @@ async function boot() {
   };
   for (const [id, sp] of Object.entries(ctx.shopSpots)) {
     if (!STORES[id]) continue;
-    interactables.push({ pos: sp.customer.clone().setY(0), r: 1.6, label: `E — ${STORES[id].label} : parler au vendeur`, fn: () => openUI(() => shop.openStore(id)) });
+    interactables.push({ pos: sp.customer.clone().setY(0), r: 1.6, when: () => ctx.time.open(id), label: `E — ${STORES[id].label} : parler au vendeur`, fn: () => openUI(() => shop.openStore(id)) });
+    interactables.push({ pos: sp.entry.clone().setY(0), r: 2.2, when: () => !ctx.time.open(id), label: `${STORES[id].label} · fermé · ouvre à ${ctx.time.opensAt(id)}`, fn: () => null });
   }
   // ------------------------------------------------------------------ boutiques et inventaire
   const credEl = $('credits');
@@ -475,6 +492,7 @@ async function boot() {
   // ------------------------------------------------------------------ simulation
   function simulate(dt, t) {
     mats.shared.uTime.value = t;
+    ctx.time.update(dt);
     const blockers = crowd.blockers(player);
     for (const u of scenes.updaters) u(dt, t, blockers);
     crowd.update(dt, player, camera.position);
@@ -719,8 +737,8 @@ async function boot() {
     simulate(dt, t);
     audio.update(dt, player, crowd, scenes);
     if (toastT > 0) { toastT -= dt; if (toastT <= 0) $('toast').classList.add('hidden'); }
-    const st = 14 * 3600 + 7 * 60 + t * 10; // 1 s réelle = 10 s à bord
-    clockEl.textContent = `HALDEN-7 · ${String(Math.floor(st / 3600) % 24).padStart(2, '0')}:${String(Math.floor(st / 60) % 60).padStart(2, '0')} · ${crowd.agents.length} pers.`;
+    clockEl.textContent = `HALDEN-7 · ${ctx.time.label} · ${crowd.agents.filter((a) => !a.away).length} pers.`;
+    renderer.setExposure(1.15 - 0.45 * ctx.time.dusk);
     updateFreightHud();
     if (touch && running) touchUI();
     if (quality.name === 'medium') { renderer.three.shadowMap.autoUpdate = false; renderer.three.shadowMap.needsUpdate = (++shadowTick % 2) === 0; }

@@ -89,6 +89,16 @@ function* chatAt(a, spot, faceTo, dur) {
   }
 }
 
+/** Rentre chez soi par le module habitat et disparaît jusqu'à ce que la condition soit vraie. */
+function* goHome(a, W, until) {
+  yield goto(W.habitat.x, W.habitat.z);
+  yield goto(W.habitatIn.x, W.habitatIn.z);
+  yield call((ag) => { ag.away = true; ag.char.root.visible = false; });
+  yield wait(() => until());
+  yield call((ag) => { ag.away = false; ag.char.root.visible = true; ag.pos.set(W.habitatIn.x, 0, W.habitatIn.z); });
+  yield goto(W.habitat.x, W.habitat.z);
+}
+
 /** Voyageur qui débarque de la navette et rejoint la galerie (puis le module habitat). */
 function* travelerArriving(a, W) {
   const top = W.navTop, bot = W.navBottom;
@@ -135,8 +145,10 @@ function* travelerDeparting(a, W) {
 /** Client de la galerie : boutiques, kiosque, bancs, vue. */
 function* shopper(a, W) {
   for (;;) {
+    const T = W.ctx.time;
+    if (T && !T.open('galerie')) { yield* goHome(a, W, () => T.open('galerie')); continue; }
     const r = Math.random();
-    if (r < 0.12) {
+    if (r < 0.12 && (!T || T.open('nouilles'))) {
       // un bol de nouilles debout au comptoir
       const sp = W.shops.nouilles, dx = pick([1.0, 2.6]);
       yield goto(sp.entry.x, sp.entry.z);
@@ -146,7 +158,9 @@ function* shopper(a, W) {
       yield act('interact', R(12, 22), { face: { x: sp.entry.x + dx, z: sp.entry.z + 2.8 } });
       yield goto(sp.entry.x, sp.entry.z);
     } else if (r < 0.35) {
-      const shop = pick(SHOPS);
+      const open = SHOPS.filter((s) => !T || T.open(s.id));
+      if (!open.length) { yield act('idle', R(2, 4)); continue; }
+      const shop = pick(open);
       const sp = W.shops[shop.id];
       yield goto(sp.entry.x, sp.entry.z);
       yield goto(sp.inside.x + R(-0.8, 0.8), sp.inside.z + R(-0.3, 0.6));
@@ -184,6 +198,15 @@ function shopkeeper(shopId) {
     };
     const busy = () => !!customer();
     for (;;) {
+      const T = W.ctx.time;
+      if (T && !T.open(shopId)) {
+        // fermeture : on quitte la boutique, rentre au module habitat, revient à l'ouverture
+        yield goto(sp.entry.x, sp.entry.z);
+        yield* goHome(a, W, () => T.open(shopId));
+        yield goto(sp.entry.x, sp.entry.z);
+        yield goto(post.x, post.z);
+        continue;
+      }
       const c = customer();
       if (c) {
         // retour au poste si besoin, puis on s'occupe du client
@@ -502,7 +525,7 @@ export class Crowd {
   separation(a) {
     let x = 0, z = 0;
     for (const b of this.agents) {
-      if (b === a || b.attached) continue;
+      if (b === a || b.attached || b.away) continue;
       const dx = a.pos.x - b.pos.x, dz = a.pos.z - b.pos.z;
       const d2 = dx * dx + dz * dz;
       if (d2 < 1.1 && d2 > 1e-4) { const d = Math.sqrt(d2); const k = (1.05 - d) / d; x += dx * k; z += dz * k; }
@@ -519,6 +542,7 @@ export class Crowd {
       const arriving = this.wave % 3 !== 0;
       this.spawnTraveler(arriving);
       this.travelerTimer = arriving ? R(4, 9) : R(8, 14);
+      if (this.ctx?.time?.night) this.travelerTimer *= 4;
       if (this.wave % 6 === 0) this.travelerTimer = R(25, 40); // entre deux navettes
       if (arriving && this.onArrival && this.wave % 6 === 1) this.onArrival();
     }
@@ -546,7 +570,7 @@ export class Crowd {
 
   /** positions des acteurs (portes, véhicules) */
   blockers(player) {
-    const out = this.agents.filter((a) => !a.attached).map((a) => a.pos);
+    const out = this.agents.filter((a) => !a.attached && !a.away).map((a) => a.pos);
     if (player) out.push(player.pos);
     return out;
   }

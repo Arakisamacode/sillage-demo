@@ -119,6 +119,19 @@ qui servent de couverture. Le Héron s'y pose rampe face au pont.
 - **Récompenses** : 420 à 720 ¤ par pirate, puis le contrat de sécurité ou une prime de 1 500 ¤.
 - **À terre** : évacuation à bord, soins d'urgence (1 200 ¤), le raid échoue (le contrat reste ouvert).
 
+## Vie de la station (horaires)
+
+Horloge accélérée (1 s réelle = 48 s à bord ; une journée = 30 min de jeu), affichée en haut à droite.
+Horaires des boutiques : Nouilles 7 h–24 h, Armurerie 9 h–21 h, Équipement naval 8 h–20 h,
+Combinaisons 10 h–21 h, Pharmacie 24 h/24. À la fermeture, le rideau de fer descend et le vendeur rentre
+au module habitat ; il revient à l'ouverture. La galerie se vide la nuit (23 h–7 h), les navettes se font rares,
+l'éclairage baisse. Dormir dans la cabine 12 le soir fait passer au matin (07:00).
+
+Hangar : terminal de diagnostic du Héron (près de l'aire 02), casiers du personnel (inventaire),
+panneau d'annonces, racks de pièces et fûts. Galerie : distributeurs, borne-plan, bancs et chaises où
+s'asseoir (E). Les vendeurs restent derrière leur comptoir, rangent l'étagère du fond, se tournent vers les
+clients et vous saluent quand vous entrez.
+
 ## Module habitat
 
 Au fond de la galerie marchande, la porte « MODULE HABITAT » mène par un couloir au hall des ascenseurs.
