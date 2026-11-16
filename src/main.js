@@ -24,6 +24,7 @@ import { ITEM, STORES } from './game/catalog.js';
 import { HeronLoadout } from './game/shipgear.js';
 import { ShopUI } from './ui/shop.js';
 import { buildOutposts } from './world/outposts.js';
+import { buildDerelict } from './world/derelict.js';
 import { Cargo, buildQuai } from './game/cargo.js';
 import { Missions } from './game/missions.js';
 import { Crew } from './game/crew.js';
@@ -76,6 +77,7 @@ async function boot() {
   buildGallery(ctx);
   buildExterior(ctx);
   ctx.outposts = buildOutposts(ctx);
+  ctx.derelict = buildDerelict(ctx);
   ctx.lights = buildLighting(ctx);
   const lib = new CharacterLibrary(manager, quality);
   const libReady = lib.load(undefined, (p) => progress(0.6 + 0.3 * p, 'Chargement des personnages'));
@@ -94,7 +96,7 @@ async function boot() {
   ctx.flight = flight;
   for (const o of ctx.outposts) flight.addPad(o.pad);
   flight.onEvent = (e, pad) => {
-    if (e === 'takeoff') { ctx.crew?.onTakeoff(); ctx.combat?.onTakeoff(); ctx.ground?.onTakeoff(); }
+    if (e === 'takeoff') { const fr = flight.lastDock?.freighter; ctx.crew?.onTakeoff(); ctx.combat?.onTakeoff(); ctx.ground?.onTakeoff(); if (fr) { ctx.combat.undock(fr); flight.lastDock = null; } }
     if (e === 'landed') {
       ctx.crew?.onLanded(pad);
       const rep = ctx.combat?.onLanded();
@@ -201,6 +203,8 @@ async function boot() {
       audio.say(`Ici ${a.name}. Nous sommes attaqués ! Des pirates sortent de la tour. Demandons assistance immédiate.`);
       toast(`Raid pirate sur ${a.name} · ${plural(b, 'assaillant', 'assaillants')} · ${touch ? 'ARME' : 'G'} : descendre armé`);
     }
+    if (e === 'boarding') audio.say('Sas ouvert. Contacts dans la soute.');
+    if (e === 'boarded') toast(`À bord du cargo pirate · ${plural(ground.raid?.n || 4, 'pirate', 'pirates')} dans la soute${a ? ` · ${plural(a, 'garde', 'gardes')} avec vous` : ''}`);
     if (e === 'disembark') toast(a ? `Sur le pont · ${plural(a, 'garde vous accompagne', 'gardes vous accompagnent')}` : `Sur le pont de ${flight.dockedAt.name}`);
     if (e === 'kill') toast(`${a.name} neutralisé · prime +${money(b)} ¤${d ? ` · ${plural(d, 'pirate restant', 'pirates restants')}` : ''}${c === 'friend' ? ' (garde)' : ''}`);
     if (e === 'cleared') { audio.say('Plateforme sécurisée. Merci, pilote. Paiement transféré.'); toast(`Plateforme sécurisée · ${c}`); }
@@ -219,6 +223,10 @@ async function boot() {
   };
   combat.onEvent = (e, a, b, c) => {
     const fire = touch ? 'TIR' : 'clic gauche / X';
+    if (e === 'wave' && c) {
+      audio.say('Alerte. Cargo pirate escorté. Désemparez-le pour l\'aborder.');
+      return toast(`Cargo pirate Rançonneur et ${plural(a - 1, 'escorte', 'escortes')} · abattez ses boucliers et sa coque sous 30 % pour l'aborder`);
+    }
     if (e === 'wave') {
       audio.say('Alerte. Contacts hostiles en approche.');
       toast(`Contacts hostiles · ${plural(a, 'chasseur pirate', 'chasseurs pirates')} · ${b} m${mining.mode ? ` · ${touch ? 'MIN' : 'M'} : quitter le minage` : ` · ${fire} : tirer`}`);
@@ -233,6 +241,11 @@ async function boot() {
     if (e === 'nolock') toast('Pas de verrouillage · gardez la cible dans l\'axe pendant 3 s');
     if (e === 'launch') toast(`Missile lancé · ${plural(a, 'restant', 'restants')}`);
     if (e === 'destroyed') { audio.say('Alerte. Perte d\'intégrité de la coque. Éjection.'); toast('Héron détruit !'); }
+    if (e === 'disabled') { audio.say('Cargo pirate désemparé. Arrimage possible.'); toast(`${a.K.name} désemparé · approchez à moins de 120 m, ralentissez · ${touch ? 'E' : 'E / B'} : arrimer et aborder`); }
+    if (e === 'docked') { flight.lastDock = flight.dockedAt; toast('Arrimage · passage du sas'); }
+    if (e === 'escorts') toast('Impossible d\'arrimer : éliminez d\'abord les escortes');
+    if (e === 'escaped') toast(`${a.K.name} s'est échappé`);
+    if (e === 'scuttled') toast('Le cargo pirate se saborde derrière vous');
     if (e === 'salvage') toast(`Capsule récupérée · composants revendus +${a.toLocaleString('fr-FR').replace(/\u202f/g, ' ')} ¤${b}`);
     if (e === 'respawn') toast(`Rapatrié à Halden-7 · Héron remplacé · franchise d'assurance −${a.toLocaleString('fr-FR').replace(/\u202f/g, ' ')} ¤${b > 0.1 ? ` · minerai perdu` : ''}`);
   };
@@ -432,10 +445,11 @@ async function boot() {
           const n = missions.dockActions(pad).length;
           const raid = ground.raid && !ground.raid.done;
           const G = touch ? 'ARME' : 'G';
-          label = raid ? `RAID EN COURS · ${G} — Descendre armé · ${touch ? '⏻' : 'ESPACE'} — Décoller`
+          if (pad.boarding) label = raid ? `${G} — Retourner dans la soute du cargo · ${touch ? '⏻' : 'ESPACE'} — Se désarrimer` : `Cargo pirate vidé · ${touch ? '⏻' : 'ESPACE'} — Se désarrimer`;
+          else label = raid ? `RAID EN COURS · ${G} — Descendre armé · ${touch ? '⏻' : 'ESPACE'} — Décoller`
             : `E — Opérations à quai${n ? ` (${n})` : ''}${pad.id === 'ardent' ? ' · raffinerie, marché' : ''}${ground.canDisembark() ? ` · ${G} — Descendre` : ''} · ${touch ? '⏻' : 'ESPACE'} — Décoller`;
           if (input.consume('draw') && ground.canDisembark()) ground.disembark();
-          if (input.consume('use')) { if (raid) toast('Opérations suspendues : raid pirate sur la plateforme'); else openUI(() => shop.openDock(pad, () => missions.dockActions(pad), mining)); }
+          if (input.consume('use') && !pad.boarding) { if (raid) toast('Opérations suspendues : raid pirate sur la plateforme'); else openUI(() => shop.openDock(pad, () => missions.dockActions(pad), mining)); }
           if (input.consume('fly') || input.consume('flyKey')) flight.takeOff();
         } else {
           label = flight.state === 'flying'
@@ -445,6 +459,11 @@ async function boot() {
                 : `${Math.round(flight.vel.length())} m/s · Maj : postcombustion${mining.laser && mining.inField(flight.pos) ? ` · ${touch ? 'MIN' : 'M'} : mode minage` : ''}`))
             : flight.state === 'spool' ? 'Démarrage des moteurs…' : flight.state === 'dead' ? 'Héron détruit · capsule de survie en route vers Halden-7…' : 'Atterrissage automatique…';
           if ((input.consume('fly') || input.consume('land')) && flight.state === 'flying') flight.land();
+          const fr = combat.boardable();
+          if (fr) {
+            label = `${touch ? 'E' : 'E / B'} — Arrimer et aborder le ${fr.K.name}`;
+            if (input.consume('board') || input.consume('use')) { if (combat.dock(fr)) { ground.startBoarding(fr); ground.disembark(); } }
+          }
         }
         promptEl.classList.remove('hidden'); promptEl.textContent = label;
         input.consume('flyKey'); input.consume('use');

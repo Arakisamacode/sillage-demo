@@ -24,6 +24,7 @@ export class Input {
       if (e.code === 'KeyI') this.pressed.add('inv');
       if (e.code === 'KeyR') this.pressed.add('missile');
       if (e.code === 'KeyG') this.pressed.add('draw');
+      if (e.code === 'KeyB') this.pressed.add('board');
       if (e.code === 'KeyT') this.pressed.add('target');
       if (e.code === 'KeyH') this.pressed.add('hud');
       if (e.code === 'Tab') e.preventDefault();

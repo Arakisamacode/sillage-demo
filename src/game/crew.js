@@ -289,10 +289,58 @@ export class Crew {
     }
   }
   gunner() { return this.members.find((m) => m.data.role === 'gunner' && m.aboard); }
+
+  // ------------------------------------------------------------------ équipage visible à bord du Héron
+  /** Postes à bord (repère local de l'aire du Héron) : siège copilote, soute, pont supérieur. */
+  _posts() {
+    const S = this.ship(), fy = 2.0, upY = 5.2, bf = upY + 0.25;
+    return {
+      seat: { p: [1.1, bf + 0.3, -12.6], yaw: Math.PI, pose: 'sit' },
+      stand: [
+        { p: [-1.7, fy, 11.6], yaw: 0, pose: 'idle' },
+        { p: [-1.4, upY, 9.4], yaw: Math.PI / 2, pose: 'talk' },
+        { p: [1.3, upY, 8.8], yaw: -Math.PI / 2, pose: 'idle' },
+        { p: [-2.2, fy, 4.0], yaw: Math.PI / 2, pose: 'talk' },
+        { p: [-0.9, upY, 3.2], yaw: 0.3, pose: 'idle' },
+        { p: [-2.2, fy, -2.5], yaw: Math.PI / 2, pose: 'idle' },
+      ],
+      S,
+    };
+  }
+  /** Crée ou retire les silhouettes de l'équipage embarqué (elles suivent le vaisseau en vol). */
+  syncAboard() {
+    const posts = this._posts(), S = posts.S;
+    let seatTaken = false;
+    const used = new Set();
+    const take = (pref) => { const i = pref !== undefined && !used.has(pref) ? pref : [1, 2, 3, 4, 5, 0].find((j) => !used.has(j)) ?? 0; used.add(i); return posts.stand[i]; };
+    const order = [...this.members].sort((a, b) => (a.data.role === 'gunner' ? -1 : 0) - (b.data.role === 'gunner' ? -1 : 0));
+    for (const m of order) {
+      const want = m.aboard && !m.ashore;
+      if (!want) { if (m.view) { S.root.remove(m.view.root); m.view = null; } continue; }
+      let post;
+      if (m.data.role === 'gunner' && !seatTaken) { post = posts.seat; seatTaken = true; }
+      else post = take(m.data.role === 'guard' ? 0 : undefined);
+      if (m.view && m.viewPost === post) continue;
+      if (!m.view) {
+        const ch = this._char(m.data);
+        this.ctx.scene.remove(ch.root);
+        if (this.ctx.dressPerson) this.ctx.dressPerson(ch, this.game.person(m.data.id), m.data.id);
+        S.root.add(ch.root);
+        m.view = ch;
+      }
+      m.viewPost = post;
+      const p = S.local(...post.p);
+      m.view.root.position.copy(p);
+      m.view.root.rotation.y = S.heading + post.yaw;
+      if (post.pose === 'sit') m.view.play('sit', { fade: 0 }); else if (post.pose === 'talk') m.view.play('talk', { fade: 0 }); else m.view.stop(0);
+    }
+  }
   wages() { return this.members.reduce((s, m) => s + m.data.wage, 0); }
 
   update(dt) {
     this.t += dt;
+    this.syncAboard();
+    for (const m of this.members) if (m.view) m.view.update(dt, null);
     // caisses portées par les manutentionnaires : animation de port
     for (const m of this.members) {
       const a = m.agent, carrying = this.cargo.crates.some((c) => c.carrier === a);

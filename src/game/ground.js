@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { ITEM } from './catalog.js';
 import { COVER, DECK } from '../world/outposts.js';
+import { BOARD_COVER, BAY } from '../world/derelict.js';
 import { BODIES, HAIRS } from '../characters/characters.js';
 
 // Combat à pied sur les avant-postes : raids pirates (aléatoires ou contrats de sécurité), débarquement armé
@@ -138,39 +139,50 @@ export class Ground {
   }
 
   // ------------------------------------------------------------------ repère de l'avant-poste
-  _arena(outpost) {
-    const inv = outpost.rot.clone().invert();
+  _makeArena(o, origin, rot, cover, opts) {
+    const inv = rot.clone().invert();
     const A = {
-      o: outpost, origin: outpost.origin, rot: outpost.rot, inv,
-      W: (x, z, y = 0) => new THREE.Vector3(x, y, z).applyQuaternion(outpost.rot).add(outpost.origin),
-      L: (p) => { const l = _v.copy(p).sub(outpost.origin).applyQuaternion(inv); return { x: l.x, z: l.z }; },
+      o, origin, rot, inv, cover, ...opts,
+      W: (x, z, y = 0) => new THREE.Vector3(x, y, z).applyQuaternion(rot).add(origin),
+      L: (p) => { const l = _v.copy(p).sub(origin).applyQuaternion(inv); return { x: l.x, z: l.z }; },
     };
     // points de couverture : quatre côtés de chaque caisse
-    A.cover = [];
-    for (const [x, z, w, d, h] of COVER) {
+    A.coverPts = [];
+    for (const [x, z, w, d, h] of cover) {
       for (const [nx, nz, off] of [[1, 0, w / 2], [-1, 0, w / 2], [0, 1, d / 2], [0, -1, d / 2]]) {
-        A.cover.push({ x: x + nx * (off + 0.55), z: z + nz * (off + 0.55), nx, nz, low: h < 2, cx: x, cz: z });
+        const p = { x: x + nx * (off + 0.55), z: z + nz * (off + 0.55), nx, nz, low: h < 2, cx: x, cz: z };
+        if (A.walk(p)) A.coverPts.push(p);
       }
     }
     return A;
   }
-  _walkable(l) {
-    const inDeck = l.x >= DECK.x0 && l.x <= DECK.x1 - 0.6 && Math.abs(l.z) <= DECK.z - 0.5;
-    const inPad = Math.hypot(l.x, l.z) <= DECK.padR - 0.4;
-    return inDeck || inPad;
+  /** Avant-poste : aire circulaire + pont de débarquement vers la tour. */
+  _arena(outpost) {
+    return this._makeArena(outpost, outpost.origin, outpost.rot, COVER, {
+      kind: 'outpost', door: { x: 45, z: 0 }, enemyMin: 27, friendMax: 34,
+      walk: (l) => (l.x >= DECK.x0 && l.x <= DECK.x1 - 0.6 && Math.abs(l.z) <= DECK.z - 0.5) || Math.hypot(l.x, l.z) <= DECK.padR - 0.4,
+      clampOut: (l) => { if (l.x > DECK.x0) { l.x = THREE.MathUtils.clamp(l.x, DECK.x0, DECK.x1 - 0.6); l.z = THREE.MathUtils.clamp(l.z, -DECK.z + 0.5, DECK.z - 0.5); } else { const r = Math.hypot(l.x, l.z), k = (DECK.padR - 0.4) / r; l.x *= k; l.z *= k; } },
+    });
+  }
+  /** Soute du cargo pirate abordé. */
+  _arenaBoard() {
+    const D = this.ctx.derelict;
+    return this._makeArena({ id: 'derelict', name: 'cargo Rançonneur' }, D.origin, D.rot, BOARD_COVER, {
+      kind: 'board', door: D.door, start: D.start, enemyMin: 15, friendMax: 12,
+      walk: (l) => l.x >= BAY.x0 && l.x <= BAY.x1 && Math.abs(l.z) <= BAY.z,
+      clampOut: (l) => { l.x = THREE.MathUtils.clamp(l.x, BAY.x0, BAY.x1); l.z = THREE.MathUtils.clamp(l.z, -BAY.z, BAY.z); },
+    });
   }
   /** Repousse un point local hors des caisses et dans la zone praticable. */
-  _clampLocal(l) {
-    for (const [x, z, w, d] of COVER) {
+  _clampLocal(l, A = this.raid?.A || this.A) {
+    for (const [x, z, w, d] of A.cover) {
       const hx = w / 2 + 0.35, hz = d / 2 + 0.35;
       const dx = l.x - x, dz = l.z - z;
       if (Math.abs(dx) < hx && Math.abs(dz) < hz) {
         if (hx - Math.abs(dx) < hz - Math.abs(dz)) l.x = x + Math.sign(dx || 1) * hx; else l.z = z + Math.sign(dz || 1) * hz;
       }
     }
-    if (!this._walkable(l)) {
-      if (l.x > DECK.x0) { l.x = THREE.MathUtils.clamp(l.x, DECK.x0, DECK.x1 - 0.6); l.z = THREE.MathUtils.clamp(l.z, -DECK.z + 0.5, DECK.z - 0.5); } else { const r = Math.hypot(l.x, l.z), k = (DECK.padR - 0.4) / r; l.x *= k; l.z *= k; }
-    }
+    if (!A.walk(l)) A.clampOut(l);
     return l;
   }
 
@@ -192,6 +204,14 @@ export class Ground {
     this.lastRaid[o.id] = this.t;
     this.onEvent('raid', o, n, !!contract);
   }
+  /** Abordage d'un cargo pirate désemparé : combat dans sa soute. */
+  startBoarding(freighter) {
+    this.endRaid(true);
+    const A = this._arenaBoard();
+    this.raid = { A, o: A.o, contract: null, n: 4 + Math.floor(Math.random() * 2), spawned: 0, spawnT: 2.5, kills: 0, bounty: 0, done: false, boarding: true, freighter };
+    for (const l of this.ctx.derelict.lights) l.visible = true;
+    this.onEvent('boarding', this.raid.n);
+  }
   _spawnEnemy() {
     const R = this.raid, A = R.A;
     const female = Math.random() < 0.35;
@@ -205,7 +225,7 @@ export class Ground {
     ch.hold(mesh, it.cat);
     this.ctx.scene.add(ch.root);
     const z = (R.spawned % 3 - 1) * 1.8;
-    const u = this._unit('enemy', ch, A.W(45.0, z), Math.PI * 1.5, gid, mesh);
+    const u = this._unit('enemy', ch, A.W(A.door.x, A.door.z + z), Math.PI * 1.5, gid, mesh);
     u.name = PIRATE_NAMES[(R.spawned + Math.floor(this.t)) % PIRATE_NAMES.length];
     u.hp = u.maxHp = 120; u.prot = ch._armor.length ? 0.25 : 0.1;
     u.skill = 0.34 + Math.random() * 0.1;
@@ -222,7 +242,8 @@ export class Ground {
   }
   /** Fin du raid : nettoyage (départ du vaisseau, joueur à terre) ou victoire. */
   endRaid(silent) {
-    for (const u of this.units) { this.ctx.scene.remove(u.ch.root); }
+    for (const u of this.units) { this.ctx.scene.remove(u.ch.root); if (u.member) u.member.ashore = false; }
+    if (this.raid?.boarding) for (const l of this.ctx.derelict.lights) l.visible = false;
     this._clearLoot();
     this.units = [];
     if (this.raid?.contract && this.raid.contract.step === 'fight' && !this.raid.done) this.raid.contract.step = 'go';
@@ -233,7 +254,11 @@ export class Ground {
     const R = this.raid;
     R.done = true;
     let msg;
-    if (R.contract) { this.missions.raidCleared(R.o.id); msg = `contrat rempli · +${fmt(R.contract.reward)} ¤`; }
+    if (R.boarding) {
+      // cargaison de contrebande : deux caisses près de la porte des pirates
+      for (const z of [-1.4, 1.4]) this._spawnLoot(R.A, R.A.door.x - 2.5, z, Math.round((1400 + Math.random() * 1600) / 50) * 50, true, null, true);
+      msg = 'cargaison de contrebande à saisir près de la porte du fond';
+    } else if (R.contract) { this.missions.raidCleared(R.o.id); msg = `contrat rempli · +${fmt(R.contract.reward)} ¤`; }
     else { const b = 1500; this.game.earn(b); msg = `prime de l'avant-poste · +${fmt(b)} ¤`; }
     for (const u of this.units) if (u.side === 'friend' && u.down) this._revive(u);
     this.onEvent('cleared', R.o, R.bounty, msg);
@@ -245,15 +270,16 @@ export class Ground {
     const p = I.rampBottom.clone().applyMatrix4(this.ctx.ships.heron.root.matrix);
     return p;
   }
-  canDisembark() { return this.flight.away && this.flight.dockedAt.outpost; }
+  canDisembark() { const d = this.flight.dockedAt; return this.flight.away && !!(d.outpost || d.boarding); }
   disembark() {
     if (!this.canDisembark()) return false;
-    const o = this.ctx.outposts.find((x) => x.id === this.flight.dockedAt.outpost.id);
-    this.A = this.raid?.A || this._arena(o);
+    const dock = this.flight.dockedAt;
+    if (dock.boarding) this.A = this.raid?.A || this._arenaBoard();
+    else this.A = this.raid?.A || this._arena(this.ctx.outposts.find((x) => x.id === dock.outpost.id));
     const P = this.player, A = this.A;
-    const foot = this.rampFoot();
-    const l = this._clampLocal(A.L(foot));
-    l.x += 1.2;
+    let l;
+    if (dock.boarding) l = { ...A.start };
+    else { l = this._clampLocal(A.L(this.rampFoot()), A); l.x += 1.2; }
     P.seated = null;
     P.pos.copy(A.W(l.x, l.z, 0.05));
     P.vel.set(0, 0, 0);
@@ -265,12 +291,15 @@ export class Ground {
     this.onFoot = true;
     this.hp = Math.max(this.hp, 1);
     this.boardPos = A.W(l.x - 0.8, l.z, 0);
+    P.obbs = null;
+    if (!dock.boarding) {
     // la coque du Héron bloque le passage (fuselage et ailes, repère de l'aire du vaisseau)
     const S = this.ctx.ships.heron;
     S.root.updateMatrixWorld(true);
     const gm = S.group.matrixWorld;
     const obb = (hx, hz, cx, cz) => { const mat = gm.clone().multiply(new THREE.Matrix4().makeTranslation(cx, 0, cz)); return { mat, inv: mat.clone().invert(), hx, hz, y0: A.origin.y - 1, y1: A.origin.y + 6 }; };
     P.obbs = [obb(4.8, 17.5, 0, -1.5), obb(11, 4.6, 0, 2.0)];
+    }
     if (this.raid) this.draw(true);
     // gardes armés : descendent avec le joueur
     let i = 0;
@@ -283,12 +312,12 @@ export class Ground {
       const mesh = weaponMesh(ITEM[gid].shape, ITEM[gid].accent);
       ch.hold(mesh, ITEM[gid].cat);
       const u = this._unit('friend', ch, A.W(l.x + 0.5, l.z + (i % 2 ? 1.6 : -1.6) * (1 + Math.floor(i / 2)), 0), P.yaw + Math.PI, gid, mesh);
-      u.name = m.data.name.split(' ')[0]; u.member = m;
+      u.name = m.data.name.split(' ')[0]; u.member = m; m.ashore = true;
       u.prot = p.armor ? ITEM[p.armor].prot : 0;
       u.skill = 0.5 + m.data.skill * 0.05;
       i++;
     }
-    this.onEvent('disembark', i);
+    this.onEvent(dock.boarding ? 'boarded' : 'disembark', i);
     return true;
   }
   nearBoard() { return this.onFoot && this.boardPos && this.player.pos.distanceTo(this.boardPos) < 3.2; }
@@ -296,7 +325,7 @@ export class Ground {
     const P = this.player;
     this.draw(false);
     this.onFoot = false;
-    for (const u of this.units.filter((x) => x.side === 'friend')) this.ctx.scene.remove(u.ch.root);
+    for (const u of this.units.filter((x) => x.side === 'friend')) { this.ctx.scene.remove(u.ch.root); if (u.member) u.member.ashore = false; }
     this.units = this.units.filter((x) => x.side !== 'friend');
     P.fallY = undefined; P.resetPos = null; P.obbs = null;
     P.sit(this.ctx.seat);
@@ -438,30 +467,34 @@ export class Ground {
   }
   /** Sacoche de butin au pied d'un pirate neutralisé : ramassée en passant dessus. */
   _dropLoot(u) {
+    const l = this.raid.A.L(u.pos);
+    const r = Math.random();
+    this._spawnLoot(this.raid.A, l.x + (Math.random() - 0.5) * 0.8, l.z + (Math.random() - 0.5) * 0.8, Math.round((60 + Math.random() * 180) / 10) * 10, r < 0.35, r > 0.85 ? u.gid : null, false);
+  }
+  _spawnLoot(A, x, z, credits, med, gun, big) {
     const g = new THREE.Group();
-    const bag = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.26, 0.34), new THREE.MeshStandardMaterial({ color: 0x3a3428, roughness: 0.85 }));
-    bag.position.y = 0.13; bag.castShadow = true; g.add(bag);
-    const strap = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.04, 0.08), new THREE.MeshStandardMaterial({ color: 0x8a2a1a, roughness: 0.6 }));
-    strap.position.y = 0.27; g.add(strap);
-    const glow = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 6), new THREE.MeshBasicMaterial({ color: new THREE.Color(4, 3, 0.6) }));
-    glow.position.set(0.18, 0.3, 0); g.add(glow);
-    const p = u.pos.clone().add(new THREE.Vector3(Math.random() - 0.5, 0, Math.random() - 0.5).multiplyScalar(0.8));
-    const l = this._clampLocal(this.raid.A.L(p));
-    g.position.copy(this.raid.A.W(l.x, l.z, 0.01));
+    const k = big ? 2.4 : 1;
+    const bag = new THREE.Mesh(new THREE.BoxGeometry(0.5 * k, 0.26 * k * (big ? 1.6 : 1), 0.34 * k), new THREE.MeshStandardMaterial({ color: big ? 0x2a3a2a : 0x3a3428, roughness: 0.85 }));
+    bag.position.y = bag.geometry.parameters.height / 2; bag.castShadow = true; g.add(bag);
+    const strap = new THREE.Mesh(new THREE.BoxGeometry(0.52 * k, 0.04 * k, 0.08 * k), new THREE.MeshStandardMaterial({ color: 0x8a2a1a, roughness: 0.6 }));
+    strap.position.y = bag.geometry.parameters.height + 0.02; g.add(strap);
+    const glow = new THREE.Mesh(new THREE.SphereGeometry(0.06 * k, 8, 6), new THREE.MeshBasicMaterial({ color: new THREE.Color(4, 3, 0.6) }));
+    glow.position.set(0.18 * k, bag.geometry.parameters.height + 0.05, 0); g.add(glow);
+    const l = this._clampLocal({ x, z }, A);
+    g.position.copy(A.W(l.x, l.z, 0.01));
     g.rotation.y = Math.random() * 6;
     this.ctx.scene.add(g);
-    const r = Math.random();
-    (this.loot || (this.loot = [])).push({ g, glow, pos: g.position.clone(), credits: Math.round((60 + Math.random() * 180) / 10) * 10, med: r < 0.35, gun: r > 0.85 ? u.gid : null });
+    (this.loot || (this.loot = [])).push({ g, glow, pos: g.position.clone(), credits, med, gun, big, r: big ? 2.0 : 1.3 });
   }
   _updateLoot() {
     if (!this.loot?.length) return;
     for (const L of this.loot) {
       L.glow.visible = (this.t * 2) % 1 < 0.5;
-      if (this.onFoot && !this.dead && this.player.pos.distanceTo(L.pos) < 1.3) {
+      if (this.onFoot && !this.dead && this.player.pos.distanceTo(L.pos) < L.r) {
         L.done = true;
         this.ctx.scene.remove(L.g);
         this.game.earn(L.credits);
-        const got = [`${fmt(L.credits)} ¤`];
+        const got = [L.big ? `contrebande revendue ${fmt(L.credits)} ¤` : `${fmt(L.credits)} ¤`];
         if (L.med) { this.game.d.owned.medpen = (this.game.d.owned.medpen || 0) + 1; got.push('stylo médical'); }
         if (L.gun) { this.game.d.owned[L.gun] = (this.game.d.owned[L.gun] || 0) + 1; got.push(ITEM[L.gun].name.split('«')[0].trim()); }
         this.game.save();
@@ -509,8 +542,8 @@ export class Ground {
     const A = this.raid.A, me = A.L(u.pos), th = threat ? A.L(threat.pos) : null;
     const meX = me.x, meZ = me.z;
     let best = null, bs = 1e9;
-    for (const c of A.cover) {
-      if (u.side === 'enemy' ? c.x < 27 - Math.min(this.raid.kills, 3) * 1.5 : c.x > 34) continue;
+    for (const c of A.coverPts) {
+      if (u.side === 'enemy' ? c.x < A.enemyMin - Math.min(this.raid.kills, 3) * 1.5 : c.x > A.friendMax) continue;
       if (this.units.some((o) => o !== u && !o.down && o.goalL && Math.hypot(o.goalL.x - c.x, o.goalL.z - c.z) < 1.2)) continue;
       let s = Math.hypot(c.x - meX, c.z - meZ) * 0.6 + Math.random() * 3;
       if (th) {
