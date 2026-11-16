@@ -250,7 +250,7 @@ export class ShopUI {
       const err = this.missions.accept(o);
       if (err) return this.flash(err, true);
       this.tab = 'active'; this.onAction('accept', o);
-      return this.flash(o.type === 'out' ? `${o.n} caisses vous attendent sur le quai de fret.` : o.type === 'container' ? 'Le conteneur est chargé dans votre soute.' : `Rendez-vous à ${o.dest.name} pour charger.`);
+      return this.flash(o.type === 'raid' ? `Rejoignez ${o.dest.name} : posez-vous, puis G pour descendre armé.` : o.type === 'out' ? `${o.n} caisses vous attendent sur le quai de fret.` : o.type === 'container' ? 'Le conteneur est chargé dans votre soute.' : `Rendez-vous à ${o.dest.name} pour charger.`);
     }
     if (a === 'dockact') { const act = this.actions()[+v]; const r = act && act.fn(); this.onAction('dock'); return this.flash(typeof r === 'string' ? r : 'Opération effectuée.', typeof r === 'string' && /insuff|incompl|Pas assez|manque/i.test(r)); }
     if (a === 'sellraw') { const r = this.mining.sellRaw(); this.onAction('sell'); return this.flash(r); }

@@ -29,6 +29,7 @@ import { Missions } from './game/missions.js';
 import { Crew } from './game/crew.js';
 import { Mining } from './game/mining.js';
 import { Combat } from './game/combat.js';
+import { Ground } from './game/ground.js';
 
 const params = new URLSearchParams(location.search);
 const HX_ = 32;
@@ -93,10 +94,11 @@ async function boot() {
   ctx.flight = flight;
   for (const o of ctx.outposts) flight.addPad(o.pad);
   flight.onEvent = (e, pad) => {
-    if (e === 'takeoff') { ctx.crew?.onTakeoff(); ctx.combat?.onTakeoff(); }
+    if (e === 'takeoff') { ctx.crew?.onTakeoff(); ctx.combat?.onTakeoff(); ctx.ground?.onTakeoff(); }
     if (e === 'landed') {
       ctx.crew?.onLanded(pad);
       const rep = ctx.combat?.onLanded();
+      setTimeout(() => ctx.ground?.onLanded(pad), 1500);
       if (rep) setTimeout(() => toast(rep), 4200);
     }
     const away = pad && pad !== flight.home;
@@ -190,6 +192,30 @@ async function boot() {
   const combat = new Combat(ctx, { game, flight, loadout: heronGear, crew, mining, ship: ctx.ships.heron });
   ctx.combat = combat;
   const plural = (n, a, b) => `${n} ${n > 1 ? b : a}`;
+  // ------------------------------------------------------------------ combat à pied (avant-postes)
+  const ground = new Ground(ctx, { game, flight, crew, player, missions });
+  ctx.ground = ground;
+  const money = (n) => n.toLocaleString('fr-FR').replace(/\u202f/g, ' ');
+  ground.onEvent = (e, a, b, c, d) => {
+    if (e === 'raid') {
+      audio.say(`Ici ${a.name}. Nous sommes attaqués ! Des pirates sortent de la tour. Demandons assistance immédiate.`);
+      toast(`Raid pirate sur ${a.name} · ${plural(b, 'assaillant', 'assaillants')} · ${touch ? 'ARME' : 'G'} : descendre armé`);
+    }
+    if (e === 'disembark') toast(a ? `Sur le pont · ${plural(a, 'garde vous accompagne', 'gardes vous accompagnent')}` : `Sur le pont de ${flight.dockedAt.name}`);
+    if (e === 'kill') toast(`${a.name} neutralisé · prime +${money(b)} ¤${d ? ` · ${plural(d, 'pirate restant', 'pirates restants')}` : ''}${c === 'friend' ? ' (garde)' : ''}`);
+    if (e === 'cleared') { audio.say('Plateforme sécurisée. Merci, pilote. Paiement transféré.'); toast(`Plateforme sécurisée · ${c}`); }
+    if (e === 'guardDown') toast(`${a.name} est à terre !`);
+    if (e === 'down') { audio.say('Blessé grave. Évacuation vers le vaisseau.'); toast('Vous êtes à terre !'); }
+    if (e === 'evac') toast(`Évacué à bord · soins d'urgence −${money(a)} ¤ · les pirates pillent le dépôt et s'enfuient`);
+    if (e === 'fled') toast('Décollage · le raid se poursuit sans vous');
+    if (e === 'noguns') toast('Armes interdites dans la station');
+    if (e === 'nogun') toast('Aucune arme personnelle · Armurerie Kestrel, galerie');
+    if (e === 'noother') toast('Pas d\'autre arme équipée');
+    if (e === 'switch') toast(a.name);
+    if (e === 'nomed') toast('Aucun stylo médical · Pharmacie, galerie');
+    if (e === 'fullhp') toast('Santé au maximum');
+    if (e === 'healed') { audio.blip(); toast('Stylo médical injecté'); }
+  };
   combat.onEvent = (e, a, b, c) => {
     const fire = touch ? 'TIR' : 'clic gauche / X';
     if (e === 'wave') {
@@ -301,6 +327,7 @@ async function boot() {
     ctx.crew?.update(dt);
     ctx.mining?.update(dt, ctx.input || { firing: false });
     ctx.combat?.update(dt, ctx.input || { firing: false });
+    ctx.ground?.update(dt);
     ctx.cargo?.update(player);
     sky.update(dt, t, camera);
     const c = camera.position, insideStation = (c.x > -HX_ && c.x < HX_ && c.z > -46 && c.z < 31 && c.y < 25) || (c.x < -40 && c.x > -103 && c.z > -25 && c.z < 11);
@@ -390,7 +417,7 @@ async function boot() {
     if (input.consume('menu') && !shop.isOpen) openMenu();
     if (input.consume('inv') && running && !flight.active && !shop.isOpen) openUI(() => shop.openInventory());
     if (running && !shop.isOpen) {
-      if (flight.active) {
+      if (flight.active && !ground.onFoot) {
         // ------------------------------------------------ en vol
         if (input.consume('view')) flight.toggleView();
         if (input.consume('mine') && flight.state === 'flying') mining.toggle();
@@ -400,8 +427,12 @@ async function boot() {
         if (flight.away) {
           const pad = flight.dockedAt;
           const n = missions.dockActions(pad).length;
-          label = `E — Opérations à quai${n ? ` (${n})` : ''}${pad.id === 'ardent' ? ' · raffinerie, marché' : ''} · ${touch ? '⏻' : 'ESPACE'} — Décoller`;
-          if (input.consume('use')) openUI(() => shop.openDock(pad, () => missions.dockActions(pad), mining));
+          const raid = ground.raid && !ground.raid.done;
+          const G = touch ? 'ARME' : 'G';
+          label = raid ? `RAID EN COURS · ${G} — Descendre armé · ${touch ? '⏻' : 'ESPACE'} — Décoller`
+            : `E — Opérations à quai${n ? ` (${n})` : ''}${pad.id === 'ardent' ? ' · raffinerie, marché' : ''}${ground.canDisembark() ? ` · ${G} — Descendre` : ''} · ${touch ? '⏻' : 'ESPACE'} — Décoller`;
+          if (input.consume('draw') && ground.canDisembark()) ground.disembark();
+          if (input.consume('use')) { if (raid) toast('Opérations suspendues : raid pirate sur la plateforme'); else openUI(() => shop.openDock(pad, () => missions.dockActions(pad), mining)); }
           if (input.consume('fly') || input.consume('flyKey')) flight.takeOff();
         } else {
           label = flight.state === 'flying'
@@ -417,20 +448,23 @@ async function boot() {
       } else {
         if (input.consume('view')) player.toggleView();
         if (cargo.carried) input.run = false;
-        player.update(dt, input, crowd.agents.filter((a) => !a.attached), [...ctx.doors, ...cargo.blockers()]);
+        ground.footInput(dt, input);
+        if (ground.dead) input.move.x = input.move.y = 0;
+        player.update(dt, input, ground.onFoot ? ground.units.filter((u) => !u.down) : crowd.agents.filter((a) => !a.attached), ground.onFoot ? [] : [...ctx.doors, ...cargo.blockers()]);
         let near = null;
-        if (player.seated) near = { label: touch ? '⏻ — Décoller · E — Se lever' : 'ESPACE — Décoller · E — Se lever', fn: () => player.stand() };
+        if (ground.onFoot) near = ground.nearBoard() && !ground.dead ? { label: `E — Remonter à bord du Héron${ground.raid && !ground.raid.done ? ' (le raid continue)' : ''}`, fn: () => ground.reboard() } : null;
+        else if (player.seated) near = { label: touch ? '⏻ — Décoller · E — Se lever' : 'ESPACE — Décoller · E — Se lever', fn: () => player.stand() };
         else near = cargo.prompt(player);
-        if (!near && !player.seated) for (const it of interactables) if (it.pos.distanceTo(player.pos) < it.r) { near = it; break; }
+        if (!near && !player.seated && !ground.onFoot) for (const it of interactables) if (it.pos.distanceTo(player.pos) < it.r) { near = it; break; }
         promptEl.classList.toggle('hidden', !near);
         if (near) promptEl.textContent = near.label;
         if (player.seated && (input.consume('fly') || input.consume('flyKey'))) { flight.takeOff(); if (player.avatar) player.avatar.root.visible = false; }
         else if (near && input.consume('use')) { const err = near.fn(); if (typeof err === 'string') toast(err); }
-        input.consume('fly'); input.consume('flyKey'); input.consume('land'); input.consume('mine'); input.consume('missile'); input.consume('target');
+        input.consume('fly'); input.consume('flyKey'); input.consume('land'); input.consume('mine'); input.consume('missile'); input.consume('target'); input.consume('draw'); input.consume('hud');
       }
       input.consume('use');
     } else if (running && shop.isOpen) {
-      if (flight.active) flight.update(dt, input);
+      if (flight.active && !ground.onFoot) flight.update(dt, input);
       else player.update(dt, input, crowd.agents.filter((a) => !a.attached), ctx.doors);
       $('prompt').classList.add('hidden');
     }

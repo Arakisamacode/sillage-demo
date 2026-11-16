@@ -17,12 +17,12 @@ const I = (id, cat, name, price, desc, extra = {}) => ({ id, cat, name, price, d
 
 export const ITEMS = [
   // ------------------------------------------------------------ armes personnelles
-  I('ks9', 'sidearm', 'Pistolet KS-9 « Mistral »', 1150, 'Pistolet compact à impulsion. Fiable, léger, réglementaire en station.', { shape: 'pistol', accent: 0x6f86a8, stats: { Dégâts: 18, Cadence: '4 tirs/s', Portée: '25 m', Chargeur: 14 } }),
-  I('rv44', 'sidearm', 'Revolver lourd RV-44', 1900, 'Six coups à forte charge. Recul marqué, arrêt garanti.', { shape: 'revolver', accent: 0x9a7a3a, stats: { Dégâts: 42, Cadence: '1,5 tir/s', Portée: '35 m', Chargeur: 6 } }),
-  I('sm3', 'primary', 'Pistolet-mitrailleur SM-3 « Grêle »', 3200, 'Cadence élevée, idéal en coursive et à bord.', { shape: 'smg', accent: 0x5a8a5a, stats: { Dégâts: 12, Cadence: '12 tirs/s', Portée: '30 m', Chargeur: 45 } }),
-  I('ac7', 'primary', 'Fusil d\'assaut AC-7 « Bourrasque »', 4800, 'Polyvalent, précis en rafale. Le choix des escortes.', { shape: 'rifle', accent: 0x7a7a3a, stats: { Dégâts: 24, Cadence: '8 tirs/s', Portée: '60 m', Chargeur: 30 } }),
-  I('br2', 'primary', 'Fusil à pompe BR-2 « Bélier »', 3900, 'Dévastateur à courte portée, pour l\'abordage.', { shape: 'shotgun', accent: 0x8a4a2a, stats: { Dégâts: '8 × 11', Cadence: '1,2 tir/s', Portée: '12 m', Chargeur: 8 } }),
-  I('lr12', 'primary', 'Fusil de précision LR-12 « Héliotrope »', 9600, 'Lunette ×8, canon flottant. Pour ceux qui tirent une seule fois.', { shape: 'sniper', accent: 0x4a5a7a, stats: { Dégâts: 110, Cadence: '0,8 tir/s', Portée: '250 m', Chargeur: 5 } }),
+  I('ks9', 'sidearm', 'Pistolet KS-9 « Mistral »', 1150, 'Pistolet compact à impulsion. Fiable, léger, réglementaire en station.', { fire: { dmg: 18, rate: 4, range: 25, mag: 14, spread: 0.014, reload: 1.4 }, shape: 'pistol', accent: 0x6f86a8, stats: { Dégâts: 18, Cadence: '4 tirs/s', Portée: '25 m', Chargeur: 14 } }),
+  I('rv44', 'sidearm', 'Revolver lourd RV-44', 1900, 'Six coups à forte charge. Recul marqué, arrêt garanti.', { fire: { dmg: 42, rate: 1.5, range: 35, mag: 6, spread: 0.008, reload: 2.2 }, shape: 'revolver', accent: 0x9a7a3a, stats: { Dégâts: 42, Cadence: '1,5 tir/s', Portée: '35 m', Chargeur: 6 } }),
+  I('sm3', 'primary', 'Pistolet-mitrailleur SM-3 « Grêle »', 3200, 'Cadence élevée, idéal en coursive et à bord.', { fire: { dmg: 12, rate: 12, range: 30, mag: 45, spread: 0.028, reload: 1.8, auto: true }, shape: 'smg', accent: 0x5a8a5a, stats: { Dégâts: 12, Cadence: '12 tirs/s', Portée: '30 m', Chargeur: 45 } }),
+  I('ac7', 'primary', 'Fusil d\'assaut AC-7 « Bourrasque »', 4800, 'Polyvalent, précis en rafale. Le choix des escortes.', { fire: { dmg: 24, rate: 8, range: 60, mag: 30, spread: 0.011, reload: 2.0, auto: true }, shape: 'rifle', accent: 0x7a7a3a, stats: { Dégâts: 24, Cadence: '8 tirs/s', Portée: '60 m', Chargeur: 30 } }),
+  I('br2', 'primary', 'Fusil à pompe BR-2 « Bélier »', 3900, 'Dévastateur à courte portée, pour l\'abordage.', { fire: { dmg: 11, pellets: 8, rate: 1.2, range: 12, mag: 8, spread: 0.07, reload: 2.6 }, shape: 'shotgun', accent: 0x8a4a2a, stats: { Dégâts: '8 × 11', Cadence: '1,2 tir/s', Portée: '12 m', Chargeur: 8 } }),
+  I('lr12', 'primary', 'Fusil de précision LR-12 « Héliotrope »', 9600, 'Lunette ×8, canon flottant. Pour ceux qui tirent une seule fois.', { fire: { dmg: 110, rate: 0.8, range: 250, mag: 5, spread: 0.002, reload: 2.8 }, shape: 'sniper', accent: 0x4a5a7a, stats: { Dégâts: 110, Cadence: '0,8 tir/s', Portée: '250 m', Chargeur: 5 } }),
 
   // ------------------------------------------------------------ tenues
   I('o_flight', 'outfit', 'Combinaison de vol Ardoise', 0, 'Combinaison de pilote standard, fournie avec la licence.', { outfit: { top: 0x2b3036, bottom: 0x2b3036, boot: 0x16181a, accent: 0x6f86a8, gloves: true, zip: false } }),
@@ -33,10 +33,10 @@ export const ITEMS = [
   I('o_black', 'outfit', 'Tenue tactique Charbon', 1450, 'Tissu anti-abrasion, poches de cuisse. Discrète.', { outfit: { top: 0x1c1e20, bottom: 0x24262a, boot: 0x0e0f10, accent: 0x6a6a5a, gloves: true, belt: true } }),
 
   // ------------------------------------------------------------ armures
-  I('a_light', 'armor', 'Armure légère « Pavois »', 2400, 'Plastron et protections d\'avant-bras. Ne gêne pas les mouvements.', { armor: { tier: 1, plate: 0x4a5058, under: 0x1b1e21, accent: 0x6e6a3a, light: 0x5fe6c8 }, stats: { Protection: '20 %', Mobilité: 'Élevée' } }),
-  I('a_med', 'armor', 'Armure moyenne « Rempart »', 5600, 'Épaulières, cuissardes et plastron renforcé.', { armor: { tier: 2, plate: 0x3a4148, under: 0x1b1e21, accent: 0x7a7a3a, light: 0x5fe6c8 }, stats: { Protection: '40 %', Mobilité: 'Moyenne' } }),
-  I('a_heavy', 'armor', 'Armure lourde « Bastion »', 11800, 'Protection intégrale et sac de survie. Pour l\'escorte armée.', { armor: { tier: 3, plate: 0x2f3236, under: 0x16181a, accent: 0x8a5a2a, light: 0xffa040 }, stats: { Protection: '65 %', Mobilité: 'Réduite' } }),
-  I('a_med_w', 'armor', 'Armure moyenne « Rempart » blanche', 6100, 'Même protection, finition céramique blanche.', { armor: { tier: 2, plate: 0xc8ccd0, under: 0x2a2e32, accent: 0x3e6a9a, light: 0x6fb8ff }, stats: { Protection: '40 %', Mobilité: 'Moyenne' } }),
+  I('a_light', 'armor', 'Armure légère « Pavois »', 2400, 'Plastron et protections d\'avant-bras. Ne gêne pas les mouvements.', { prot: 0.2, armor: { tier: 1, plate: 0x4a5058, under: 0x1b1e21, accent: 0x6e6a3a, light: 0x5fe6c8 }, stats: { Protection: '20 %', Mobilité: 'Élevée' } }),
+  I('a_med', 'armor', 'Armure moyenne « Rempart »', 5600, 'Épaulières, cuissardes et plastron renforcé.', { prot: 0.4, armor: { tier: 2, plate: 0x3a4148, under: 0x1b1e21, accent: 0x7a7a3a, light: 0x5fe6c8 }, stats: { Protection: '40 %', Mobilité: 'Moyenne' } }),
+  I('a_heavy', 'armor', 'Armure lourde « Bastion »', 11800, 'Protection intégrale et sac de survie. Pour l\'escorte armée.', { prot: 0.65, armor: { tier: 3, plate: 0x2f3236, under: 0x16181a, accent: 0x8a5a2a, light: 0xffa040 }, stats: { Protection: '65 %', Mobilité: 'Réduite' } }),
+  I('a_med_w', 'armor', 'Armure moyenne « Rempart » blanche', 6100, 'Même protection, finition céramique blanche.', { prot: 0.4, armor: { tier: 2, plate: 0xc8ccd0, under: 0x2a2e32, accent: 0x3e6a9a, light: 0x6fb8ff }, stats: { Protection: '40 %', Mobilité: 'Moyenne' } }),
 
   // ------------------------------------------------------------ vaisseau
   I('l1', 'shipWeapon', 'Canon laser L1 « Aiguille »', 6200, 'Arme à énergie de taille 1. Pas de munitions, chauffe vite.', { size: 1, gun: 'laser', dps: 210, stats: { Taille: 1, 'Dégâts/s': 210, Portée: '1,6 km', Munitions: 'énergie' } }),

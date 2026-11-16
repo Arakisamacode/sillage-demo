@@ -23,6 +23,7 @@ export class Input {
       if (e.code === 'KeyM') this.pressed.add('mine');
       if (e.code === 'KeyI') this.pressed.add('inv');
       if (e.code === 'KeyR') this.pressed.add('missile');
+      if (e.code === 'KeyG') this.pressed.add('draw');
       if (e.code === 'KeyT') this.pressed.add('target');
       if (e.code === 'KeyH') this.pressed.add('hud');
       if (e.code === 'Tab') e.preventDefault();
@@ -77,6 +78,8 @@ export class Input {
     btn('t-inv', () => this.pressed.add('inv'));
     btn('t-mine', () => this.pressed.add('mine'));
     btn('t-msl', () => this.pressed.add('missile'));
+    btn('t-gun', () => this.pressed.add('draw'));
+    btn('t-med', () => this.pressed.add('hud'));
     for (const [id, k] of [['t-up', 'touchUp'], ['t-down', 'touchDown'], ['t-fire', 'touchFire']]) {
       const el = document.getElementById(id);
       el.addEventListener('pointerdown', (e) => { e.stopPropagation(); this[k] = true; });

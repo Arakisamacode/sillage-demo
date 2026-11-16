@@ -12,6 +12,14 @@ export const OUTPOSTS = [
   { id: 'lys', name: 'Station agricole Lys', kind: 'agri', pos: [-300, 650, -4800], heading: 2.4, color: '#7dff9a', desc: 'Serres orbitales et coopérative' },
 ];
 
+// Caisses de couverture du pont (repère local de l'avant-poste) : x, z, largeur, profondeur, hauteur
+export const COVER = [
+  [22.5, 7.5, 2.4, 2.4, 1.25], [23.5, -6.5, 3.6, 1.6, 1.25], [30, 0.5, 1.6, 4.0, 1.25], [31, 9.5, 2.4, 2.4, 2.5],
+  [32, -9, 2.4, 2.4, 1.25], [38, 4.5, 3.0, 1.6, 1.25], [39, -4.5, 1.6, 3.0, 1.25], [43.5, 9.5, 2.4, 2.4, 2.5], [43.5, -9.5, 2.4, 2.4, 1.25],
+];
+// Pont de débarquement entre l'aire et la tour : x ∈ [14, 47], z ∈ [-12.5, 12.5]
+export const DECK = { x0: 14, x1: 46, z: 12.4, padR: 16.2 };
+
 export function buildOutposts(ctx) {
   const { mats, scene } = ctx;
   const B = new Builder(null);
@@ -37,6 +45,15 @@ export function buildOutposts(ctx) {
     cyl(16.6, 16.6, 0.06, deck, [0, 0.0, 0], null, 8);
     ctx.builder.colliderBox(24, 1.6, 24, P(0, -0.8, 0), R());
     ctx.builder.colliderBox(24, 1.6, 24, P(0, -0.8, 0), R(0, Math.PI / 4));
+    // disque praticable (16 secteurs) et garde-corps bas, sauf côté pont
+    for (let i = 0; i < 16; i++) {
+      const a = (i / 16) * Math.PI * 2 + Math.PI / 16, c = Math.cos(a), sn = Math.sin(a);
+      ctx.builder.colliderBox(6.6, 1.6, 16.4, P(c * 8.2, -0.8, sn * 8.2), R(0, -a + Math.PI / 2));
+      if (Math.abs(Math.atan2(sn, c)) < 0.75) continue;
+      box(6.4, 0.1, 0.1, yellow, [c * 16.7, 1.05, sn * 16.7], [0, -a + Math.PI / 2, 0]);
+      box(0.12, 1.05, 0.12, metal, [c * 16.7, 0.52, sn * 16.7]);
+      ctx.builder.colliderBox(6.6, 1.2, 0.3, P(c * 16.8, 0.6, sn * 16.8), R(0, -a + Math.PI / 2));
+    }
     for (let i = 0; i < 16; i++) {
       const a = (i / 16) * Math.PI * 2;
       box(0.5, 0.25, 0.5, padLight, [Math.cos(a) * 15.6, 0.12, Math.sin(a) * 15.6]);
@@ -50,9 +67,24 @@ export function buildOutposts(ctx) {
     // dessous : poutres et projecteurs
     for (let i = 0; i < 4; i++) box(34, 1.2, 1.2, metal, [0, -2.2, 0], [0, (i * Math.PI) / 4, 0]);
     // ------------------------------------------------ passerelle vers le module principal (+x)
-    box(30, 2.2, 5, shell, [32, -1.0, 0], null, true);
-    box(30, 0.3, 0.3, yellow, [32, 0.2, 2.6]); box(30, 0.3, 0.3, yellow, [32, 0.2, -2.6]);
-    for (let x = 20; x < 46; x += 4) box(0.4, 2.0, 0.4, metal, [x, 1.0, 2.6]), box(0.4, 2.0, 0.4, metal, [x, 1.0, -2.6]);
+    // pont de débarquement (aire ↔ tour) : plancher, garde-corps, caisses de couverture, porte de la tour
+    box(33, 1.6, 25.6, shellDark, [30.5, -0.82, 0], null, true);
+    box(32.6, 0.04, 25.2, deck, [30.5, 0.0, 0]);
+    for (const zz of [-12.9, 12.9]) {
+      box(32, 0.1, 0.1, yellow, [30.5, 1.05, zz]);
+      for (let x = 15; x <= 46; x += 3.1) box(0.12, 1.05, 0.12, metal, [x, 0.52, zz]);
+      ctx.builder.colliderBox(33, 1.2, 0.3, P(30.5, 0.6, zz), R());
+    }
+    for (let x = 16; x < 46; x += 4) box(3.4, 0.03, 0.18, yellow, [x, 0.03, 0]);
+    const crateCols = [0x5c6b4a, 0x3d4a5a, 0x6a5a3a, 0x8a5a2a];
+    COVER.forEach(([x, z, w, d, h], i) => {
+      box(w, h, d, mats.cladding(crateCols[i % crateCols.length]), [x, h / 2, z], null, true);
+      box(w + 0.06, 0.1, d + 0.06, metal, [x, h - 0.05, z]);
+      box(w + 0.06, 0.1, d + 0.06, metal, [x, 0.05, z]);
+    });
+    box(0.6, 6.4, 7.6, shellDark, [46.2, 3.2, 0]);
+    box(0.3, 5.2, 5.6, mats.metal(0x1a1c1e, { rough: 0.5 }), [46.0, 2.6, 0]);
+    box(0.1, 0.2, 5.6, redL, [45.85, 5.35, 0]);
     // ------------------------------------------------ module principal : tour cylindrique
     const hx = 60;
     cyl(14, 14, 44, shell, [hx, 4, 0], null, 24);
@@ -107,7 +139,8 @@ export function buildOutposts(ctx) {
     L.position.set(...P(0, 18, 0)); scene.add(L);
     out.push({
       ...O,
-      pad: { id: O.id, name: O.name, pos: new THREE.Vector3(...P(0, 0, 0)), q: rot.clone(), outpost: O },
+      pad: { id: O.id, name: O.name, pos: new THREE.Vector3(...P(0, 0, 0)), q: rot.clone().multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(0, Math.PI / 2, 0))), outpost: O },
+      rot: rot.clone(), origin: o.clone(), door: new THREE.Vector3(...P(45.2, 0, 0)),
       center: new THREE.Vector3(...P(0, 0, 0)),
     });
   }

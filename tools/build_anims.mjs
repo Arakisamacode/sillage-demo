@@ -5,7 +5,8 @@ import { prune, resample, quantize } from '@gltf-transform/functions';
 const [,, src, dst] = process.argv;
 const KEEP = new Set(['A_TPose','Idle_Loop','Idle_Talking_Loop','Walk_Loop','Walk_Formal_Loop','Jog_Fwd_Loop','Sprint_Loop',
   'Sitting_Enter','Sitting_Idle_Loop','Sitting_Talking_Loop','Sitting_Exit','Fixing_Kneeling','Interact','PickUp_Table',
-  'Push_Loop','Driving_Loop','Idle_Torch_Loop','Crouch_Idle_Loop']);
+  'Push_Loop','Driving_Loop','Idle_Torch_Loop','Crouch_Idle_Loop',
+  'Pistol_Idle_Loop','Pistol_Aim_Neutral','Pistol_Shoot','Pistol_Reload','Hit_Chest','Death01','Crouch_Fwd_Loop']);
 const io = new NodeIO();
 const doc = await io.read(src);
 const root = doc.getRoot();

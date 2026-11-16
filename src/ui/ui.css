@@ -158,3 +158,17 @@ body.is-touch #radar { left: calc(12px + env(safe-area-inset-left)); bottom: aut
 #gunaim::before { left: 12px; top: 0; width: 2px; height: 26px; clip-path: polygon(0 0,100% 0,100% 35%,0 35%,0 65%,100% 65%,100% 100%,0 100%); }
 #gunaim::after { top: 12px; left: 0; height: 2px; width: 26px; clip-path: polygon(0 0,35% 0,35% 100%,0 100%,0 0,65% 0,100% 0,100% 100%,65% 100%); }
 #hitfx { position: absolute; inset: 0; pointer-events: none; opacity: 0; background: radial-gradient(ellipse at center, transparent 45%, rgba(255,40,20,.55) 100%); }
+
+/* ------------------------------------------------------------------ combat à pied */
+#crosshair.hit { background: #ff5a3a; box-shadow: 0 0 0 6px rgba(255,90,58,.35); }
+#dmgfx { position: absolute; inset: 0; pointer-events: none; opacity: 0; background: radial-gradient(ellipse at center, transparent 40%, rgba(200,20,10,.6) 100%); }
+#foot { position: absolute; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom)); transform: translateX(-50%); width: min(460px, 70vw); font-size: 11.5px; letter-spacing: .06em; text-align: center; text-shadow: 0 0 3px #000; }
+body.is-touch #foot { bottom: auto; top: 8px; width: min(380px, 48vw); font-size: 10.5px; }
+.ft-hp { position: relative; height: 13px; background: rgba(10,14,18,.65); border: 1px solid rgba(255,255,255,.12); text-align: left; }
+.ft-hp i { position: absolute; left: 0; top: 0; bottom: 0; background: linear-gradient(90deg, #3aa86a, #7dff9a); transition: width .15s; }
+.ft-hp span { position: relative; padding-left: 6px; font-size: 10px; line-height: 13px; }
+.ft-w { margin-top: 4px; } .ft-w b { color: var(--accent); font-weight: 600; }
+#raidbox { position: absolute; left: 50%; top: 52px; transform: translateX(-50%); font-size: 12.5px; letter-spacing: .08em; text-align: center; background: rgba(8,11,15,.55); padding: 5px 14px; border-left: 2px solid #ff5a3a; text-shadow: 0 0 3px #000; }
+body.is-touch #raidbox { top: 44px; font-size: 11px; }
+#raidbox b { color: #ff6a4a; } #raidbox b.ok { color: #7dff9a; } #raidbox i { color: #ff8a6a; font-style: normal; }
+#gmarks i { position: absolute; width: 0; height: 0; margin: -6px 0 0 -5px; border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 8px solid #ff4a3a; pointer-events: none; filter: drop-shadow(0 0 2px #000); }

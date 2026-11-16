@@ -18,8 +18,13 @@ export const CLIPS = {
   jog: 'Jog_Fwd_Loop', run: 'Sprint_Loop', sitEnter: 'Sitting_Enter', sit: 'Sitting_Idle_Loop',
   sitTalk: 'Sitting_Talking_Loop', sitExit: 'Sitting_Exit', repair: 'Fixing_Kneeling', interact: 'Interact',
   pickup: 'PickUp_Table', push: 'Push_Loop', drive: 'Driving_Loop', torch: 'Idle_Torch_Loop', crouch: 'Crouch_Idle_Loop',
+  aim: 'Pistol_Idle_Loop', aimHold: 'Pistol_Aim_Neutral', shoot: 'Pistol_Shoot', reload: 'Pistol_Reload', hit: 'Hit_Chest', death: 'Death01',
+  crouchWalk: 'Crouch_Fwd_Loop',
 };
-const LOOPING = new Set(['idle', 'talk', 'walk', 'walkFormal', 'jog', 'run', 'sit', 'sitTalk', 'push', 'drive', 'torch', 'crouch', 'repair']);
+const LOOPING = new Set(['idle', 'talk', 'walk', 'walkFormal', 'jog', 'run', 'sit', 'sitTalk', 'push', 'drive', 'torch', 'crouch', 'repair', 'aim', 'aimU', 'aimHoldU', 'crouchWalk']);
+// os du haut du corps : les clips « …U » ne pilotent qu'eux (visée en marchant)
+const UPPER = /^(spine_02|spine_03|neck_01|head|clavicle_|upperarm_|lowerarm_|hand_|thumb_|index_|middle_|ring_|pinky_)/i;
+const UPPER_ROLES = ['aim', 'aimHold', 'shoot', 'reload'];
 
 // vitesse au sol (m/s) correspondant à timeScale = 1 pour une taille de référence
 const GAIT = { walk: 1.35, walkFormal: 1.25, jog: 3.1, run: 5.6 };
@@ -123,6 +128,11 @@ export class CharacterLibrary {
       for (const [role, name] of Object.entries(CLIPS)) {
         const c = rt.bake(name, { fps: 30, inPlace: true, rename: role });
         if (c) clips[role] = c;
+      }
+      for (const r of UPPER_ROLES) {
+        const c = clips[r];
+        if (!c) continue;
+        clips[r + 'U'] = new THREE.AnimationClip(r + 'U', c.duration, c.tracks.filter((t) => UPPER.test(t.name.split('.')[0])));
       }
       this.clipsBySkel[skel] = clips;
     }
@@ -299,6 +309,42 @@ export class Character {
 
   setSpeed(v) { this.speed = v; }
 
+  /** Couche « haut du corps » (visée, tir, rechargement) par-dessus la locomotion ; null pour l'arrêter. */
+  upper(role, opts = {}) {
+    const prev = this.upperRole ? this.actions[this.upperRole] : null;
+    if (!role) { if (prev) prev.fadeOut(opts.fade ?? 0.25); this.upperRole = null; return; }
+    const a = this.actions[role];
+    if (!a) return;
+    if (this.upperRole === role && !opts.restart) return;
+    a.reset(); a.timeScale = opts.speed ?? 1;
+    a.setEffectiveWeight(opts.weight ?? 8); a.play(); a.fadeIn(opts.fade ?? 0.12);
+    if (prev && prev !== a) prev.fadeOut(opts.fade ?? 0.12);
+    this.upperRole = role;
+    if (!LOOPING.has(role)) {
+      const back = opts.then;
+      const onFin = (e) => { if (e.action !== a) return; this.mixer.removeEventListener('finished', onFin); if (this.upperRole === role) this.upper(back || null, { fade: 0.15 }); };
+      this.mixer.addEventListener('finished', onFin);
+    }
+  }
+
+  /** Arme tenue en main (maquette orientée selon le regard) ; null pour la ranger. */
+  hold(mesh, kind) {
+    if (this.held) this.root.remove(this.held);
+    for (const k of ['sidearm', 'primary']) for (const m of this._gear[k] || []) m.visible = !(mesh && k === kind);
+    this.held = mesh || null;
+    if (mesh) this.root.add(mesh);
+    this.aimPitch = this.aimPitch || 0;
+  }
+  _placeHeld() {
+    const h = this.held, hand = this.bones.hand_r || this.bones.Hand_R;
+    if (!h || !hand) return;
+    this.root.updateMatrixWorld();
+    hand.getWorldPosition(_v);
+    this.root.worldToLocal(_v);
+    h.position.copy(_v);
+    h.rotation.set(-(this.aimPitch || 0), 0, 0);
+  }
+
   lookAt(p) { this.lookTarget = p; }
 
   _locomotion() {
@@ -375,6 +421,7 @@ export class Character {
     this._locomotion();
     this.mixer.update(step);
     this._applyLook(step);
+    if (this.held) this._placeHeld();
   }
 
   _applyLook(dt) {

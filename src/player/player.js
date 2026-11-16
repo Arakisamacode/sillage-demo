@@ -70,7 +70,7 @@ export class Player {
     const h = dt / steps;
     for (let i = 0; i < steps; i++) this._move(h, npcs, doors);
     this.speed = Math.hypot(this.vel.x, this.vel.z);
-    if (this.pos.y < -5) this.pos.set(-26, 0.1, -6);
+    if (this.pos.y < (this.fallY ?? -5)) { if (this.resetPos) this.pos.copy(this.resetPos); else this.pos.set(-26, 0.1, -6); this.vel.set(0, 0, 0); }
 
     // pas
     if (this.grounded && this.speed > 0.4) {
@@ -125,7 +125,7 @@ export class Player {
 
   _updateCamera(dt) {
     const cam = this.camera;
-    const want = this.thirdPerson ? 2.35 : 0;
+    const want = this.thirdPerson ? (this.aiming ? 1.45 : 2.35) : 0;
     this.camDist += (want - this.camDist) * (1 - Math.exp(-dt * 6));
     const moving = this.grounded && this.speed > 0.3;
     this.bob += dt * this.speed * 2.2 * (moving ? 1 : 0);
@@ -151,7 +151,11 @@ export class Player {
     if (this.avatar) {
       this.avatar.root.visible = this.camDist > 0.6;
       this.avatar.root.position.copy(this.pos);
-      if (this.speed > 0.2) {
+      if (this.aiming) {
+        let d = this.yaw + Math.PI - this.avatar.root.rotation.y;
+        d = Math.atan2(Math.sin(d), Math.cos(d));
+        this.avatar.root.rotation.y += d * (1 - Math.exp(-dt * 16));
+      } else if (this.speed > 0.2) {
         const face = Math.atan2(this.vel.x, this.vel.z);
         let d = face - this.avatar.root.rotation.y;
         d = Math.atan2(Math.sin(d), Math.cos(d));

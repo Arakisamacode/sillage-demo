@@ -32,15 +32,17 @@ export class Missions {
   _offer(i = Math.floor(Math.random() * 3)) {
     const dest = pick(this.outposts), g = pick(GOODS);
     const km = dest.center.distanceTo(this.home) / 1000;
-    const type = ['out', 'in', 'out', 'container', 'in', 'out'][i % 6];
-    const n = type === 'container' ? 1 : 2 + Math.floor(Math.random() * 5);
-    const reward = Math.round((type === 'container' ? 6500 + km * 1100 : n * 620 + km * 380) / 50) * 50;
-    const client = type === 'in' ? pick(CLIENTS.filter((c) => c !== 'Halden Logistique')) : pick(CLIENTS);
+    const type = ['out', 'in', 'raid', 'container', 'in', 'out'][i % 6];
+    const n = type === 'container' ? 1 : type === 'raid' ? 0 : 2 + Math.floor(Math.random() * 5);
+    const reward = Math.round((type === 'raid' ? 4800 + km * 700 : type === 'container' ? 6500 + km * 1100 : n * 620 + km * 380) / 50) * 50;
+    const client = type === 'raid' ? `Sécurité de ${dest.name}` : type === 'in' ? pick(CLIENTS.filter((c) => c !== 'Halden Logistique')) : pick(CLIENTS);
     const o = { id: seq++, type, dest, goods: g.name, n, reward, client, crateColor: g.color, tagColor: g.tag, step: 'new' };
     o.short = `${g.name} · ${dest.name}`;
-    o.title = type === 'out' ? `Livraison : ${n} caisses de ${g.name}` : type === 'in' ? `Collecte : ${n} caisses de ${g.name}` : `Conteneur de ${g.name}`;
+    o.title = type === 'raid' ? `Sécurité : repousser un raid à ${dest.name}` : type === 'out' ? `Livraison : ${n} caisses de ${g.name}` : type === 'in' ? `Collecte : ${n} caisses de ${g.name}` : `Conteneur de ${g.name}`;
     o.route = type === 'in' ? `${dest.name} → Halden-7` : `Halden-7 → ${dest.name}`;
-    o.desc = type === 'out'
+    o.desc = type === 'raid'
+      ? `Des pirates ont pris pied sur le pont de ${dest.name}. Posez-vous, descendez armé (G) et éliminez-les. Vos gardes descendent avec vous.`
+      : type === 'out'
       ? `Prenez les caisses sur le quai de fret (aire 02), portez-les dans la soute du Héron puis livrez-les à ${dest.name}.`
       : type === 'in'
         ? `Chargez la marchandise à ${dest.name}, ramenez-la à Halden-7 et déposez chaque caisse sur le quai de fret.`
@@ -53,7 +55,10 @@ export class Missions {
 
   accept(o) {
     if (this.active.length >= 3) return 'Trois contrats au maximum en même temps.';
-    if (o.type === 'out') {
+    if (o.type === 'raid') {
+      if (this.active.some((x) => x.type === 'raid' && x.dest === o.dest)) return 'Un contrat de sécurité est déjà en cours sur cet avant-poste.';
+      o.step = 'go';
+    } else if (o.type === 'out') {
       if (this.cargo.quaiFree() < o.n) return 'Le quai de fret est encombré : chargez d\'abord les caisses déjà déposées.';
       for (let i = 0; i < o.n; i++) this.cargo.spawn(o, 'ground');
       o.step = 'load';
@@ -91,6 +96,7 @@ export class Missions {
       return h < o.n ? `Charger la soute : ${h}/${o.n} caisses` : `Livrer à ${o.dest.name}`;
     }
     if (o.type === 'container') return `Livrer le conteneur à ${o.dest.name}`;
+    if (o.type === 'raid') return o.step === 'fight' ? `Raid en cours à ${o.dest.name} · ${this.ctx.ground?.enemiesLeft() ?? '?'} pirates` : `Se poser à ${o.dest.name} et descendre armé`;
     if (o.step === 'pickup') return `Aller charger à ${o.dest.name}`;
     return `Décharger sur le quai : ${this.cargo.inQuai(o)}/${o.n} caisses`;
   }
@@ -126,9 +132,14 @@ export class Missions {
     }
   }
 
+  /** Contrat de sécurité de cet avant-poste (en cours), s'il existe. */
+  raidFor(outpostId) { return this.active.find((o) => o.type === 'raid' && o.dest.id === outpostId); }
+  raidCleared(outpostId) { const o = this.raidFor(outpostId); if (o) this._complete(o); return o; }
+
   /** Prochaine destination à afficher sur le HUD : { pos, name } ou null. */
   navTarget() {
     for (const o of this.active) {
+      if (o.type === 'raid' && this.flight.dockedAt !== o.dest.pad) return { pos: o.dest.center, name: `${o.dest.name} · raid pirate` };
       if ((o.type === 'out' && this.cargo.inHold(o) >= o.n) || o.type === 'container' || (o.type === 'in' && o.step === 'pickup')) return { pos: o.dest.center, name: o.dest.name };
       if (o.type === 'in' && o.step === 'return' && this.flight.dockedAt !== this.flight.home) return { pos: this.home, name: 'Halden-7 · hangar 07' };
     }
