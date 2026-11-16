@@ -34,10 +34,10 @@
       <button id="go">Entrer dans le hangar</button>
       <div class="help desktop">
         <b>ZQSD / WASD</b> se déplacer · <b>Maj</b> courir · <b>Souris</b> regarder · <b>V</b> vue 1re / 3e personne ·
-        <b>E</b> interagir · <b>I</b> inventaire · <b>Échap</b> menu<br>Aux commandes du Héron : <b>Espace</b> décoller · en vol <b>ZQSD</b> poussée, <b>souris</b> orientation, <b>Espace / C</b> monter / descendre, <b>Q / E</b> roulis, <b>Maj</b> postcombustion, <b>L</b> atterrir<br>Contrats de fret : terminal du quai, à gauche de la rampe du Héron · Minage en vol : <b>M</b> mode minage, <b>clic gauche</b> ou <b>X</b> laser
+        <b>E</b> interagir · <b>I</b> inventaire · <b>Échap</b> menu<br>Aux commandes du Héron : <b>Espace</b> décoller · en vol <b>ZQSD</b> poussée, <b>souris</b> orientation, <b>Espace / C</b> monter / descendre, <b>Q / E</b> roulis, <b>Maj</b> postcombustion, <b>L</b> atterrir<br>Contrats de fret : terminal du quai, à gauche de la rampe du Héron · Combat : <b>clic gauche</b> ou <b>X</b> tirer, <b>R</b> missile (après verrouillage), <b>T</b> changer de cible · Minage en vol : <b>M</b> mode minage, même bouton pour le laser
       </div>
       <div class="help touch">
-        Joystick gauche : se déplacer · glisser à droite : regarder · boutons : courir, vue, interagir (E), SAC = inventaire · ⏻ décoller / atterrir, ▲ ▼ monter / descendre, MIN mode minage, LASER (maintenir)
+        Joystick gauche : se déplacer · glisser à droite : regarder · boutons : courir, vue, interagir (E), SAC = inventaire · ⏻ décoller / atterrir, ▲ ▼ monter / descendre, TIR (maintenir) : canons ou laser de minage, MSL missile, MIN mode minage
       </div>
     </div>
   </div>
@@ -51,6 +51,13 @@
     <div id="nav" class="hidden"><i></i><span></span></div>
     <div id="aim" class="hidden"></div>
     <div id="mine" class="hidden"></div>
+    <div id="hitfx"></div>
+    <div id="marks"></div>
+    <div id="tgt" class="hidden"><div></div></div>
+    <div id="lead" class="hidden"></div>
+    <div id="gunaim" class="hidden"></div>
+    <div id="cbt" class="hidden"></div>
+    <canvas id="radar" class="hidden" width="150" height="150"></canvas>
     <div id="fps"></div>
     <div id="toast" class="hidden"></div>
   </div>
@@ -67,7 +74,8 @@
       <button id="t-down">▼</button>
       <button id="t-inv">SAC</button>
       <button id="t-mine">MIN</button>
-      <button id="t-fire">LASER</button>
+      <button id="t-fire">TIR</button>
+      <button id="t-msl">MSL</button>
     </div>
   </div>
 

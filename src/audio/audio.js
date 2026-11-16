@@ -241,6 +241,75 @@ export class Audio {
     });
   }
 
+  // --------------------------------------------------------------------------- combat
+  /** Tir : laser (chirp descendant), balistique (claquement), tourelle, pirate, missile (souffle). */
+  zap(kind, vol = 0.3) {
+    if (!this.ac || !this.enabled) return;
+    const ac = this.ac, t = ac.currentTime;
+    this._zapN = (this._zapN || 0);
+    if (this._zapT === t) { if (++this._zapN > 3) return; } else { this._zapT = t; this._zapN = 0; }
+    const g = ac.createGain(); g.connect(this.master);
+    if (kind === 'ballistic') {
+      const s = this._src(false); const bp = ac.createBiquadFilter(); bp.type = 'lowpass'; bp.frequency.value = 1800;
+      g.gain.setValueAtTime(vol * 0.9, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.16);
+      s.connect(bp).connect(g); s.start(t, Math.random() * 2, 0.2);
+      const o = ac.createOscillator(); o.type = 'square'; o.frequency.setValueAtTime(140, t); o.frequency.exponentialRampToValueAtTime(50, t + 0.1);
+      const g2 = ac.createGain(); g2.gain.setValueAtTime(vol * 0.3, t); g2.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+      o.connect(g2).connect(this.master); o.start(t); o.stop(t + 0.14);
+      return;
+    }
+    if (kind === 'missile') {
+      const s = this._src(false); const bp = ac.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.setValueAtTime(600, t); bp.frequency.exponentialRampToValueAtTime(2400, t + 0.8); bp.Q.value = 0.7;
+      g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vol, t + 0.05); g.gain.exponentialRampToValueAtTime(0.001, t + 1.2);
+      s.connect(bp).connect(g); s.start(t, Math.random() * 2, 1.3);
+      return;
+    }
+    const f0 = kind === 'pirate' ? 900 : kind === 'turret' ? 2200 : 1700, f1 = kind === 'pirate' ? 160 : 260;
+    const o = ac.createOscillator(); o.type = kind === 'pirate' ? 'sawtooth' : 'triangle';
+    o.frequency.setValueAtTime(f0 * (0.95 + Math.random() * 0.1), t); o.frequency.exponentialRampToValueAtTime(f1, t + 0.13);
+    const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = kind === 'pirate' ? 1400 : 3200;
+    g.gain.setValueAtTime(vol * 0.5, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
+    o.connect(lp).connect(g); o.start(t); o.stop(t + 0.17);
+  }
+  /** Explosion : souffle grave filtré + grondement. */
+  boom(vol = 0.6) {
+    if (!this.ac || !this.enabled) return;
+    const ac = this.ac, t = ac.currentTime;
+    const s = this._src(false); const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.setValueAtTime(1600, t); lp.frequency.exponentialRampToValueAtTime(90, t + 1.6);
+    const g = ac.createGain(); g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + 2.2);
+    s.connect(lp).connect(g).connect(this.master); s.connect(this.revSend); s.start(t, Math.random() * 1.5, 2.3);
+    const o = ac.createOscillator(); o.frequency.setValueAtTime(70, t); o.frequency.exponentialRampToValueAtTime(28, t + 1.2);
+    const g2 = ac.createGain(); g2.gain.setValueAtTime(vol * 0.7, t); g2.gain.exponentialRampToValueAtTime(0.001, t + 1.3);
+    o.connect(g2).connect(this.master); o.start(t); o.stop(t + 1.4);
+  }
+  /** Impact reçu : bouclier (bourdonnement électrique) ou coque (choc métallique). */
+  hit(shield) {
+    if (!this.ac || !this.enabled) return;
+    const ac = this.ac, t = ac.currentTime;
+    if (this._hitT && t - this._hitT < 0.06) return; this._hitT = t;
+    const g = ac.createGain(); g.connect(this.master);
+    if (shield) {
+      const o = ac.createOscillator(); o.type = 'sawtooth'; o.frequency.setValueAtTime(220, t); o.frequency.linearRampToValueAtTime(120, t + 0.25);
+      const bp = ac.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 700; bp.Q.value = 3;
+      g.gain.setValueAtTime(0.16, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
+      o.connect(bp).connect(g); o.start(t); o.stop(t + 0.32);
+    } else {
+      const s = this._src(false); const bp = ac.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 420; bp.Q.value = 2.5;
+      g.gain.setValueAtTime(0.5, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.45);
+      s.connect(bp).connect(g); s.start(t, Math.random() * 2, 0.5);
+    }
+  }
+  /** Tonalité de verrouillage missile. */
+  lockTone() {
+    if (!this.ac || !this.enabled) return;
+    const ac = this.ac, t = ac.currentTime;
+    for (let i = 0; i < 3; i++) {
+      const o = ac.createOscillator(); o.type = 'square'; o.frequency.value = 1500; const g = ac.createGain();
+      g.gain.setValueAtTime(0.04, t + i * 0.09); g.gain.setValueAtTime(0, t + i * 0.09 + 0.06);
+      o.connect(g).connect(this.master); o.start(t + i * 0.09); o.stop(t + i * 0.09 + 0.07);
+    }
+  }
+
   // --------------------------------------------------------------------------- conversations étouffées
   _voice() {
     const ac = this.ac;

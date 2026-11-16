@@ -305,8 +305,12 @@ export class Crew {
     if (tur) {
       const head = tur.userData.head;
       const manned = this.flight.active && this.gunner();
-      const want = manned ? Math.sin(this.t * 0.35) * 1.4 + Math.sin(this.t * 1.1) * 0.2 : 0;
-      head.rotation.y += (want - head.rotation.y) * (1 - Math.exp(-dt * 2));
+      const aiming = manned && this.turretAim != null;
+      let want = aiming ? this.turretAim : manned ? Math.sin(this.t * 0.35) * 1.4 + Math.sin(this.t * 1.1) * 0.2 : 0;
+      // plus court chemin angulaire
+      while (want - head.rotation.y > Math.PI) want -= Math.PI * 2;
+      while (want - head.rotation.y < -Math.PI) want += Math.PI * 2;
+      head.rotation.y += (want - head.rotation.y) * (1 - Math.exp(-dt * (aiming ? 9 : 2)));
     }
   }
 

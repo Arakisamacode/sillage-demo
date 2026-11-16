@@ -42,6 +42,9 @@ Pour tester sur un téléphone pendant le développement : `npm run dev`, puis o
 | Inventaire (personnage, Héron, sac) | I | bouton SAC |
 | Décoller (assis aux commandes) / atterrir près de l'aire 02 | Espace / L | bouton ⏻ |
 | Vol : poussée, monter / descendre, roulis, postcombustion | ZQSD, Espace / C, Q / E, Maj | joystick, ▲ ▼ |
+| Tirer (canons, ou laser de minage en mode minage) | clic gauche / X | bouton TIR (maintenir) |
+| Missile (après 3 s de verrouillage) / cible suivante | R / T | bouton MSL |
+| Mode minage | M | bouton MIN |
 | Menu / qualité | Échap | bouton ≡ |
 
 Le vaisseau du joueur (Héron, aire 02) s'ouvre par la rampe arrière : on monte à bord sans
@@ -72,6 +75,28 @@ Code : `src/game/cargo.js`, `src/game/missions.js`, `src/world/outposts.js`.
 5. Posez-vous à la **Plateforme Ardent-3** : *E — Opérations à quai* → **Raffinerie** (vente brute immédiate, ou
    raffinage Rapide / Standard / Précis : durée, rendement et frais différents) puis **Marché** (vente au cours du jour).
 Code : `src/game/mining.js`.
+
+## Combat spatial
+
+À plus de 1,5 km de Halden-7, l'espace n'est plus surveillé : des chasseurs pirates interceptent le
+Héron pendant les trajets et dans la Ceinture d'Ardent (vagues plus grosses quand la soute est pleine
+ou en plein minage). Deux modèles : l'Écorcheur, léger et vif, et le Charognard, plus lourd et
+mieux protégé. Ils attaquent en passes successives (approche en tire-bouchon, tir anticipé, dégagement)
+et décrochent si vous revenez dans la zone protégée de la station (1,1 km, armes verrouillées).
+
+- **Armes du Héron** : celles installées à l'Équipement naval tirent depuis leur emplacement réel.
+  Laser (énergie, illimité), balistique (600 obus, 40 % des dégâts traversent les boucliers),
+  lance-missiles (4 missiles à guidage, verrouillage en gardant la cible 3 s dans l'axe).
+  Un cercle jaune indique le point de tir anticipé ; les tirs proches de l'axe sont corrigés vers lui.
+- **Tourelle dorsale** : servie automatiquement par l'artilleur recruté s'il est à bord.
+- **Boucliers et coque** : le bouclier encaisse d'abord et se recharge après quelques secondes sans
+  impact (S1 : 2 400, S2 : 5 200). La coque est conservée d'un vol à l'autre ; réparations et réarmement
+  sont facturés à l'atterrissage.
+- **Primes** : chaque pirate abattu rapporte 900 à 2 800 ¤.
+- **Destruction** : capsule de survie, Héron remplacé à l'aire 02, franchise d'assurance
+  (2 500 ¤ + 5 % des crédits) et perte du minerai.
+- **Interface** : barres bouclier / coque, armement, cadre de cible (bouclier, coque, distance),
+  repères des autres hostiles, radar de 2,5 km (station en vert).
 
 ## Équipage
 
@@ -136,6 +161,7 @@ src/characters/          personnages (Universal Base Characters), tenues en shad
 src/ai/                  grille de navigation, agents, rôles et emplois du temps, scènes de travail
 src/vehicles/            chariot élévateur, tracteur + remorque, nacelle, chariot citerne
 src/player/              contrôleur capsule (three-mesh-bvh), caméras
+src/game/                 économie, catalogue, fret, équipage, minage, combat spatial
 src/audio/               ambiance, annonces, machines, pas, conversations, musique (synthèse)
 tools/                   génération des textures, préparation des assets, captures et tests
 ```

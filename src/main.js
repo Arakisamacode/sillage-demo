@@ -28,6 +28,7 @@ import { Cargo, buildQuai } from './game/cargo.js';
 import { Missions } from './game/missions.js';
 import { Crew } from './game/crew.js';
 import { Mining } from './game/mining.js';
+import { Combat } from './game/combat.js';
 
 const params = new URLSearchParams(location.search);
 const HX_ = 32;
@@ -92,8 +93,12 @@ async function boot() {
   ctx.flight = flight;
   for (const o of ctx.outposts) flight.addPad(o.pad);
   flight.onEvent = (e, pad) => {
-    if (e === 'takeoff') ctx.crew?.onTakeoff();
-    if (e === 'landed') ctx.crew?.onLanded(pad);
+    if (e === 'takeoff') { ctx.crew?.onTakeoff(); ctx.combat?.onTakeoff(); }
+    if (e === 'landed') {
+      ctx.crew?.onLanded(pad);
+      const rep = ctx.combat?.onLanded();
+      if (rep) setTimeout(() => toast(rep), 4200);
+    }
     const away = pad && pad !== flight.home;
     if (e === 'landing' && (away || flight.target !== flight.home)) {
       const T = flight.target;
@@ -180,6 +185,29 @@ async function boot() {
   ctx.audio = audio;
   crowd.onArrival = () => audio.announce('arrival');
   player.onStep = (p, sp) => audio.step(p, sp);
+  // ------------------------------------------------------------------ combat spatial
+  ctx.touch = touch;
+  const combat = new Combat(ctx, { game, flight, loadout: heronGear, crew, mining, ship: ctx.ships.heron });
+  ctx.combat = combat;
+  const plural = (n, a, b) => `${n} ${n > 1 ? b : a}`;
+  combat.onEvent = (e, a, b, c) => {
+    const fire = touch ? 'TIR' : 'clic gauche / X';
+    if (e === 'wave') {
+      audio.say('Alerte. Contacts hostiles en approche.');
+      toast(`Contacts hostiles · ${plural(a, 'chasseur pirate', 'chasseurs pirates')} · ${b} m${mining.mode ? ` · ${touch ? 'MIN' : 'M'} : quitter le minage` : ` · ${fire} : tirer`}`);
+    }
+    if (e === 'kill') { toast(`${a.K.name} détruit · prime +${b.toLocaleString('fr-FR').replace(/\u202f/g, ' ')} ¤${c ? ` · ${plural(c, 'hostile restant', 'hostiles restants')}` : ''}`); }
+    if (e === 'clear') { audio.say('Menace éliminée. Primes versées par la sécurité de Halden.'); setTimeout(() => toast(`Menace éliminée · primes : +${a.toLocaleString('fr-FR').replace(/\u202f/g, ' ')} ¤`), 2500); }
+    if (e === 'gone') toast('Les pirates décrochent');
+    if (e === 'safe') toast('Zone protégée de Halden-7 · armes verrouillées');
+    if (e === 'nogun') toast('Aucune arme de vaisseau installée · Équipement naval');
+    if (e === 'nomissile') toast('Aucun lance-missiles installé · Équipement naval');
+    if (e === 'nomissiles') toast('Plus de missiles · réarmement à l\'atterrissage');
+    if (e === 'nolock') toast('Pas de verrouillage · gardez la cible dans l\'axe pendant 3 s');
+    if (e === 'launch') toast(`Missile lancé · ${plural(a, 'restant', 'restants')}`);
+    if (e === 'destroyed') { audio.say('Alerte. Perte d\'intégrité de la coque. Éjection.'); toast('Héron détruit !'); }
+    if (e === 'respawn') toast(`Rapatrié à Halden-7 · Héron remplacé · franchise d'assurance −${a.toLocaleString('fr-FR').replace(/\u202f/g, ' ')} ¤${b > 0.1 ? ` · minerai perdu` : ''}`);
+  };
   for (const d of ctx.doors) d.onMove = (opening) => audio.door(new THREE.Vector3(d.x, 2, d.z), opening);
 
   // ------------------------------------------------------------------ interactions
@@ -272,6 +300,7 @@ async function boot() {
     for (const u of ctx.updaters) u(dt, t);
     ctx.crew?.update(dt);
     ctx.mining?.update(dt, ctx.input || { firing: false });
+    ctx.combat?.update(dt, ctx.input || { firing: false });
     ctx.cargo?.update(player);
     sky.update(dt, t, camera);
     const c = camera.position, insideStation = (c.x > -HX_ && c.x < HX_ && c.z > -46 && c.z < 31 && c.y < 25) || (c.x < -40 && c.x > -103 && c.z > -25 && c.z < 11);
@@ -377,9 +406,10 @@ async function boot() {
         } else {
           label = flight.state === 'flying'
             ? (np ? `${touch ? '⏻' : 'L'} — Atterrir · ${np.name}` : (flight.insideHangar() ? 'Sortie par la baie · vitesse limitée dans le hangar'
-              : mining.mode ? `Minage · ${touch ? 'LASER (maintenir)' : 'clic gauche / X : laser'} · ${touch ? 'MIN' : 'M'} : quitter`
+              : mining.mode ? `Minage · ${touch ? 'TIR (maintenir)' : 'clic gauche / X : laser'} · ${touch ? 'MIN' : 'M'} : quitter`
+                : combat.engaged ? `Combat · ${touch ? 'TIR' : 'clic gauche / X'} : tirer${combat.launchers ? ` · ${touch ? 'MSL' : 'R'} : missile` : ''}${touch ? '' : ' · T : cible suivante'}`
                 : `${Math.round(flight.vel.length())} m/s · Maj : postcombustion${mining.laser && mining.inField(flight.pos) ? ` · ${touch ? 'MIN' : 'M'} : mode minage` : ''}`))
-            : flight.state === 'spool' ? 'Démarrage des moteurs…' : 'Atterrissage automatique…';
+            : flight.state === 'spool' ? 'Démarrage des moteurs…' : flight.state === 'dead' ? 'Héron détruit · capsule de survie en route vers Halden-7…' : 'Atterrissage automatique…';
           if ((input.consume('fly') || input.consume('land')) && flight.state === 'flying') flight.land();
         }
         promptEl.classList.remove('hidden'); promptEl.textContent = label;
@@ -396,7 +426,7 @@ async function boot() {
         if (near) promptEl.textContent = near.label;
         if (player.seated && (input.consume('fly') || input.consume('flyKey'))) { flight.takeOff(); if (player.avatar) player.avatar.root.visible = false; }
         else if (near && input.consume('use')) { const err = near.fn(); if (typeof err === 'string') toast(err); }
-        input.consume('fly'); input.consume('flyKey'); input.consume('land'); input.consume('mine');
+        input.consume('fly'); input.consume('flyKey'); input.consume('land'); input.consume('mine'); input.consume('missile'); input.consume('target');
       }
       input.consume('use');
     } else if (running && shop.isOpen) {

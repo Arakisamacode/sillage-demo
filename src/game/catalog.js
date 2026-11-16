@@ -39,15 +39,15 @@ export const ITEMS = [
   I('a_med_w', 'armor', 'Armure moyenne « Rempart » blanche', 6100, 'Même protection, finition céramique blanche.', { armor: { tier: 2, plate: 0xc8ccd0, under: 0x2a2e32, accent: 0x3e6a9a, light: 0x6fb8ff }, stats: { Protection: '40 %', Mobilité: 'Moyenne' } }),
 
   // ------------------------------------------------------------ vaisseau
-  I('l1', 'shipWeapon', 'Canon laser L1 « Aiguille »', 6200, 'Arme à énergie de taille 1. Pas de munitions, chauffe vite.', { size: 1, gun: 'laser', stats: { Taille: 1, 'Dégâts/s': 210, Portée: '1,6 km', Munitions: 'énergie' } }),
-  I('l2', 'shipWeapon', 'Canon laser L2 « Lance »', 14500, 'Laser de taille 2 à haute cadence.', { size: 2, gun: 'laser', stats: { Taille: 2, 'Dégâts/s': 390, Portée: '1,8 km', Munitions: 'énergie' } }),
-  I('b2', 'shipWeapon', 'Canon balistique B2 « Marteau »', 17800, 'Obus perforants, traverse les boucliers.', { size: 2, gun: 'ballistic', stats: { Taille: 2, 'Dégâts/s': 460, Portée: '1,4 km', Munitions: 600 } }),
-  I('m2', 'shipWeapon', 'Lance-missiles M2 « Essaim »', 21000, 'Quatre missiles à guidage thermique.', { size: 2, gun: 'missile', stats: { Taille: 2, Missiles: 4, 'Dégâts/missile': 1800, Verrouillage: '3 s' } }),
+  I('l1', 'shipWeapon', 'Canon laser L1 « Aiguille »', 6200, 'Arme à énergie de taille 1. Pas de munitions, chauffe vite.', { size: 1, gun: 'laser', dps: 210, stats: { Taille: 1, 'Dégâts/s': 210, Portée: '1,6 km', Munitions: 'énergie' } }),
+  I('l2', 'shipWeapon', 'Canon laser L2 « Lance »', 14500, 'Laser de taille 2 à haute cadence.', { size: 2, gun: 'laser', dps: 390, stats: { Taille: 2, 'Dégâts/s': 390, Portée: '1,8 km', Munitions: 'énergie' } }),
+  I('b2', 'shipWeapon', 'Canon balistique B2 « Marteau »', 17800, 'Obus perforants, traverse les boucliers.', { size: 2, gun: 'ballistic', dps: 460, stats: { Taille: 2, 'Dégâts/s': 460, Portée: '1,4 km', Munitions: 600 } }),
+  I('m2', 'shipWeapon', 'Lance-missiles M2 « Essaim »', 21000, 'Quatre missiles à guidage thermique.', { size: 2, gun: 'missile', dmg: 1800, stats: { Taille: 2, Missiles: 4, 'Dégâts/missile': 1800, Verrouillage: '3 s' } }),
   I('tur2', 'turret', 'Tourelle dorsale « Vigie »', 26000, 'Tourelle double télé-opérée. Nécessite un artilleur.', { gun: 'turret', stats: { Canons: '2 × taille 1', Rotation: '360°', Équipage: 1 } }),
   I('ml1', 'mining', 'Laser de minage ML-1 « Pic »', 9500, 'Tête de minage ventrale d\'entrée de gamme. Fenêtre de fracture étroite.', { power: 1.0, window: 1.0, stab: 1.0, extract: 1.0, stats: { Puissance: '1,0', 'Fenêtre optimale': 'standard', Extraction: '1,2 SCU/s' } }),
   I('ml2', 'mining', 'Laser de minage ML-2 « Foreuse »', 26000, 'Plus puissant, plus stable, fenêtre élargie. Pour les roches dures.', { power: 1.45, window: 1.35, stab: 0.65, extract: 1.6, stats: { Puissance: '1,45', 'Fenêtre optimale': '+35 %', Stabilité: '+35 %', Extraction: '1,9 SCU/s' } }),
-  I('sh1', 'shield', 'Bouclier « Égide » S1', 0, 'Générateur d\'origine du Héron.', { stats: { Capacité: 2400, Recharge: '120/s' } }),
-  I('sh2', 'shield', 'Bouclier « Égide » S2', 18000, 'Double capacité, recharge rapide.', { stats: { Capacité: 5200, Recharge: '260/s' } }),
+  I('sh1', 'shield', 'Bouclier « Égide » S1', 0, 'Générateur d\'origine du Héron.', { cap: 2400, regen: 120, stats: { Capacité: 2400, Recharge: '120/s', Délai: '3 s' } }),
+  I('sh2', 'shield', 'Bouclier « Égide » S2', 18000, 'Double capacité, recharge rapide.', { cap: 5200, regen: 260, stats: { Capacité: 5200, Recharge: '260/s', Délai: '2,5 s' } }),
 
   // ------------------------------------------------------------ consommables
   I('medpen', 'consumable', 'Stylo médical', 150, 'Injecteur d\'urgence : soigne et stabilise.', {}),
