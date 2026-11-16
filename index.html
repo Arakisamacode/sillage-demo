@@ -37,7 +37,7 @@
         <b>E</b> interagir · <b>I</b> inventaire · <b>Échap</b> menu<br>Aux commandes du Héron : <b>Espace</b> décoller · en vol <b>ZQSD</b> poussée, <b>souris</b> orientation, <b>Espace / C</b> monter / descendre, <b>Q / E</b> roulis, <b>Maj</b> postcombustion, <b>L</b> atterrir<br>Contrats de fret : terminal du quai, à gauche de la rampe du Héron · Combat spatial : <b>clic gauche</b> ou <b>X</b> tirer, <b>R</b> missile (après verrouillage), <b>T</b> changer de cible · Avant-postes : <b>G</b> descendre armé / dégainer, <b>clic gauche</b> tirer, <b>R</b> recharger, <b>T</b> changer d'arme, <b>H</b> stylo médical, <b>E</b> à la rampe pour remonter · Minage en vol : <b>M</b> mode minage, même bouton pour le laser
       </div>
       <div class="help touch">
-        Joystick gauche : se déplacer · glisser à droite : regarder · boutons : courir, vue, interagir (E), SAC = inventaire · ⏻ décoller / atterrir, ▲ ▼ monter / descendre, TIR (maintenir) : canons, laser de minage ou arme personnelle, MSL missile (à pied : recharger), ARME descendre armé / dégainer, SOIN stylo médical, MIN mode minage
+        Joystick gauche : se déplacer · glisser à droite : regarder · les boutons à droite changent selon la situation (à pied, aux commandes, en vol, armé) · SAC : inventaire · ≡ : menu
       </div>
     </div>
   </div>
@@ -68,15 +68,17 @@
 
   <div id="touch" class="hidden">
     <div id="stick"><div id="knob"></div></div>
+    <div class="tcorner">
+      <button id="t-inv" title="Inventaire">SAC</button>
+      <button id="t-menu" title="Menu">≡</button>
+    </div>
     <div class="tbtns">
       <button id="t-run">COURIR</button>
       <button id="t-view">VUE</button>
       <button id="t-use">E</button>
-      <button id="t-menu">≡</button>
       <button id="t-fly">⏻</button>
       <button id="t-up">▲</button>
       <button id="t-down">▼</button>
-      <button id="t-inv">SAC</button>
       <button id="t-mine">MIN</button>
       <button id="t-fire">TIR</button>
       <button id="t-msl">MSL</button>

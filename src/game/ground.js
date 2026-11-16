@@ -756,7 +756,7 @@ export class Ground {
       const it = this.drawn && this.gun;
       const med = this.game.free ? this.game.free('medpen') : 0;
       const h = `<div class="ft-hp"><i style="width:${Math.max(0, this.hp)}%"></i><span>SANTÉ ${Math.max(0, Math.round(this.hp))}</span></div>`
-        + `<div class="ft-w">${it ? `<b>${it.name.split('«')[0].trim()}</b> ${this.reloadT > 0 ? 'rechargement…' : `${this.ammo[it.id]} / ${it.fire.mag}`}` : 'Arme rangée · G : dégainer'} · Armure ${Math.round(this.prot * 100)} % · Stylos médicaux ${med} (H)</div>`;
+        + `<div class="ft-w">${it ? `<b>${it.name.split('«')[0].trim()}</b> ${this.reloadT > 0 ? 'rechargement…' : `${this.ammo[it.id]} / ${it.fire.mag}`}` : 'Arme rangée · G : dégainer'} · Armure ${Math.round(this.prot * 100)} % · Stylos médicaux ${med}${this.ctx.touch ? '' : ' (H)'}</div>`;
       if (h !== this._lastH) { E.hud.innerHTML = h; this._lastH = h; }
     }
     // repères au-dessus des pirates visibles

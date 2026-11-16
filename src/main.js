@@ -115,7 +115,7 @@ async function boot() {
     if (e === 'takeoff' && flight.spoolFrom && flight.spoolFrom.distanceTo(flight.home.pos) > 50) return toast('Décollage · moteurs en montée de régime');
     const msg = {
       takeoff: ['Contrôle de pont : Héron, autorisation de décollage accordée, aire zéro deux. Champ de confinement ouvert.', 'Décollage autorisé · aire 02'],
-      airborne: [null, 'En vol · ZQSD : poussée · souris : orientation · Espace / C : monter / descendre · Q / E : roulis · V : vue'],
+      airborne: [null, touch ? 'En vol · joystick : poussée · glisser : orientation · ▲ ▼ : altitude' : 'En vol · ZQSD : poussée · souris : orientation · Espace / C : monter / descendre · Q / E : roulis · V : vue'],
       landing: ['Contrôle de pont : Héron, autorisation d\'atterrissage, aire zéro deux.', 'Atterrissage autorisé · aire 02'],
       landed: [null, 'Posé sur l\'aire 02 · moteurs coupés'],
     }[e];
@@ -203,7 +203,7 @@ async function boot() {
   ground.onEvent = (e, a, b, c, d) => {
     if (e === 'raid') {
       audio.say(`Ici ${a.name}. Nous sommes attaqués ! Des pirates sortent de la tour. Demandons assistance immédiate.`);
-      toast(`Raid pirate sur ${a.name} · ${plural(b, 'assaillant', 'assaillants')} · ${touch ? 'ARME' : 'G'} : descendre armé`);
+      toast(`Raid pirate sur ${a.name} · ${plural(b, 'assaillant', 'assaillants')} · ${touch ? 'DESC.' : 'G'} : descendre armé`);
     }
     if (e === 'alert') {
       audio.say('Alerte. Intrusion armée, baie du hangar zéro sept. Civils, mettez-vous à l\'abri. Port d\'arme autorisé.');
@@ -253,7 +253,7 @@ async function boot() {
     if (e === 'nolock') toast('Pas de verrouillage · gardez la cible dans l\'axe pendant 3 s');
     if (e === 'launch') toast(`Missile lancé · ${plural(a, 'restant', 'restants')}`);
     if (e === 'destroyed') { audio.say('Alerte. Perte d\'intégrité de la coque. Éjection.'); toast('Héron détruit !'); }
-    if (e === 'disabled') { audio.say('Cargo pirate désemparé. Arrimage possible.'); toast(`${a.K.name} désemparé · approchez à moins de 150 m, ralentissez · ${touch ? 'E' : 'E / B'} : arrimer et aborder`); }
+    if (e === 'disabled') { audio.say('Cargo pirate désemparé. Arrimage possible.'); toast(`${a.K.name} désemparé · approchez à moins de 150 m, ralentissez · ${touch ? 'ABORD.' : 'E / B'} : arrimer et aborder`); }
     if (e === 'docked') { flight.lastDock = flight.dockedAt; toast('Arrimage · passage du sas'); }
     if (e === 'escorts') toast('Impossible d\'arrimer : éliminez d\'abord les escortes');
     if (e === 'escaped') toast(`${a.K.name} s'est échappé`);
@@ -433,6 +433,69 @@ async function boot() {
     navTxt.textContent = `${T.name} · ${d > 1000 ? (d / 1000).toFixed(1).replace('.', ',') + ' km' : Math.round(d) + ' m'}`;
   }
 
+  // ------------------------------------------------------------------ commandes tactiles contextuelles
+  // Un bouton principal (gros) et au plus quelques boutons secondaires, selon la situation.
+  const TB = {};
+  for (const id of ['t-run', 't-view', 't-use', 't-fly', 't-up', 't-down', 't-mine', 't-fire', 't-msl', 't-gun', 't-med']) TB[id] = $(id);
+  const SLOTS = [[100, 14], [96, 84], [34, 106], [168, 22], [162, 94], [108, 156], [40, 176]];
+  let tbKey = '';
+  function touchUI() {
+    const main = { id: null, label: '' }, smalls = [];
+    const add = (id, label, slot) => smalls.push({ id, label, slot });
+    const onFootNow = !flight.active || ground.onFoot;
+    const prompt = !promptEl.classList.contains('hidden');
+    if (!onFootNow) {
+      const fr = combat.boardable();
+      if (flight.away) {
+        const pad = flight.dockedAt;
+        if (!pad.boarding && !(ground.raid && !ground.raid.done)) { main.id = 't-use'; main.label = 'OPS'; }
+        else if (ground.canDisembark()) { main.id = 't-gun'; main.label = pad.boarding ? 'SOUTE' : 'DESC.'; }
+        add('t-fly', 'DÉCOL.', 0);
+        if (main.id !== 't-gun' && ground.canDisembark()) add('t-gun', 'DESC.', 1);
+        add('t-view', 'VUE', 3);
+      } else if (flight.state === 'flying') {
+        if (mining.mode || combat.guns.length) { main.id = 't-fire'; main.label = mining.mode ? 'LASER' : 'TIR'; }
+        add('t-down', '▼', 0); add('t-up', '▲', 1);
+        if (flight.nearPad()) add('t-fly', 'POSER', 2);
+        else if (fr) add('t-use', 'ABORD.', 2);
+        if (mining.laser && (mining.mode || mining.inField(flight.pos))) add('t-mine', mining.mode ? 'QUITTER' : 'MIN', 3);
+        if (combat.launchers && !mining.mode) add('t-msl', 'MSL', 4);
+        add('t-view', 'VUE', 5);
+      } else add('t-view', 'VUE', 0);
+    } else if (player.seated) {
+      main.id = 't-fly'; main.label = 'DÉCOL.';
+      add('t-use', 'LEVER', 0); add('t-view', 'VUE', 1);
+    } else if (ground.drawn) {
+      main.id = 't-fire'; main.label = 'TIR';
+      add('t-msl', 'RECH.', 0); add('t-gun', 'RANGER', 1);
+      if (prompt) add('t-use', 'E', 2);
+      if (ground.hp < 100 && game.free('medpen') > 0) add('t-med', 'SOIN', 3);
+      add('t-run', 'COURIR', 4); add('t-view', 'VUE', 5);
+    } else {
+      main.id = 't-use'; main.label = 'E';
+      add('t-run', 'COURIR', 0); add('t-view', 'VUE', 1);
+      if (ground.armed) add('t-gun', 'ARME', 2);
+      if (ground.hp < 100 && ground.armed && game.free('medpen') > 0) add('t-med', 'SOIN', 3);
+    }
+    const dimMain = main.id === 't-use' && main.label === 'E' && !prompt;
+    const key = `${main.id}:${main.label}:${dimMain}|` + smalls.map((b) => b.id + b.label + b.slot).join(',');
+    if (key === tbKey) return;
+    tbKey = key;
+    for (const el of Object.values(TB)) { el.classList.remove('show', 'main', 'dim'); }
+    if (main.id) {
+      const el = TB[main.id];
+      el.classList.add('show', 'main'); el.classList.toggle('dim', dimMain); el.textContent = main.label;
+      el.style.right = '18px'; el.style.bottom = '20px';
+    }
+    for (const b of smalls) {
+      const el = TB[b.id];
+      if (el.classList.contains('main')) continue;
+      el.classList.add('show'); el.textContent = b.label;
+      el.style.right = `${SLOTS[b.slot][0]}px`; el.style.bottom = `${SLOTS[b.slot][1]}px`;
+    }
+    TB['t-run'].classList.toggle('on', !!input.touchRun);
+  }
+
   // ------------------------------------------------------------------ boucle
   let last = performance.now(), t = 0, fpsAcc = 0, fpsN = 0, shadowTick = 0;
   const clockEl = $('clock'), fpsEl = $('fps'), promptEl = $('prompt');
@@ -457,18 +520,18 @@ async function boot() {
           const n = missions.dockActions(pad).length;
           const raid = ground.raid && !ground.raid.done;
           const G = touch ? 'ARME' : 'G';
-          if (pad.boarding) label = raid ? `${G} — Retourner dans la soute du cargo · ${touch ? '⏻' : 'ESPACE'} — Se désarrimer` : `Cargo pirate vidé · ${touch ? '⏻' : 'ESPACE'} — Se désarrimer`;
-          else label = raid ? `RAID EN COURS · ${G} — Descendre armé · ${touch ? '⏻' : 'ESPACE'} — Décoller`
-            : `E — Opérations à quai${n ? ` (${n})` : ''}${pad.id === 'ardent' ? ' · raffinerie, marché' : ''}${ground.canDisembark() ? ` · ${G} — Descendre` : ''} · ${touch ? '⏻' : 'ESPACE'} — Décoller`;
+          if (pad.boarding) label = raid ? `${touch ? 'SOUTE' : G} — Retourner dans la soute du cargo · ${touch ? 'DÉCOL.' : 'ESPACE'} — Se désarrimer` : `Cargo pirate vidé · ${touch ? 'DÉCOL.' : 'ESPACE'} — Se désarrimer`;
+          else label = raid ? `RAID EN COURS · ${touch ? 'DESC.' : G} — Descendre armé · ${touch ? 'DÉCOL.' : 'ESPACE'} — Décoller`
+            : `E — Opérations à quai${n ? ` (${n})` : ''}${pad.id === 'ardent' ? ' · raffinerie, marché' : ''}${ground.canDisembark() ? ` · ${touch ? 'DESC.' : G} — Descendre` : ''} · ${touch ? 'DÉCOL.' : 'ESPACE'} — Décoller`;
           if (input.consume('draw') && ground.canDisembark()) ground.disembark();
           if (input.consume('use') && !pad.boarding) { if (raid) toast('Opérations suspendues : raid pirate sur la plateforme'); else openUI(() => shop.openDock(pad, () => missions.dockActions(pad), mining)); }
           if (input.consume('fly') || input.consume('flyKey')) flight.takeOff();
         } else {
           label = flight.state === 'flying'
-            ? (np ? `${touch ? '⏻' : 'L'} — Atterrir · ${np.name}` : (flight.insideHangar() ? 'Sortie par la baie · vitesse limitée dans le hangar'
+            ? (np ? `${touch ? 'POSER' : 'L'} — Atterrir · ${np.name}` : (flight.insideHangar() ? 'Sortie par la baie · vitesse limitée dans le hangar'
               : mining.mode ? `Minage · ${touch ? 'TIR (maintenir)' : 'clic gauche / X : laser'} · ${touch ? 'MIN' : 'M'} : quitter`
                 : combat.engaged ? `Combat · ${touch ? 'TIR' : 'clic gauche / X'} : tirer${combat.launchers ? ` · ${touch ? 'MSL' : 'R'} : missile` : ''}${touch ? '' : ' · T : cible suivante'}`
-                : `${Math.round(flight.vel.length())} m/s · Maj : postcombustion${mining.laser && mining.inField(flight.pos) ? ` · ${touch ? 'MIN' : 'M'} : mode minage` : ''}`))
+                : `${Math.round(flight.vel.length())} m/s${touch ? '' : ' · Maj : postcombustion'}${mining.laser && mining.inField(flight.pos) ? ` · ${touch ? 'MIN' : 'M'} : mode minage` : ''}`))
             : flight.state === 'spool' ? 'Démarrage des moteurs…' : flight.state === 'dead' ? 'Héron détruit · capsule de survie en route vers Halden-7…' : 'Atterrissage automatique…';
           if ((input.consume('fly') || input.consume('land')) && flight.state === 'flying') flight.land();
           const fr = combat.boardable();
@@ -487,7 +550,7 @@ async function boot() {
         player.update(dt, input, ground.onFoot ? ground.units.filter((u) => !u.down) : [...crowd.agents.filter((a) => !a.attached), ...ground.units.filter((u) => !u.down)], ground.onFoot ? [] : [...ctx.doors, ...cargo.blockers()]);
         let near = null;
         if (ground.onFoot) near = ground.nearBoard() && !ground.dead ? { label: `E — Remonter à bord du Héron${ground.raid && !ground.raid.done ? ' (le raid continue)' : ''}`, fn: () => ground.reboard() } : null;
-        else if (player.seated) near = { label: touch ? '⏻ — Décoller · E — Se lever' : 'ESPACE — Décoller · E — Se lever', fn: () => player.stand() };
+        else if (player.seated) near = { label: touch ? 'DÉCOL. — Décoller · LEVER — Se lever' : 'ESPACE — Décoller · E — Se lever', fn: () => player.stand() };
         else near = cargo.prompt(player);
         if (!near && !player.seated && !ground.onFoot) for (const it of interactables) if (it.pos.distanceTo(player.pos) < it.r) { near = it; break; }
         promptEl.classList.toggle('hidden', !near);
@@ -508,6 +571,7 @@ async function boot() {
     const st = 14 * 3600 + 7 * 60 + t * 10; // 1 s réelle = 10 s à bord
     clockEl.textContent = `HALDEN-7 · ${String(Math.floor(st / 3600) % 24).padStart(2, '0')}:${String(Math.floor(st / 60) % 60).padStart(2, '0')} · ${crowd.agents.length} pers.`;
     updateFreightHud();
+    if (touch && running) touchUI();
     if (quality.name === 'medium') { renderer.three.shadowMap.autoUpdate = false; renderer.three.shadowMap.needsUpdate = (++shadowTick % 2) === 0; }
     renderer.render(dt);
     fpsAcc += dt; fpsN++;
