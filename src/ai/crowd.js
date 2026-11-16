@@ -212,7 +212,29 @@ function shopkeeper(shopId) {
         // retour au poste si besoin, puis on s'occupe du client
         if (Math.hypot(a.pos.x - post.x, a.pos.z - post.z) > 0.3) yield move(post.x, 0, post.z, { speed: 1.0 });
         yield act(Math.random() < 0.65 ? 'talk' : 'idle', R(2.5, 4.5), { face: { x: c.x, z: c.z } });
-        if (Math.random() < 0.3) yield act('interact', 2.2, { face: sp.clerkFace });
+        if (Math.random() < 0.3) {
+          yield act('interact', 2.2, { face: sp.clerkFace });
+          // vente : un article quitte le rayon
+          const st = W.ctx.shopStock?.[shopId], full = st && st.slots.filter((q) => q.filled);
+          if (full && full.length) { const q = pick(full); q.filled = false; q.mesh.visible = false; }
+        }
+        continue;
+      }
+      // mise en rayon : carton pris au fond, porté à bras jusqu'à l'étagère, article posé
+      const stock = W.ctx.shopStock?.[shopId];
+      const empty = stock ? stock.slots.filter((q) => !q.filled) : [];
+      if (empty.length && extra.back && Math.random() < 0.55) {
+        const q = pick(empty);
+        yield move(extra.back.x, 0, extra.back.z, { speed: 0.9 });
+        yield act('pickup', 1.6, { face: extra.backFace });
+        yield call((ag) => { ag.data.carryBox = stock.box; stock.box.visible = true; ag.char.carry = stock.box; ag.char.carryHW = 0.2; ag.char.carryY = 0.15; ag.char.carryZ = 0; });
+        yield move(q.stand.x, 0, q.stand.z, { speed: 0.8 });
+        yield act('idle', 0.4, { face: q.face });
+        yield call((ag) => { ag.data.carryBox = null; ag.char.carry = null; stock.box.visible = false; });
+        yield act('pickup', 1.6, { face: q.face });
+        yield call(() => { q.filled = true; q.mesh.visible = true; });
+        yield act('idle', R(1, 2), { face: q.face, abort: busy });
+        yield move(post.x, 0, post.z, { speed: 0.9 });
         continue;
       }
       const r = Math.random();
@@ -549,6 +571,11 @@ export class Crowd {
     for (const a of this.agents) {
       a.update(dt, player);
       a.char.update(dt, camPos);
+      if (a.data.carryBox) {
+        const b = a.data.carryBox;
+        b.position.set(a.pos.x + Math.sin(a.yaw) * 0.42, a.pos.y + 0.95, a.pos.z + Math.cos(a.yaw) * 0.42);
+        b.rotation.y = a.yaw;
+      }
       if (a.data.cart) {
         const c = a.data.cart;
         c.position.set(a.pos.x + Math.sin(a.yaw) * 0.75, 0, a.pos.z + Math.cos(a.yaw) * 0.75);

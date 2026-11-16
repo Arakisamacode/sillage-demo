@@ -33,7 +33,10 @@ export class ShopUI {
 
   get isOpen() { return this.open; }
 
-  openStore(storeId) { this.mode = 'store'; this.store = storeId; this.tab = 'buy'; this.filter = null; this._show(); }
+  openStore(storeId, focus) {
+    this.mode = 'store'; this.store = storeId; this.tab = 'buy'; this.filter = null; this._show();
+    if (focus) requestAnimationFrame(() => { const el = this.root?.querySelector(`[data-id="${focus}"]`) || document.querySelector(`#shop [data-id="${focus}"]`); if (el) { el.scrollIntoView({ block: 'center' }); el.classList.add('focus'); } });
+  }
   openBoard(missions) { this.mode = 'board'; this.missions = missions; this.tab = missions.active.length ? 'active' : 'offers'; this._show(); }
   /** Opérations à quai d'un avant-poste : actions de contrat, et à Ardent-3 la raffinerie et le marché. */
   openDock(pad, actions, mining) { this.mode = 'dock'; this.pad = pad; this.actions = actions; this.mining = mining; this.tab = 'ops'; this._show(); }
@@ -102,7 +105,7 @@ export class ShopUI {
       const own = S.count(it.id), equipable = ['sidearm', 'primary', 'outfit', 'armor'].includes(it.cat);
       const worn = equipable && S.person(this.who)[it.cat] === it.id;
       const can = S.credits >= it.price;
-      h += `<div class="sh-item"><img class="sh-thumb" src="${thumb(it.id)}" alt="">
+      h += `<div class="sh-item" data-id="${it.id}"><img class="sh-thumb" src="${thumb(it.id)}" alt="">
         <div class="sh-main"><b>${it.name}</b><p>${it.desc}</p>${this._stats(it)}</div>
         <div class="sh-side"><div class="sh-price">${fmt(it.price)}</div>
           ${own ? `<div class="sh-own">Possédé ×${own}</div>` : ''}

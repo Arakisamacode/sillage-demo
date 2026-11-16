@@ -356,8 +356,9 @@ export class Character {
     m.updateMatrixWorld(true);
     this.root.updateMatrixWorld(true);
     // côté gauche du personnage = +X local (il regarde +Z) ; la caisse a le même cap
-    this._ik2(this.bones.upperarm_l, this.bones.lowerarm_l, this.bones.hand_l, new THREE.Vector3(hw + 0.02, 0.62, -0.12).applyMatrix4(m.matrixWorld));
-    this._ik2(this.bones.upperarm_r, this.bones.lowerarm_r, this.bones.hand_r, new THREE.Vector3(-hw - 0.02, 0.62, -0.12).applyMatrix4(m.matrixWorld));
+    const cy = this.carryY ?? 0.62, cz = this.carryZ ?? -0.12;
+    this._ik2(this.bones.upperarm_l, this.bones.lowerarm_l, this.bones.hand_l, new THREE.Vector3(hw + 0.02, cy, cz).applyMatrix4(m.matrixWorld));
+    this._ik2(this.bones.upperarm_r, this.bones.lowerarm_r, this.bones.hand_r, new THREE.Vector3(-hw - 0.02, cy, cz).applyMatrix4(m.matrixWorld));
   }
   /** IK analytique à deux os (épaule-coude-poignet) vers une cible monde. */
   _ik2(A, B, C, t) {

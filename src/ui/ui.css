@@ -218,3 +218,5 @@ body.is-touch #prompt { top: 21%; }
   .sh-side button { padding: 6px 8px; min-width: 84px; font-size: 11px; }
   .sh-cat { margin: 8px 0 4px; }
 }
+
+.sh-item.focus { background: rgba(242,163,58,.12); box-shadow: inset 3px 0 0 var(--accent); }

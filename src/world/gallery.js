@@ -4,7 +4,7 @@ import { metricBox, worldUV } from './materials.js';
 import { AIRLOCK, GALLERY, HX } from './layout.js';
 import { neonTexture, neonMaterial, paintedText, decalMaterial, Screen, FONT, rand, seed, pictogram, canvas } from './signage.js';
 import { Local, bench, crate } from './props.js';
-import { shopDecor, SHELF_PALETTE } from './shopdecor.js';
+import { shopDecor, shelfProduct } from './shopdecor.js';
 
 // Sas + galerie marchande : vitrine panoramique sur la planète, boutiques, kiosque café,
 // panneau des départs, bancs, jardinières.
@@ -325,9 +325,9 @@ function shop(ctx, s, wall, wallDark, trim) {
     for (let k = 0; k < 4; k++) {
       L.box(0.5, 0.04, depth - 1.5, mats.metal(0x6b6f72), [sx * (w / 2 - 0.3), 0.4 + k * 0.55, depth / 2 + 0.4], null, { cast: false });
       for (let i = 0; i < 8; i++) {
-        const pal = SHELF_PALETTE[s.id] || [0xb8452e, 0x2f6f9a, 0xd9b44a, 0x4a7d3a, 0xe6e1d6, 0x6a3f7a, 0x2b2b2b];
-        const col = pal[Math.floor(rand() * pal.length)];
-        L.box(0.3, 0.15 + rand() * 0.25, 0.25 + rand() * 0.2, mats.plastic(col, 0.6), [sx * (w / 2 - 0.3), 0.55 + k * 0.55 + 0.1, 1.2 + i * 0.52], null, { cast: false });
+        if (sx < 0 && (k === 1 || k === 2) && i >= 5) continue; // emplacements gérés par le vendeur (rayon vivant)
+        if (rand() < 0.12) continue;
+        shelfProduct(ctx, s.id, L, sx * (w / 2 - 0.3), 0.42 + k * 0.55, 1.2 + i * 0.52, Math.floor(rand() * 9));
       }
     }
     L.obstacle(0.4, (depth - 1.5) / 2, sx * (w / 2 - 0.3), depth / 2 + 0.4);

@@ -441,6 +441,7 @@ async function boot() {
   for (const [id, sp] of Object.entries(ctx.shopSpots)) {
     if (!STORES[id]) continue;
     interactables.push({ pos: sp.customer.clone().setY(0), r: 1.6, when: () => ctx.time.open(id), label: `E — ${STORES[id].label} : parler au vendeur`, fn: () => openUI(() => shop.openStore(id)) });
+    for (const f of sp.features || []) interactables.push({ pos: f.pos, r: 1.1, when: () => ctx.time.open(id), label: `E — Examiner : ${ITEM[f.item].name.split('«')[0].trim()} · ${ITEM[f.item].price.toLocaleString('fr-FR').replace(/\u202f/g, ' ')} ¤`, fn: () => openUI(() => shop.openStore(id, f.item)) });
     interactables.push({ pos: sp.entry.clone().setY(0), r: 2.2, when: () => !ctx.time.open(id), label: `${STORES[id].label} · fermé · ouvre à ${ctx.time.opensAt(id)}`, fn: () => null });
   }
   // ------------------------------------------------------------------ boutiques et inventaire
