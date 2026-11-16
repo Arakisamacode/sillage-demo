@@ -4,7 +4,7 @@ import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 import { Retargeter } from './retarget.js';
 import { loadBinary } from '../core/binary.js';
 import { buildGarment, skinMaterial } from './garment.js';
-import { buildArmor } from './armor.js';
+import { buildArmor, buildGear } from './armor.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 // Bibliothèque de personnages : « Universal Base Characters » de Quaternius (CC0) habillés
@@ -169,6 +169,19 @@ export class CharacterLibrary {
     return this._armor[key];
   }
 
+  gearFor(name, kind, shape, accent) {
+    const key = [name, kind, shape, accent].join('|');
+    this._gear = this._gear || {};
+    if (!this._gear[key]) {
+      const t = this.templates[name];
+      t.scene.updateMatrixWorld(true);
+      const bones = {};
+      t.scene.traverse((o) => { if (o.isBone) bones[o.name] = o; });
+      this._gear[key] = buildGear(bones, kind, shape, accent);
+    }
+    return this._gear[key];
+  }
+
   create(name, opts = {}) {
     return new Character(this, name, opts);
   }
@@ -188,6 +201,9 @@ export class Character {
     this.heightScale = s;
     this.root.add(this.model);
     this.bones = {};
+    this._suits = [];
+    this._armor = [];
+    this._gear = {};
     this.model.traverse((o) => { if (o.isBone) this.bones[o.name] = o; });
     // tenue : matériau du corps propre à l'instance (mêmes shaders, autres couleurs)
     this.model.traverse((o) => {
@@ -202,23 +218,13 @@ export class Character {
       for (const [k, v] of Object.entries(su)) u[k] = { value: v.value.clone() };
       o.material.userData.suit = u;
       o.material.onBeforeCompile = (sh) => { src.onBeforeCompile(sh); Object.assign(sh.uniforms, u); };
-      const f = opts.outfit || {};
-      if (f.top !== undefined) u.uTop.value.set(f.top);
-      if (f.bottom !== undefined) u.uBottom.value.set(f.bottom); else if (f.top !== undefined) u.uBottom.value.set(f.top);
-      if (f.boot !== undefined) u.uBoot.value.set(f.boot);
-      if (f.accent !== undefined) u.uAccent.value.set(f.accent);
-      u.uZones.value.w = f.gloves ? 1 : 0;
-      u.uOpts.value.set(f.hivis ? 1 : 0, f.belt === false ? 0 : 1, f.zip === false ? 0 : 1, 0);
+      this._suits.push(u);
       if (o.name === 'body') this.body = o;
     });
+    this.lib = lib; this.opts = opts;
+    this.setOutfit(opts.outfit || {});
     this.bones.Neck = this.bones.neck_01;
-    if (opts.armor) {
-      for (const p of lib.armorFor(name, opts.armor)) {
-        const m = new THREE.Mesh(p.mesh.geometry, p.mesh.material);
-        m.castShadow = opts.armorShadows ?? true; m.receiveShadow = true;
-        this.bones[p.bone].add(m);
-      }
-    }
+    this.setArmor(opts.armor);
     this.handR = this.bones.hand_r;
     // coiffure accrochée à l'os de tête
     if (opts.hair && lib.hairs[opts.hair]) {
@@ -316,6 +322,44 @@ export class Character {
     // phase commune marche / course
     if (w.jog > 0 && w.walk > 0) j.time = (wk.time / wk.getClip().duration) * j.getClip().duration;
     if (w.run > 0 && w.jog > 0) r.time = (j.time / j.getClip().duration) * r.getClip().duration;
+  }
+
+  /** Change la tenue (couleurs du vêtement porté). */
+  setOutfit(f) {
+    for (const u of this._suits) {
+      if (f.top !== undefined) u.uTop.value.set(f.top);
+      if (f.bottom !== undefined) u.uBottom.value.set(f.bottom); else if (f.top !== undefined) u.uBottom.value.set(f.top);
+      if (f.boot !== undefined) u.uBoot.value.set(f.boot);
+      if (f.accent !== undefined) u.uAccent.value.set(f.accent);
+      u.uZones.value.w = f.gloves ? 1 : 0;
+      u.uOpts.value.set(f.hivis ? 1 : 0, f.belt === false ? 0 : 1, f.zip === false ? 0 : 1, 0);
+    }
+  }
+
+  /** Change (ou retire avec null) l'armure. */
+  setArmor(colors) {
+    for (const m of this._armor) m.parent?.remove(m);
+    this._armor = [];
+    if (!colors) return;
+    for (const p of this.lib.armorFor(this.name, colors)) {
+      const m = new THREE.Mesh(p.mesh.geometry, p.mesh.material);
+      m.castShadow = this.opts.armorShadows ?? true; m.receiveShadow = true;
+      this.bones[p.bone].add(m);
+      this._armor.push(m);
+    }
+  }
+
+  /** Arme rangée visible : kind 'sidearm' | 'primary', shape null pour retirer. */
+  setGear(kind, shape, accent) {
+    for (const m of this._gear[kind] || []) m.parent?.remove(m);
+    this._gear[kind] = [];
+    if (!shape) return;
+    for (const p of this.lib.gearFor(this.name, kind, shape, accent)) {
+      const m = new THREE.Mesh(p.mesh.geometry, p.mesh.material);
+      m.castShadow = true;
+      this.bones[p.bone].add(m);
+      this._gear[kind].push(m);
+    }
   }
 
   update(dt, camPos) {

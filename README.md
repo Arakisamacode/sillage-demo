@@ -39,10 +39,22 @@ Pour tester sur un téléphone pendant le développement : `npm run dev`, puis o
 | Courir | Maj | bouton COURIR (bascule) |
 | Vue 1re / 3e personne | V | bouton VUE |
 | Interagir (siège pilote, café, kiosque) | E | bouton E |
+| Inventaire (personnage, Héron, sac) | I | bouton SAC |
+| Décoller (assis aux commandes) / atterrir près de l'aire 02 | Espace / L | bouton ⏻ |
+| Vol : poussée, monter / descendre, roulis, postcombustion | ZQSD, Espace / C, Q / E, Maj | joystick, ▲ ▼ |
 | Menu / qualité | Échap | bouton ≡ |
 
 Le vaisseau du joueur (Héron, aire 02) s'ouvre par la rampe arrière : on monte à bord sans
 chargement, on traverse la soute, on gravit les marches du cockpit et on s'assoit aux commandes (E).
+
+## Économie et boutiques
+
+On démarre avec 15 000 ¤. Dans la galerie, chaque vendeur ouvre sa boutique (E au comptoir) :
+**Armurerie Kestrel** (armes de poing et armes principales), **Combinaisons Vega** (tenues et armures),
+**Équipement naval** (canons, lance-missiles, tourelle, bouclier du Héron), **Pharmacie** et **Nouilles Orbitales**.
+On achète, revend (50 % du prix) et équipe ; la tenue, l'armure et les armes rangées se voient sur le personnage,
+l'armement installé se voit sur le Héron (installation seulement vaisseau posé). La partie est sauvegardée
+dans le navigateur (`localStorage`). Code : `src/game/` (catalogue, état, armement du vaisseau) et `src/ui/shop.js`.
 
 ## Qualité
 

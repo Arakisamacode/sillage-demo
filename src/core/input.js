@@ -21,6 +21,7 @@ export class Input {
       if (e.code === 'KeyL') this.pressed.add('land');
       if (e.code === 'KeyE' || e.code === 'KeyF') this.pressed.add('use');
       if (e.code === 'KeyM') this.pressed.add('map');
+      if (e.code === 'KeyI') this.pressed.add('inv');
       if (e.code === 'KeyH') this.pressed.add('hud');
       if (e.code === 'Tab') e.preventDefault();
     });
@@ -69,6 +70,7 @@ export class Input {
     btn('t-use', () => this.pressed.add('use'));
     btn('t-menu', () => this.pressed.add('menu'));
     btn('t-fly', () => this.pressed.add('fly'));
+    btn('t-inv', () => this.pressed.add('inv'));
     for (const [id, k] of [['t-up', 'touchUp'], ['t-down', 'touchDown']]) {
       const el = document.getElementById(id);
       el.addEventListener('pointerdown', (e) => { e.stopPropagation(); this[k] = true; });

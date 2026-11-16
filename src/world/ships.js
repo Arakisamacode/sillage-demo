@@ -252,7 +252,6 @@ function buildHeron(ctx) {
     // volets de bord de fuite (séparés par un jour), point d'emport, feux
     S.box(4.6, 0.12, 0.7, HM.alt, [sx * 7.6, 3.7, 6.9], [0.12, 0, 0]);
     S.box(0.2, 0.35, 1.8, metal, [sx * 8.4, 3.38, 1.0]);
-    S.cyl(0.11, 0.11, 2.4, mats.metal(0x2a2c2e), [sx * 8.4, 3.1, 0.6], [Math.PI / 2, 0, 0], { seg: 8 });
     S.box(0.5, 0.35, 3.0, accent, [sx * 10.25, 3.75, 3.9], null, { tex: 1 });
     // pod VTOL en bout d'aile
     S.plated([{ z: 0.6, w: 0.35, h: 0.35, x: sx * 10.3, y: 3.75, n: 3 }, { z: 1.6, w: 0.85, h: 0.85, x: sx * 10.3, y: 3.75, n: 3 }, { z: 6.2, w: 0.85, h: 0.85, x: sx * 10.3, y: 3.75, n: 3 }, { z: 7.0, w: 0.5, h: 0.5, x: sx * 10.3, y: 3.75, n: 3 }], { facets: 10, steps: 2, plateEvery: [1, 1], seed: 30 + sx }, HM);

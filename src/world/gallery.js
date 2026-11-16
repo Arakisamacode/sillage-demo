@@ -10,8 +10,8 @@ import { Local, bench, crate } from './props.js';
 
 export const SHOPS = [
   { id: 'nouilles', name: 'NOUILLES ORBITALES', color: '#ff5a3c', x: -94 },
-  { id: 'cafe', name: 'CAFÉ PÉRIHÉLIE', color: '#ffb84a', x: -84 },
-  { id: 'pieces', name: 'PIÈCES & RECHANGES', color: '#5fe6ff', x: -74 },
+  { id: 'armes', name: 'ARMURERIE KESTREL', color: '#ff7a3a', x: -84 },
+  { id: 'pieces', name: 'ÉQUIPEMENT NAVAL', color: '#5fe6ff', x: -74 },
   { id: 'pharma', name: 'PHARMACIE', color: '#4dff8a', x: -64 },
   { id: 'combis', name: 'COMBINAISONS VEGA', color: '#c58bff', x: -54 },
 ];
@@ -327,7 +327,7 @@ function shop(ctx, s, wall, wallDark, trim) {
     L.obstacle(0.4, (depth - 1.5) / 2, sx * (w / 2 - 0.3), depth / 2 + 0.4);
   }
   // mobilier spécifique
-  if (s.id === 'nouilles' || s.id === 'cafe') {
+  if (s.id === 'nouilles') {
     for (const dx of [1.0, 2.6]) {
       L.cyl(0.4, 0.4, 0.04, mats.metal(0x9a9da0, { rough: 0.3 }), [dx, 1.05, 1.6], null, { seg: 18 });
       L.cyl(0.04, 0.04, 1.03, mats.metal(0x2b2f32), [dx, 0.52, 1.6], null, { seg: 8 });
@@ -337,14 +337,29 @@ function shop(ctx, s, wall, wallDark, trim) {
     // menu lumineux
     const menu = new Screen(256, 160, (c, cw, ch) => {
       c.fillStyle = '#120a06'; c.fillRect(0, 0, cw, ch);
-      c.fillStyle = s.color; c.font = `700 22px ${FONT}`; c.fillText(s.id === 'cafe' ? 'CARTE' : 'MENU', 12, 28);
+      c.fillStyle = s.color; c.font = `700 22px ${FONT}`; c.fillText('MENU', 12, 28);
       c.font = `500 15px ${FONT}`; c.fillStyle = '#f2e6d6';
-      const items = s.id === 'cafe' ? ['Espresso', 'Café long', 'Thé fumé', 'Chicorée'] : ['Ramen protéiné', 'Soba aux algues', 'Bouillon miso', 'Raviolis vapeur'];
+      const items = ['Ramen protéiné', 'Soba aux algues', 'Bouillon miso', 'Raviolis vapeur'];
       items.forEach((it, i) => { c.fillText(it, 12, 58 + i * 24); c.fillText(`${(i + 2) * 3},50 ¤`, 190, 58 + i * 24); });
     }, { period: 5, intensity: 1.6 });
     ctx.screens.push(menu);
     const mm = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 1.0), menu.material);
     L.decal(mm, [-1.6, 2.6, depth - 0.02], [0, Math.PI, 0]);
+  }
+  if (s.id === 'armes') {
+    // râteliers muraux : silhouettes d'armes longues et de pistolets sous vitrine
+    const gunM = mats.metal(0x23262a, { rough: 0.45, grime: 0.2 }), stockM = mats.plastic(0x15171a, 0.8);
+    L.box(4.2, 2.0, 0.08, mats.paint(0x2a2e31, { plain: true }), [1.5, 2.2, depth - 0.05], null, { cast: false });
+    for (let i = 0; i < 5; i++) {
+      const y = 1.5 + (i % 3) * 0.55, xx = 0.1 + i * 0.7;
+      L.box(0.9, 0.08, 0.06, gunM, [xx + 0.2, y, depth - 0.15], [0, 0, 0.0], { cast: false });
+      L.box(0.3, 0.12, 0.06, stockM, [xx - 0.35, y - 0.02, depth - 0.15], null, { cast: false });
+      L.box(0.05, 0.14, 0.05, stockM, [xx + 0.05, y - 0.1, depth - 0.15], null, { cast: false });
+    }
+    L.box(2.8, 0.9, 0.7, mats.paint(0x3a3e42, { plain: true }), [1.5, 0.45, 1.6], null, { collide: true });
+    L.box(2.8, 0.25, 0.7, mats.glass(0xaac4d4, 0.15), [1.5, 1.03, 1.6], null, { cast: false });
+    for (let i = 0; i < 4; i++) L.box(0.22, 0.05, 0.12, gunM, [0.6 + i * 0.6, 0.93, 1.6], [0, 0.4, 0], { cast: false });
+    L.obstacle(1.5, 0.45, 1.5, 1.6);
   }
   if (s.id === 'combis') {
     // mannequins de combinaisons (formes simples)

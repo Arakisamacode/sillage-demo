@@ -19,6 +19,10 @@ import { Audio } from './audio/audio.js';
 import { SHOTS } from './shots.js';
 import { buildExterior } from './world/exterior.js';
 import { Flight } from './flight/flight.js';
+import { GameState } from './game/state.js';
+import { ITEM, STORES } from './game/catalog.js';
+import { HeronLoadout } from './game/shipgear.js';
+import { ShopUI } from './ui/shop.js';
 
 const params = new URLSearchParams(location.search);
 const HX_ = 32;
@@ -91,7 +95,20 @@ async function boot() {
     toast(msg[1]);
     if (e === 'landed' && player.avatar) player.avatar.root.visible = player.thirdPerson;
   };
-  player.setAvatar(lib.create('UM_light', { height: 1.82, hair: 'Hair_Buzzed', hairColor: 0x2a1d14, outfit: { top: 0x2b3036, bottom: 0x2b3036, boot: 0x16181a, accent: 0x6f86a8, gloves: true, zip: false }, armor: { plate: 0x3a4148, under: 0x1b1e21, accent: 0x6e6a3a, light: 0x5fe6c8 } }));
+  // ------------------------------------------------------------------ économie : état de la partie, équipement visible
+  const game = new GameState();
+  ctx.game = game;
+  const dressPerson = (ch, p) => {
+    ch.setOutfit(ITEM[p.outfit || 'o_flight'].outfit);
+    ch.setArmor(p.armor ? ITEM[p.armor].armor : null);
+    for (const k of ['sidearm', 'primary']) ch.setGear(k, p[k] ? ITEM[p[k]].shape : null, p[k] ? ITEM[p[k]].accent : 0);
+  };
+  ctx.dressPerson = dressPerson;
+  player.setAvatar(lib.create('UM_light', { height: 1.82, hair: 'Hair_Buzzed', hairColor: 0x2a1d14, outfit: ITEM.o_flight.outfit }));
+  dressPerson(player.avatar, game.person('me'));
+  const heronGear = new HeronLoadout(ctx.ships.heron);
+  heronGear.apply(game.d.ship);
+  game.on(() => { dressPerson(player.avatar, game.person('me')); heronGear.apply(game.d.ship); });
   player.thirdPerson = true; player.camDist = 2.6;
   if (shotName === 'lineup' || shotName === 'portrait') {
     const roles = [['mécanicien', 'M'], ['pilote', 'F'], ['sécurité', 'M'], ['client', 'F'], ['ravitailleur', 'M'], ['client', 'M'], ['entretien', 'F']];
@@ -133,9 +150,34 @@ async function boot() {
   const seat = heron.interior.seat;
   const interactables = [
     { pos: heron.interior.seatTrigger, r: 2.0, label: 'E — S\'installer aux commandes', fn: () => { player.sit(seat); toast('Héron Mk II · HL-2207 · systèmes en veille · autorisation de départ en attente'); audio.blip(); } },
-    { pos: new THREE.Vector3(-29.9, 0, 3.1), r: 1.4, label: 'E — Prendre un café', fn: () => { audio.coffee(); toast('Café serré · 2,50 ¤ débités'); } },
-    { pos: new THREE.Vector3(ctx.kiosk.x, 0, ctx.kiosk.z), r: 3.7, label: 'E — Commander au kiosque', fn: () => { audio.coffee(); toast('« Et voilà, bonne escale ! »'); } },
+    { pos: new THREE.Vector3(-29.9, 0, 3.1), r: 1.4, label: 'E — Prendre un café (3 ¤)', fn: () => { if (game.pay(3)) { audio.coffee(); toast('Café serré · 3 ¤ débités'); } else toast('Crédits insuffisants'); } },
+    { pos: new THREE.Vector3(ctx.kiosk.x, 0, ctx.kiosk.z), r: 3.7, label: 'E — Commander au kiosque (5 ¤)', fn: () => { if (game.pay(5)) { audio.coffee(); toast('« Et voilà, bonne escale ! » · 5 ¤'); } else toast('Crédits insuffisants'); } },
   ];
+  for (const [id, sp] of Object.entries(ctx.shopSpots)) {
+    if (!STORES[id]) continue;
+    interactables.push({ pos: sp.customer.clone().setY(0), r: 1.6, label: `E — ${STORES[id].label} : parler au vendeur`, fn: () => openUI(() => shop.openStore(id)) });
+  }
+  // ------------------------------------------------------------------ boutiques et inventaire
+  const credEl = $('credits');
+  const showCredits = () => { credEl.textContent = game.credits.toLocaleString('fr-FR').replace(/\u202f/g, ' ') + ' ¤'; };
+  game.on(showCredits); showCredits();
+  const shop = new ShopUI({
+    state: game,
+    canEquipShip: () => flight.state === 'parked',
+    onAction: (a, it) => { if (a === 'buy' && it?.eat) audio.coffee(); else audio.blip(); },
+    onClose: () => {
+      input.enabled = true;
+      if (touch) $('touch').classList.remove('hidden');
+      else $('view').requestPointerLock?.();
+    },
+  });
+  ctx.shop = shop;
+  function openUI(fn) {
+    input.enabled = false; input.keys.clear(); input.move.x = input.move.y = 0;
+    $('touch').classList.add('hidden');
+    if (document.pointerLockElement) document.exitPointerLock();
+    fn();
+  }
   let toastT = 0;
   function toast(msg) { const el = $('toast'); el.textContent = msg; el.classList.remove('hidden'); toastT = 4; }
 
@@ -223,8 +265,9 @@ async function boot() {
     last = now;
     t += dt;
     input.update();
-    if (input.consume('menu')) openMenu();
-    if (running) {
+    if (input.consume('menu') && !shop.isOpen) openMenu();
+    if (input.consume('inv') && running && !flight.active && !shop.isOpen) openUI(() => shop.openInventory());
+    if (running && !shop.isOpen) {
       if (flight.active) {
         // ------------------------------------------------ en vol
         if (input.consume('view')) flight.toggleView();
@@ -248,6 +291,9 @@ async function boot() {
         input.consume('fly'); input.consume('flyKey'); input.consume('land');
       }
       input.consume('use');
+    } else if (running && shop.isOpen) {
+      player.update(dt, input, crowd.agents.filter((a) => !a.attached), ctx.doors);
+      $('prompt').classList.add('hidden');
     }
     simulate(dt, t);
     audio.update(dt, player, crowd, scenes);

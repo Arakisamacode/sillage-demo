@@ -363,7 +363,7 @@ function roster(W) {
     ['sécurité', null, patrol('patrolHangar', 0), { walk: 1.1 }],
     ['sécurité', null, patrol('patrolGallery', 3), { walk: 1.1 }],
     ['commerçant', 'F', shopkeeper('nouilles'), {}],
-    ['commerçant', 'M', shopkeeper('cafe'), {}],
+    ['commerçant', 'M', shopkeeper('armes'), {}],
     ['commerçant', 'M', shopkeeper('pieces'), {}],
     ['commerçant', 'F', shopkeeper('pharma'), {}],
     ['commerçant', 'F', shopkeeper('combis'), {}],
