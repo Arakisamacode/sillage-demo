@@ -385,7 +385,7 @@ async function boot() {
     if ((persistAcc += 1 / 60) > 4) { persistAcc = 0; missions.persist(); }
     if (jobsAcc > 0.25) {
       jobsAcc = 0;
-      const lines = missions.active.map((o) => `<b>${o.type === 'in' ? 'COLLECTE' : o.type === 'container' ? 'CONTENEUR' : 'LIVRAISON'}</b> ${o.goods} · ${missions.status(o)}`);
+      const lines = missions.active.map((o) => `<b>${o.type === 'in' ? 'COLLECTE' : o.type === 'container' ? 'CONTENEUR' : o.type === 'raid' ? 'SÉCURITÉ' : 'LIVRAISON'}</b> ${o.type === 'raid' ? o.dest.name : o.goods} · ${missions.status(o)}`);
       if (crew.members.length) {
         const aboard = crew.members.filter((m) => m.aboard).length, g = crew.gunner();
         lines.push(`<b>ÉQUIPAGE</b> ${crew.members.length} · ${aboard ? `${aboard} à bord` : crew.members.map((m) => `${m.data.name.split(' ')[0]} ${crew.status(m)}`).join(' · ')}${flight.active && heronGear.meshes.dorsal ? (g ? ` · tourelle : ${g.data.name.split(' ')[0]}` : ' · tourelle sans artilleur') : ''}`);
