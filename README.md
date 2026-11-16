@@ -119,6 +119,21 @@ qui servent de couverture. Le Héron s'y pose rampe face au pont.
 - **Récompenses** : 420 à 720 ¤ par pirate, puis le contrat de sécurité ou une prime de 1 500 ¤.
 - **À terre** : évacuation à bord, soins d'urgence (1 200 ¤), le raid échoue (le contrat reste ouvert).
 
+## Alerte d'intrusion (hangar 07)
+
+De temps en temps (première alerte après 5 à 8 minutes à pied dans le hangar), des pirates franchissent
+le champ de confinement de la baie. Le port d'arme est alors autorisé (**G**) ; trois agents de la sécurité
+de la station et vos gardes (s'ils vous suivent) prennent position derrière les caisses de transit devant
+la baie, les civils s'accroupissent à l'abri. Prime de la sécurité : 2 000 ¤ en plus des primes par pirate.
+À terre : infirmerie de la station (1 200 ¤), la sécurité termine le travail.
+
+## Commerce des matériaux
+
+Les matériaux raffinés récupérés à Ardent-3 sont chargés dans la soute du Héron et se revendent sur trois
+marchés : Ardent-3 (rachat au rabais), Relais Corvin (métaux de construction : fer, cuivre) et Station
+agricole Lys (titane, corindon, aurélite). L'onglet « Marché des matériaux » de chaque avant-poste compare
+les cours, et le repère de navigation indique le marché le plus rentable pour votre chargement.
+
 ## Abordage
 
 Certaines vagues pirates escortent un **cargo Rançonneur** qui tente de fuir (il s'échappe au-delà de
