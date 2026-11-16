@@ -19,6 +19,10 @@ export class GameState {
     try { d = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch { d = null; }
     this.d = d && d.owned ? d : fresh();
     this.d.crew = this.d.crew || [];
+    this.d.ore = this.d.ore || {};
+    this.d.materials = this.d.materials || {};
+    this.d.refJobs = this.d.refJobs || [];
+    if (!('mining' in this.d.ship)) this.d.ship.mining = null;
     if (!this.d.owned.a_med && this.d.people.me.armor === 'a_med') this.d.owned.a_med = 1;
   }
   get credits() { return this.d.credits; }

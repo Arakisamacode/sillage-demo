@@ -60,6 +60,19 @@ Trois avant-postes en orbite : **Relais Corvin** (dépôt), **Plateforme Ardent-
 (ou ⏻) quand on est à moins de 22 m au-dessus de l'aire. Paiement à la livraison ; abandon : pénalité de 10 %.
 Code : `src/game/cargo.js`, `src/game/missions.js`, `src/world/outposts.js`.
 
+## Minage et raffinage
+
+1. Achetez un **laser de minage** à l'Équipement naval (ML-1 « Pic » ou ML-2 « Foreuse ») : il s'installe sous le nez du Héron.
+2. Volez jusqu'au **champ d'astéroïdes** (Ceinture d'Ardent, repère à l'écran), puis **M** (bouton MIN) : mode minage,
+   vitesse réduite, caméra relevée. Le panneau affiche la composition de la roche visée (fer, cuivre, titane,
+   corindon, aurélite, part inerte), sa résistance et son instabilité.
+3. **Clic gauche / X** (bouton LASER maintenu) : la charge monte ; gardez-la dans la **zone verte** pendant 3 s pour
+   fracturer la roche ; au-delà de la zone rouge, surcharge : la roche est pulvérisée et perdue.
+4. Visez les **fragments** et maintenez le laser à moins de 90 m pour extraire le minerai vers le bac (32 SCU ; la part inerte est rejetée).
+5. Posez-vous à la **Plateforme Ardent-3** : *E — Opérations à quai* → **Raffinerie** (vente brute immédiate, ou
+   raffinage Rapide / Standard / Précis : durée, rendement et frais différents) puis **Marché** (vente au cours du jour).
+Code : `src/game/mining.js`.
+
 ## Équipage
 
 Au **bureau de recrutement** de la galerie (Guilde des équipages, extrémité est, côté baie), on engage

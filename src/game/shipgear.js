@@ -7,6 +7,7 @@ export const HERON_MOUNTS = {
   wingR: { pos: [8.4, 3.05, 0.4] },
   chin: { pos: [0, 2.3, -14.0], hang: true },
   dorsal: { pos: [0, 8.95, 2.4], top: true },
+  mining: { pos: [0, 1.45, -9.6] },
 };
 
 let M = null;
@@ -55,6 +56,19 @@ export function shipGunMesh(id) {
   return g;
 }
 
+/** Tête de minage ventrale : carter, bras articulé, émetteur à lentille. */
+export function miningMesh(id) {
+  const K = mats(), g = new THREE.Group(), big = ITEM[id].power > 1.2;
+  add(g, new THREE.BoxGeometry(1.4, 0.5, 2.0), K.gun, 0, 0.1, 0.4);
+  add(g, new THREE.BoxGeometry(1.5, 0.12, 1.6), new THREE.MeshStandardMaterial({ color: 0xd9a21b, roughness: 0.6, metalness: 0.3 }), 0, 0.38, 0.4);
+  add(g, new THREE.SphereGeometry(0.42, 14, 10), K.dark, 0, -0.2, -0.4);
+  add(g, cylZ(0.26, 0.34, big ? 1.3 : 1.0), K.olive, 0, -0.25, -0.95);
+  add(g, cylZ(0.3, 0.3, 0.12), K.steel, 0, -0.25, big ? -1.6 : -1.45);
+  add(g, cylZ(0.18, 0.18, 0.05), new THREE.MeshBasicMaterial({ color: new THREE.Color(4, 1.4, 0.4) }), 0, -0.25, big ? -1.68 : -1.53);
+  for (const x of [-0.5, 0.5]) add(g, new THREE.BoxGeometry(0.12, 0.12, 0.9), K.steel, x, -0.1, -0.5);
+  return g;
+}
+
 /** Tourelle dorsale double. */
 export function turretMesh() {
   const K = mats(), g = new THREE.Group();
@@ -89,7 +103,7 @@ export class HeronLoadout {
       if (this.meshes[slot]) this.ship.group.remove(this.meshes[slot]);
       delete this.meshes[slot];
       if (!id) continue;
-      const mesh = slot === 'dorsal' ? turretMesh() : shipGunMesh(id);
+      const mesh = slot === 'dorsal' ? turretMesh() : slot === 'mining' ? miningMesh(id) : shipGunMesh(id);
       mesh.position.set(...m.pos);
       if (m.hang) mesh.position.y -= 0.25;
       mesh.userData.id = id;

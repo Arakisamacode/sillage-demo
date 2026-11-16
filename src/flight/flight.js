@@ -167,7 +167,7 @@ export class Flight {
     const up = (k.has('Space') || input.touchUp ? 1 : 0) - (k.has('KeyC') || k.has('ControlLeft') || input.touchDown ? 1 : 0);
     const roll = (k.has('KeyQ') ? 1 : 0) - (k.has('KeyE') ? 1 : 0);
     this.vertical = up;
-    const vMax = inside ? { f: 14, s: 6, u: 6 } : { f: boost ? 260 : 110, s: 45, u: 45 };
+    const vMax = inside ? { f: 14, s: 6, u: 6 } : this.mining ? { f: 28, s: 14, u: 14 } : { f: boost ? 260 : 110, s: 45, u: 45 };
     const want = _v.set(strafe * vMax.s, up * vMax.u, -fwd * vMax.f).applyQuaternion(this.q);
     const acc = inside ? 1.6 : (boost ? 0.9 : 1.2);
     this.vel.lerp(want, 1 - Math.exp(-acc * dt));
@@ -177,7 +177,7 @@ export class Flight {
     this.stick.x = THREE.MathUtils.clamp(this.stick.x + look.dx * 0.004, -1, 1);
     this.stick.y = THREE.MathUtils.clamp(this.stick.y + look.dy * 0.004, -1, 1);
     this.stick.multiplyScalar(Math.exp(-dt * 2.2));
-    const maxRate = inside ? 0.6 : 1.1;
+    const maxRate = inside ? 0.6 : this.mining ? 0.5 : 1.1;
     const target = _v2.set(-this.stick.y * maxRate, -this.stick.x * maxRate, roll * maxRate * 1.4);
     this.rate.lerp(target, 1 - Math.exp(-dt * 4));
     _e.set(this.rate.x * dt, this.rate.y * dt, this.rate.z * dt, 'YXZ');
@@ -222,7 +222,7 @@ export class Flight {
       cam.position.copy(eye);
       cam.quaternion.copy(this.q);
     } else {
-      const off = _v.set(0, 7.5, 34).applyQuaternion(this.q);
+      const off = (this.mining ? _v.set(0, 13, 30) : _v.set(0, 7.5, 34)).applyQuaternion(this.q);
       const want = this.pos.clone().add(off);
       if (this.camPos.lengthSq() === 0) this.camPos.copy(want);
       this.camPos.lerp(want, 1 - Math.exp(-dt * 5));
@@ -233,7 +233,7 @@ export class Flight {
         this.camPos.z = THREE.MathUtils.clamp(this.camPos.z, Z_BAY - 200, Z_BACK - 2);
       }
       cam.position.copy(this.camPos);
-      const look = this.pos.clone().add(_v2.set(0, 4.5, -18).applyQuaternion(this.q));
+      const look = this.pos.clone().add((this.mining ? _v2.set(0, 3, -70) : _v2.set(0, 4.5, -18)).applyQuaternion(this.q));
       _m.lookAt(cam.position, look, _v.set(0, 1, 0).applyQuaternion(this.q));
       this.camQ.setFromRotationMatrix(_m);
       cam.quaternion.slerp(this.camQ, 1 - Math.exp(-dt * 8));

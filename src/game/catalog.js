@@ -7,6 +7,7 @@ export const CATEGORIES = {
   outfit: 'Tenue',
   armor: 'Armure',
   shipWeapon: 'Arme de vaisseau',
+  mining: 'Module de minage',
   turret: 'Tourelle',
   shield: 'Bouclier',
   consumable: 'Consommable',
@@ -43,6 +44,8 @@ export const ITEMS = [
   I('b2', 'shipWeapon', 'Canon balistique B2 « Marteau »', 17800, 'Obus perforants, traverse les boucliers.', { size: 2, gun: 'ballistic', stats: { Taille: 2, 'Dégâts/s': 460, Portée: '1,4 km', Munitions: 600 } }),
   I('m2', 'shipWeapon', 'Lance-missiles M2 « Essaim »', 21000, 'Quatre missiles à guidage thermique.', { size: 2, gun: 'missile', stats: { Taille: 2, Missiles: 4, 'Dégâts/missile': 1800, Verrouillage: '3 s' } }),
   I('tur2', 'turret', 'Tourelle dorsale « Vigie »', 26000, 'Tourelle double télé-opérée. Nécessite un artilleur.', { gun: 'turret', stats: { Canons: '2 × taille 1', Rotation: '360°', Équipage: 1 } }),
+  I('ml1', 'mining', 'Laser de minage ML-1 « Pic »', 9500, 'Tête de minage ventrale d\'entrée de gamme. Fenêtre de fracture étroite.', { power: 1.0, window: 1.0, stab: 1.0, extract: 1.0, stats: { Puissance: '1,0', 'Fenêtre optimale': 'standard', Extraction: '1,2 SCU/s' } }),
+  I('ml2', 'mining', 'Laser de minage ML-2 « Foreuse »', 26000, 'Plus puissant, plus stable, fenêtre élargie. Pour les roches dures.', { power: 1.45, window: 1.35, stab: 0.65, extract: 1.6, stats: { Puissance: '1,45', 'Fenêtre optimale': '+35 %', Stabilité: '+35 %', Extraction: '1,9 SCU/s' } }),
   I('sh1', 'shield', 'Bouclier « Égide » S1', 0, 'Générateur d\'origine du Héron.', { stats: { Capacité: 2400, Recharge: '120/s' } }),
   I('sh2', 'shield', 'Bouclier « Égide » S2', 18000, 'Double capacité, recharge rapide.', { stats: { Capacité: 5200, Recharge: '260/s' } }),
 
@@ -62,13 +65,28 @@ export const HERON_SLOTS = [
   { id: 'chin', name: 'Menton', cats: ['shipWeapon'], size: 1 },
   { id: 'dorsal', name: 'Dos', cats: ['turret'], size: 0 },
   { id: 'shield', name: 'Bouclier', cats: ['shield'], size: 0 },
+  { id: 'mining', name: 'Module de minage (ventral)', cats: ['mining'], size: 0 },
 ];
 
 // Boutiques de la galerie : ce qu'elles vendent
 export const STORES = {
   armes: { label: 'Armurerie Kestrel', name: 'ARMURERIE KESTREL', cats: ['sidearm', 'primary'], greet: 'Bienvenue chez Kestrel. Tout est homologué station, pas de tir dans la galerie.' },
-  pieces: { label: 'Équipement naval', name: 'ÉQUIPEMENT NAVAL', cats: ['shipWeapon', 'turret', 'shield'], greet: 'Armement et composants. On installe directement sur votre appareil à quai.' },
+  pieces: { label: 'Équipement naval', name: 'ÉQUIPEMENT NAVAL', cats: ['shipWeapon', 'turret', 'shield', 'mining'], greet: 'Armement et composants. On installe directement sur votre appareil à quai.' },
   combis: { label: 'Combinaisons Vega', name: 'COMBINAISONS VEGA', cats: ['outfit', 'armor'], greet: 'Essayez ce que vous voulez, la cabine est au fond.' },
   pharma: { label: 'Pharmacie', name: 'PHARMACIE', cats: ['consumable'], filter: (i) => ['medpen', 'medkit', 'ration'].includes(i.id), greet: 'Bonjour. Soins d\'urgence et vivres de bord.' },
   nouilles: { label: 'Nouilles Orbitales', name: 'NOUILLES ORBITALES', cats: ['consumable'], filter: (i) => i.id === 'noodles', greet: '« Un bol ? C\'est le meilleur bouillon de la station ! »' },
 };
+
+// Minerais (prix au SCU : brut à la vente directe, raffiné après passage à la raffinerie)
+export const ORES = {
+  fer: { name: 'Fer', raw: 60, ref: 140, tint: 0x8a5a40, instab: 0.2, resist: 0.3, w: 30 },
+  cuivre: { name: 'Cuivre', raw: 110, ref: 250, tint: 0xc8742a, instab: 0.3, resist: 0.38, w: 25 },
+  titane: { name: 'Titane', raw: 190, ref: 420, tint: 0x8fb0c8, instab: 0.35, resist: 0.62, w: 22 },
+  corindon: { name: 'Corindon', raw: 320, ref: 700, tint: 0xc83a4a, instab: 0.5, resist: 0.72, w: 15 },
+  aurelite: { name: 'Aurélite', raw: 900, ref: 2000, tint: 0xf2d04a, instab: 0.85, resist: 0.5, w: 8 },
+};
+export const REFINE = [
+  { id: 'fast', name: 'Rapide', time: 60, yield: 0.7, fee: 0.05, desc: '1 min · rendement 70 %' },
+  { id: 'std', name: 'Standard', time: 180, yield: 0.85, fee: 0.08, desc: '3 min · rendement 85 %' },
+  { id: 'fine', name: 'Précis', time: 420, yield: 0.95, fee: 0.12, desc: '7 min · rendement 95 %' },
+];

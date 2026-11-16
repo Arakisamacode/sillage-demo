@@ -107,3 +107,23 @@ body.is-touch .help.desktop, body:not(.is-touch) .help.touch { display: none; }
 #jobs b { color: var(--accent); font-weight: 600; letter-spacing: .06em; }
 .sh-btns { display: flex; gap: 8px; margin-top: 8px; }
 .sh-btns button { background: #1c2630; color: var(--fg); border: 1px solid #34404b; padding: 7px 12px; font: inherit; font-size: 12px; letter-spacing: .1em; text-transform: uppercase; cursor: pointer; }
+/* minage */
+#aim { position: absolute; width: 34px; height: 34px; margin: -17px 0 0 -17px; border: 1.5px solid rgba(255,190,110,.75); border-radius: 50%; }
+#aim::after { content: ''; position: absolute; left: 50%; top: 50%; width: 4px; height: 4px; margin: -2px; border-radius: 50%; background: rgba(255,190,110,.9); }
+#aim.lock { border-color: #5fffb0; }
+#mine { position: absolute; right: calc(16px + env(safe-area-inset-right)); top: 64px; width: min(330px, 44vw); background: rgba(8,11,15,.72); border-left: 2px solid var(--accent); padding: 10px 12px; font-size: 12.5px; line-height: 1.45; }
+body.is-touch #mine { top: 56px; width: min(300px, 40vw); font-size: 11.5px; }
+.mn-t { color: var(--accent); letter-spacing: .18em; font-weight: 700; font-size: 12px; }
+.mn-n { font-weight: 600; margin-top: 4px; }
+.mn-d { color: var(--dim); margin-top: 3px; }
+.mn-comp span { display: block; position: relative; margin-top: 3px; padding: 1px 6px; background: #121920; overflow: hidden; }
+.mn-comp span i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--c); opacity: .45; }
+.mn-comp span.inert i { background: #555; }
+.mn-bar { position: relative; height: 14px; margin-top: 7px; background: linear-gradient(90deg, #1a242c 0 88%, #4a1a14 88%); border: 1px solid #2c3742; }
+.mn-bar b { position: absolute; top: 0; bottom: 0; background: rgba(80,220,140,.55); }
+.mn-bar u { position: absolute; top: -3px; bottom: -3px; width: 3px; margin-left: -1.5px; background: #fff; box-shadow: 0 0 6px #ffb060; }
+.mn-prog { height: 5px; margin-top: 4px; background: #1a242c; }
+.mn-prog i { display: block; height: 100%; background: #5fffb0; }
+.mn-bin { position: relative; margin-top: 8px; padding: 3px 6px; background: #121920; overflow: hidden; }
+.mn-bin i { position: absolute; left: 0; top: 0; bottom: 0; background: rgba(242,163,58,.35); }
+.mn-bin span { float: right; position: relative; }

@@ -27,6 +27,7 @@ import { buildOutposts } from './world/outposts.js';
 import { Cargo, buildQuai } from './game/cargo.js';
 import { Missions } from './game/missions.js';
 import { Crew } from './game/crew.js';
+import { Mining } from './game/mining.js';
 
 const params = new URLSearchParams(location.search);
 const HX_ = 32;
@@ -137,6 +138,10 @@ async function boot() {
   const missions = new Missions(ctx, cargo, ctx.outposts, game, flight);
   ctx.cargo = cargo; ctx.missions = missions;
   ctx.missionsBoard = () => missions.board();
+  // ------------------------------------------------------------------ minage
+  const mining = new Mining(ctx, { game, flight, ship: ctx.ships.heron, loadout: heronGear });
+  ctx.mining = mining;
+  const ardent = ctx.outposts.find((o) => o.id === 'ardent');
   player.thirdPerson = true; player.camDist = 2.6;
   if (shotName === 'lineup' || shotName === 'portrait') {
     const roles = [['mécanicien', 'M'], ['pilote', 'F'], ['sécurité', 'M'], ['client', 'F'], ['ravitailleur', 'M'], ['client', 'M'], ['entretien', 'F']];
@@ -186,6 +191,12 @@ async function boot() {
     { pos: new THREE.Vector3(ctx.kiosk.x, 0, ctx.kiosk.z), r: 3.7, label: 'E — Commander au kiosque (5 ¤)', fn: () => { if (game.pay(5)) { audio.coffee(); toast('« Et voilà, bonne escale ! » · 5 ¤'); } else toast('Crédits insuffisants'); } },
   ];
   interactables.push({ pos: ctx.recruit.customer, r: 1.6, label: 'E — Guilde des équipages : recruter', fn: () => openUI(() => shop.openRecruit(crew)) });
+  mining.onEvent = (e, k) => {
+    const M = { nolaser: 'Aucun laser de minage installé · Équipement naval, galerie', on: 'Mode minage · vitesse réduite · visez une roche avec le nez du vaisseau', off: 'Mode minage désactivé',
+      fracture: 'Fracture réussie · extrayez les fragments', overcharge: 'Surcharge ! La roche s\'est pulvérisée', full: 'Bac à minerai plein · direction la raffinerie d\'Ardent-3', depleted: 'Fragment épuisé' }[e];
+    if (M) toast(M);
+    if (e === 'fracture' || e === 'overcharge') audio.blip();
+  };
   crew.onEvent = (e, x) => {
     if (e === 'hired') { audio.blip(); }
     if (e === 'boarded') toast(`Équipage à bord : ${x} ${x > 1 ? 'personnes' : 'personne'}`);
@@ -260,6 +271,7 @@ async function boot() {
     for (const d of ctx.doors) d.update(dt, blockers);
     for (const u of ctx.updaters) u(dt, t);
     ctx.crew?.update(dt);
+    ctx.mining?.update(dt, ctx.input || { firing: false });
     ctx.cargo?.update(player);
     sky.update(dt, t, camera);
     const c = camera.position, insideStation = (c.x > -HX_ && c.x < HX_ && c.z > -46 && c.z < 31 && c.y < 25) || (c.x < -40 && c.x > -103 && c.z > -25 && c.z < 11);
@@ -321,7 +333,7 @@ async function boot() {
       }
       jobsEl.innerHTML = lines.join('<br>');
     }
-    const T = missions.navTarget();
+    const T = missions.navTarget() || (flight.active ? mining.navTarget(ardent) : null);
     if (!T || shop.isOpen) { navEl.classList.add('hidden'); return; }
     const from = flight.active ? flight.pos : player.pos;
     const d = from.distanceTo(T.pos);
@@ -352,17 +364,21 @@ async function boot() {
       if (flight.active) {
         // ------------------------------------------------ en vol
         if (input.consume('view')) flight.toggleView();
+        if (input.consume('mine') && flight.state === 'flying') mining.toggle();
         flight.update(dt, input);
         const np = flight.state === 'flying' && flight.nearPad();
         let label;
         if (flight.away) {
-          const acts = missions.dockActions(flight.dockedAt);
-          label = (acts.length ? `E — ${acts[0].label} · ` : '') + (touch ? '⏻ — Décoller' : 'ESPACE — Décoller');
-          if (acts.length && input.consume('use')) { const err = acts[0].fn(); if (typeof err === 'string') toast(err); }
+          const pad = flight.dockedAt;
+          const n = missions.dockActions(pad).length;
+          label = `E — Opérations à quai${n ? ` (${n})` : ''}${pad.id === 'ardent' ? ' · raffinerie, marché' : ''} · ${touch ? '⏻' : 'ESPACE'} — Décoller`;
+          if (input.consume('use')) openUI(() => shop.openDock(pad, () => missions.dockActions(pad), mining));
           if (input.consume('fly') || input.consume('flyKey')) flight.takeOff();
         } else {
           label = flight.state === 'flying'
-            ? (np ? `${touch ? '⏻' : 'L'} — Atterrir · ${np.name}` : (flight.insideHangar() ? 'Sortie par la baie · vitesse limitée dans le hangar' : `${Math.round(flight.vel.length())} m/s · Maj : postcombustion`))
+            ? (np ? `${touch ? '⏻' : 'L'} — Atterrir · ${np.name}` : (flight.insideHangar() ? 'Sortie par la baie · vitesse limitée dans le hangar'
+              : mining.mode ? `Minage · ${touch ? 'LASER (maintenir)' : 'clic gauche / X : laser'} · ${touch ? 'MIN' : 'M'} : quitter`
+                : `${Math.round(flight.vel.length())} m/s · Maj : postcombustion${mining.laser && mining.inField(flight.pos) ? ` · ${touch ? 'MIN' : 'M'} : mode minage` : ''}`))
             : flight.state === 'spool' ? 'Démarrage des moteurs…' : 'Atterrissage automatique…';
           if ((input.consume('fly') || input.consume('land')) && flight.state === 'flying') flight.land();
         }
@@ -380,11 +396,12 @@ async function boot() {
         if (near) promptEl.textContent = near.label;
         if (player.seated && (input.consume('fly') || input.consume('flyKey'))) { flight.takeOff(); if (player.avatar) player.avatar.root.visible = false; }
         else if (near && input.consume('use')) { const err = near.fn(); if (typeof err === 'string') toast(err); }
-        input.consume('fly'); input.consume('flyKey'); input.consume('land');
+        input.consume('fly'); input.consume('flyKey'); input.consume('land'); input.consume('mine');
       }
       input.consume('use');
     } else if (running && shop.isOpen) {
-      player.update(dt, input, crowd.agents.filter((a) => !a.attached), ctx.doors);
+      if (flight.active) flight.update(dt, input);
+      else player.update(dt, input, crowd.agents.filter((a) => !a.attached), ctx.doors);
       $('prompt').classList.add('hidden');
     }
     simulate(dt, t);

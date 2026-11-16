@@ -20,7 +20,7 @@ export class Input {
       if (e.code === 'Space') this.pressed.add('flyKey');
       if (e.code === 'KeyL') this.pressed.add('land');
       if (e.code === 'KeyE' || e.code === 'KeyF') this.pressed.add('use');
-      if (e.code === 'KeyM') this.pressed.add('map');
+      if (e.code === 'KeyM') this.pressed.add('mine');
       if (e.code === 'KeyI') this.pressed.add('inv');
       if (e.code === 'KeyH') this.pressed.add('hud');
       if (e.code === 'Tab') e.preventDefault();
@@ -35,6 +35,8 @@ export class Input {
       this.locked = document.pointerLockElement === canvas;
       if (!this.locked && this.enabled && !this.isTouch) this.pressed.add('menu');
     });
+    canvas.addEventListener('mousedown', (e) => { if (e.button === 0 && this.locked) this.mouseFire = true; });
+    addEventListener('mouseup', (e) => { if (e.button === 0) this.mouseFire = false; });
     addEventListener('mousemove', (e) => {
       if (!this.locked) return;
       this.look.dx += e.movementX; this.look.dy += e.movementY;
@@ -71,7 +73,8 @@ export class Input {
     btn('t-menu', () => this.pressed.add('menu'));
     btn('t-fly', () => this.pressed.add('fly'));
     btn('t-inv', () => this.pressed.add('inv'));
-    for (const [id, k] of [['t-up', 'touchUp'], ['t-down', 'touchDown']]) {
+    btn('t-mine', () => this.pressed.add('mine'));
+    for (const [id, k] of [['t-up', 'touchUp'], ['t-down', 'touchDown'], ['t-fire', 'touchFire']]) {
       const el = document.getElementById(id);
       el.addEventListener('pointerdown', (e) => { e.stopPropagation(); this[k] = true; });
       for (const ev of ['pointerup', 'pointercancel', 'pointerleave']) el.addEventListener(ev, () => { this[k] = false; });
@@ -87,6 +90,8 @@ export class Input {
   }
 
   setTouch(on) { this.isTouch = on; }
+  /** Tir maintenu (clic gauche, touche X ou bouton tactile). */
+  get firing() { return !!(this.mouseFire || this.keys.has('KeyX') || this.touchFire); }
 
   update() {
     if (!this.isTouch || (this.move.x === 0 && this.move.y === 0 && this.keys.size)) {

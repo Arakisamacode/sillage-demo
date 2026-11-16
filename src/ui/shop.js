@@ -1,5 +1,6 @@
 import { ITEMS, ITEM, CATEGORIES, STORES, HERON_SLOTS } from '../game/catalog.js';
 import { ROLES } from '../game/crew.js';
+import { ORES, REFINE } from '../game/catalog.js';
 
 // Interfaces de commerce et d'inventaire (HTML par-dessus la vue 3D).
 const fmt = (n) => n.toLocaleString('fr-FR').replace(/ /g, ' ') + ' ¤';
@@ -33,6 +34,8 @@ export class ShopUI {
 
   openStore(storeId) { this.mode = 'store'; this.store = storeId; this.tab = 'buy'; this.filter = null; this._show(); }
   openBoard(missions) { this.mode = 'board'; this.missions = missions; this.tab = missions.active.length ? 'active' : 'offers'; this._show(); }
+  /** Opérations à quai d'un avant-poste : actions de contrat, et à Ardent-3 la raffinerie et le marché. */
+  openDock(pad, actions, mining) { this.mode = 'dock'; this.pad = pad; this.actions = actions; this.mining = mining; this.tab = 'ops'; this._show(); }
   openRecruit(crew) { this.mode = 'recruit'; this.crew = crew; this.tab = 'cands'; this._show(); }
   openInventory(who) {
     if (who) this.who = who; this.mode = 'inv'; this.tab = 'perso'; this._show(); }
@@ -46,16 +49,19 @@ export class ShopUI {
       ? `<div class="sh-title">${STORES[this.store].name}</div><div class="sh-greet">${STORES[this.store].greet}</div>`
       : this.mode === 'board'
         ? `<div class="sh-title">CONTRATS DE FRET</div><div class="sh-greet">Quai de fret · aire 02 · paiement à la livraison.</div>`
+        : this.mode === 'dock' ? `<div class="sh-title">${this.pad.name.toUpperCase()}</div><div class="sh-greet">${this.pad.outpost?.desc || ''} · opérations à quai</div>`
         : this.mode === 'recruit' ? `<div class="sh-title">GUILDE DES ÉQUIPAGES</div><div class="sh-greet">« Des gens sérieux, payés à la mission. Vous signez, ils embarquent. »</div>`
         : `<div class="sh-title">INVENTAIRE</div><div class="sh-greet">Équipement personnel, vaisseau et objets.</div>`;
     const tabs = this.mode === 'store'
       ? [['buy', 'Acheter'], ['sell', 'Vendre']]
       : this.mode === 'board' ? [['offers', 'Offres'], ['active', `En cours (${this.missions.active.length})`]]
+        : this.mode === 'dock' ? [['ops', 'Opérations'], ...(this.pad.id === 'ardent' ? [['refine', 'Raffinerie'], ['market', 'Marché']] : [])]
         : this.mode === 'recruit' ? [['cands', 'Candidats'], ['crew', `Mon équipage (${this.crew.members.length})`]]
         : [['perso', 'Personnage'], ['ship', 'Héron Mk II'], ['bag', 'Sac']];
     let body = '';
     if (this.mode === 'store') body = this.tab === 'buy' ? this._buyList() : this._sellList();
     else if (this.mode === 'board') body = this.tab === 'offers' ? this._offers() : this._activeJobs();
+    else if (this.mode === 'dock') body = this.tab === 'ops' ? this._ops() : this.tab === 'refine' ? this._refinery() : this._market();
     else if (this.mode === 'recruit') body = this.tab === 'cands' ? this._cands() : this._crewList();
     else if (this.tab === 'perso') body = this._persoPanel();
     else if (this.tab === 'ship') body = this._shipPanel();
@@ -162,6 +168,44 @@ export class ShopUI {
       <div class="sh-side">${it.cat === 'consumable' ? `<button data-a="use" data-v="${it.id}">Utiliser</button>` : ''}</div></div>`).join('');
   }
 
+  _ops() {
+    const acts = this.actions();
+    let h = acts.length ? acts.map((a, i) => `<div class="sh-item"><div class="sh-main"><b>${a.label}</b></div><div class="sh-side"><button data-a="dockact" data-v="${i}">Valider</button></div></div>`).join('')
+      : '<div class="sh-empty">Aucune opération de contrat ici pour l\'instant.</div>';
+    if (this.pad.id === 'ardent') h += '<div class="sh-note">Raffinerie et marché des matériaux : onglets ci-dessus.</div>';
+    return h;
+  }
+
+  _refinery() {
+    const M = this.mining, S = this.state, ore = S.d.ore, used = M.binUsed();
+    let h = `<div class="sh-cat">Bac à minerai · ${used.toFixed(1).replace('.', ',')} / 32 SCU</div>`;
+    const list = Object.entries(ore).filter(([, q]) => q > 0.01);
+    h += list.length ? list.map(([o, q]) => `<div class="sh-item"><div class="sh-main"><b>${ORES[o].name}</b><p>${q.toFixed(1).replace('.', ',')} SCU · brut ${fmt(M.price(o, false))}/SCU · raffiné ${fmt(M.price(o, true))}/SCU</p></div></div>`).join('')
+      : '<div class="sh-empty">Bac vide. Allez miner dans le champ d\'astéroïdes voisin.</div>';
+    if (list.length) {
+      h += `<div class="sh-item"><div class="sh-main"><b>Vendre le minerai brut</b><p>Vente immédiate, sans raffinage.</p></div><div class="sh-side"><div class="sh-price">${fmt(Math.round(M.rawValue()))}</div><button class="sec" data-a="sellraw">Vendre</button></div></div>`;
+      h += '<div class="sh-cat">Raffiner le chargement</div>' + REFINE.map((m) => `<div class="sh-item"><div class="sh-main"><b>Méthode ${m.name}</b><p>${m.desc} · frais ${Math.round(m.fee * 100)} % de la valeur raffinée</p></div><div class="sh-side"><button data-a="refine" data-v="${m.id}">Raffiner</button></div></div>`).join('');
+    }
+    const jobs = S.d.refJobs;
+    if (jobs.length) {
+      h += '<div class="sh-cat">Lots en raffinage</div>' + jobs.map((j, i) => {
+        const left = Math.max(0, Math.ceil((j.done - Date.now()) / 1000));
+        const txt = Object.entries(j.out).map(([o, q]) => `${ORES[o].name} ${q.toFixed(1).replace('.', ',')}`).join(' · ');
+        return `<div class="sh-item"><div class="sh-main"><b>Lot ${REFINE.find((m) => m.id === j.method).name}</b><p>${txt} SCU</p></div><div class="sh-side">${left ? `<div class="sh-own">${Math.floor(left / 60)} min ${String(left % 60).padStart(2, '0')} s</div>` : `<button data-a="collect" data-v="${i}">Récupérer</button>`}</div></div>`;
+      }).join('');
+    }
+    return h;
+  }
+
+  _market() {
+    const M = this.mining, mats = Object.entries(this.state.d.materials).filter(([, q]) => q > 0);
+    let h = '<div class="sh-cat">Cours des matériaux raffinés</div>' + Object.keys(ORES).map((o) => `<div class="sh-item"><div class="sh-main"><b>${ORES[o].name}</b><p>${fmt(M.price(o, true))} / SCU raffiné · ${fmt(M.price(o, false))} / SCU brut</p></div></div>`).join('');
+    h += '<div class="sh-cat">Votre entrepôt</div>';
+    h += mats.length ? mats.map(([o, q]) => `<div class="sh-item"><div class="sh-main"><b>${ORES[o].name} raffiné</b><p>${q.toFixed(1).replace('.', ',')} SCU</p></div><div class="sh-side"><div class="sh-price">${fmt(Math.round(q * M.price(o, true)))}</div><button data-a="sellmat" data-v="${o}">Vendre</button></div></div>`).join('')
+      : '<div class="sh-empty">Aucun matériau raffiné en entrepôt.</div>';
+    return h;
+  }
+
   _cands() {
     const C = this.crew;
     if (!C.candidates.length) return '<div class="sh-empty">Plus de candidats pour l\'instant. Revenez dans un moment.</div>';
@@ -208,6 +252,11 @@ export class ShopUI {
       this.tab = 'active'; this.onAction('accept', o);
       return this.flash(o.type === 'out' ? `${o.n} caisses vous attendent sur le quai de fret.` : o.type === 'container' ? 'Le conteneur est chargé dans votre soute.' : `Rendez-vous à ${o.dest.name} pour charger.`);
     }
+    if (a === 'dockact') { const act = this.actions()[+v]; const r = act && act.fn(); this.onAction('dock'); return this.flash(typeof r === 'string' ? r : 'Opération effectuée.', typeof r === 'string' && /insuff|incompl|Pas assez|manque/i.test(r)); }
+    if (a === 'sellraw') { const r = this.mining.sellRaw(); this.onAction('sell'); return this.flash(r); }
+    if (a === 'refine') { const r = this.mining.refine(v); this.onAction('buy'); return this.flash(r, /insuff|vide/.test(r)); }
+    if (a === 'collect') { const r = this.mining.collect(this.state.d.refJobs[+v]); return this.flash(r); }
+    if (a === 'sellmat') { const r = this.mining.sellMaterial(v); this.onAction('sell'); return this.flash(r); }
     if (a === 'hire') { const c = this.crew.candidates.find((x) => x.data.cid === +v); const err = c && this.crew.hire(c); if (err) return this.flash(err, true); this.onAction('hire'); return this.flash(`${c.data.name} rejoint votre équipage.`); }
     if (a === 'fire') { const m = this.crew.members.find((x) => x.data.id === v); this.crew.dismiss(m); return this.flash(`${m.data.name} a quitté l'équipage.`, true); }
     if (a === 'equipcrew') { this.who = v; this.mode = 'inv'; this.tab = 'perso'; this.msg = ''; return this.render(); }
