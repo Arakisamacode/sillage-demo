@@ -15,8 +15,8 @@ const GUNS = {
   turret: { speed: 1400, len: 8, w: 0.24, color: new THREE.Color(0.6, 4, 2.2), pierce: 0 },
 };
 const KINDS = {
-  ecorcheur: { name: 'Écorcheur', shield: 600, hull: 1100, speed: 150, turn: 1.5, dmg: 28, rate: 4, scale: 1, bounty: [900, 1500] },
-  charognard: { name: 'Charognard', shield: 1400, hull: 2300, speed: 118, turn: 1.05, dmg: 42, rate: 3.5, scale: 1.35, bounty: [1800, 2800] },
+  ecorcheur: { name: 'Écorcheur', shield: 600, hull: 1100, speed: 150, turn: 1.5, dmg: 40, rate: 4.5, scale: 1, bounty: [900, 1500] },
+  charognard: { name: 'Charognard', shield: 1400, hull: 2300, speed: 118, turn: 1.05, dmg: 60, rate: 4, scale: 1.35, bounty: [1800, 2800] },
 };
 const fmt = (n) => Math.round(n).toLocaleString('fr-FR').replace(/ /g, ' ');
 const _v = new THREE.Vector3(), _v2 = new THREE.Vector3(), _v3 = new THREE.Vector3(), _q = new THREE.Quaternion(), _m = new THREE.Matrix4();
@@ -278,10 +278,10 @@ export class Combat {
     p.fireCd -= dt;
     if (p.state === 'attack' && dist < 900 && p.fireCd <= 0) {
       const want = _v.subVectors(aim, p.pos).normalize();
-      if (fwd.dot(want) > 0.985) {
+      if (fwd.dot(want) > 0.97) {
         p.fireCd = 1 / K.rate; p.side = -p.side;
         const muzzle = new THREE.Vector3(p.side * 7.1 * K.scale, -0.4 * K.scale, -4.6 * K.scale).applyQuaternion(p.q).add(p.pos);
-        const spread = 0.012 + (this.flight.vel.length() > 80 ? 0.01 : 0);
+        const spread = 0.008 + (this.flight.vel.length() > 80 ? 0.008 : 0);
         const dir = want.add(new THREE.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).multiplyScalar(spread * 2)).normalize();
         this._fire('pirate', muzzle, dir, K.dmg, p, p.vel);
         this.audio?.zap?.('pirate', THREE.MathUtils.clamp(160 / dist, 0.05, 0.5));
