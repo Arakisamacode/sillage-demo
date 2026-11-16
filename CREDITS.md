@@ -25,7 +25,7 @@ par un shader (`src/characters/characters.js`) ; les coiffures sont accrochées 
 |---|---|---|---|---|
 | `public/assets/anim/ual.glb` | Quaternius — *Universal Animation Library (Standard)* | CC0 1.0 | https://quaternius.com/packs/universalanimationlibrary.html | https://github.com/J-Ponzo/gltf-universal-animation-library |
 
-Modifications : extraction de 18 clips, suppression du maillage (`tools/build_anims.mjs`) ;
+Modifications : extraction de 25 clips (dont tir, rechargement, impact et chute pour le combat à pied), suppression du maillage (`tools/build_anims.mjs`) ;
 reciblage à l'exécution sur le squelette des personnages (`src/characters/retarget.js`).
 
 ## Images HDR (éclairage d'ambiance / reflets)

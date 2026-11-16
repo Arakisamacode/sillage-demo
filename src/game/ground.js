@@ -207,7 +207,7 @@ export class Ground {
     const z = (R.spawned % 3 - 1) * 1.8;
     const u = this._unit('enemy', ch, A.W(45.0, z), Math.PI * 1.5, gid, mesh);
     u.name = PIRATE_NAMES[(R.spawned + Math.floor(this.t)) % PIRATE_NAMES.length];
-    u.hp = u.maxHp = 100; u.prot = ch._armor.length ? 0.25 : 0.1;
+    u.hp = u.maxHp = 120; u.prot = ch._armor.length ? 0.25 : 0.1;
     u.skill = 0.34 + Math.random() * 0.1;
     R.spawned++;
   }

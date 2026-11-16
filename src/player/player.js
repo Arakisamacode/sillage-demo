@@ -125,7 +125,7 @@ export class Player {
 
   _updateCamera(dt) {
     const cam = this.camera;
-    const want = this.thirdPerson ? (this.aiming ? 1.45 : 2.35) : 0;
+    const want = this.thirdPerson ? (this.aiming ? 2.0 : 2.35) : 0;
     this.camDist += (want - this.camDist) * (1 - Math.exp(-dt * 6));
     const moving = this.grounded && this.speed > 0.3;
     this.bob += dt * this.speed * 2.2 * (moving ? 1 : 0);
@@ -135,7 +135,7 @@ export class Player {
     const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(this.pitch, this.yaw, 0, 'YXZ'));
     if (this.camDist > 0.05) {
       // épaule droite, recul limité par la géométrie
-      const back = new THREE.Vector3(0.58, 0.02, this.camDist).applyQuaternion(q);
+      const back = new THREE.Vector3(this.aiming ? 0.85 : 0.58, this.aiming ? 0.12 : 0.02, this.camDist).applyQuaternion(q);
       const len = back.length();
       _ray.origin.copy(eye); _ray.direction.copy(back).normalize();
       const hit = this.bvh.raycastFirst(_ray, THREE.DoubleSide);

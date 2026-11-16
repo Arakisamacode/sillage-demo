@@ -45,6 +45,7 @@ Pour tester sur un téléphone pendant le développement : `npm run dev`, puis o
 | Tirer (canons, ou laser de minage en mode minage) | clic gauche / X | bouton TIR (maintenir) |
 | Missile (après 3 s de verrouillage) / cible suivante | R / T | bouton MSL |
 | Mode minage | M | bouton MIN |
+| À pied sur un avant-poste : descendre armé / dégainer, recharger, changer d'arme, soin | G, R, T, H | ARME, MSL, —, SOIN |
 | Menu / qualité | Échap | bouton ≡ |
 
 Le vaisseau du joueur (Héron, aire 02) s'ouvre par la rampe arrière : on monte à bord sans
@@ -97,6 +98,26 @@ et décrochent si vous revenez dans la zone protégée de la station (1,1 km, ar
   (2 500 ¤ + 5 % des crédits) et perte du minerai.
 - **Interface** : barres bouclier / coque, armement, cadre de cible (bouclier, coque, distance),
   repères des autres hostiles, radar de 2,5 km (station en vert).
+
+## Combat à pied (avant-postes)
+
+Les avant-postes ont désormais un pont de débarquement entre l'aire et la tour, avec des caisses
+qui servent de couverture. Le Héron s'y pose rampe face au pont.
+
+- **Raids** : à l'atterrissage sur un avant-poste, un raid pirate peut être en cours (3 chances sur 10,
+  ou à coup sûr avec un contrat « Sécurité » du terminal des contrats). Les pirates sortent de la tour,
+  prennent position derrière les caisses, tirent en rafales, s'accroupissent et rechargent.
+- **Descendre armé** : posé sur l'avant-poste, **G** (bouton ARME) fait descendre par la rampe ;
+  l'arme est dégainée automatiquement pendant un raid. **E** à la rampe pour remonter à bord.
+- **Armes personnelles** : celles de l'Armurerie Kestrel (dégâts, cadence, portée, chargeur, dispersion
+  propres à chaque arme ; tir réel au centre de l'écran, tête ×2). **R** recharger, **T** passer de
+  l'arme principale à l'arme de poing, **H** stylo médical (+55 santé). Armes interdites dans la station.
+- **Gardes** : les gardes de l'équipage à bord descendent avec vous, avec l'arme et l'armure que vous
+  leur avez achetées, prennent les caisses côté vaisseau et combattent. Un garde blessé reste à terre
+  jusqu'à la fin du raid.
+- **Armure** : réduit les dégâts reçus (légère 20 %, moyenne 40 %, lourde 65 %).
+- **Récompenses** : 420 à 720 ¤ par pirate, puis le contrat de sécurité ou une prime de 1 500 ¤.
+- **À terre** : évacuation à bord, soins d'urgence (1 200 ¤), le raid échoue (le contrat reste ouvert).
 
 ## Équipage
 
