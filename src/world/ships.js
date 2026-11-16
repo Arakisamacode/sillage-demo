@@ -301,19 +301,9 @@ function buildHeron(ctx) {
   // grille de fret (marquages) et caisses arrimées
   for (let i = 0; i <= 4; i++) S.box(0.05, 0.01, 9.6, yellow, [-1.2 + i * 1.2 - 0.0, fy + 0.005, 8.2], null, { cast: false, receive: true });
   for (let k = 0; k <= 8; k++) S.box(4.85, 0.01, 0.05, yellow, [1.2, fy + 0.005, 3.4 + k * 1.2], null, { cast: false, receive: true });
-  const crateCols = [0x5c6b4a, 0x3d4a5a, 0x8a5a2a, 0x6a6e70];
-  const crates = [[2.4, 4.0, 1.1, 0], [2.4, 5.2, 1.1, 1], [1.2, 4.0, 1.1, 2], [2.4, 4.0, 1.1, 3, 1], [2.4, 7.6, 1.1, 1], [1.2, 7.6, 1.1, 0], [2.4, 10.0, 1.1, 2], [2.4, 11.2, 1.1, 3], [2.4, 10.0, 1.1, 0, 1]];
-  for (const [x, z, sz, c, lvl] of crates) {
-    const y = fy + (lvl ? sz : 0);
-    S.box(sz, sz, sz, mats.paint(crateCols[c], { plain: true, rough: 0.7, grime: 0.8 }), [x, y + sz / 2, z]);
-    S.box(sz + 0.02, 0.06, sz + 0.02, trim, [x, y + sz - 0.03, z], null, { cast: false });
-    S.box(0.08, sz + 0.02, sz + 0.02, mats.plastic(0xc8901a, 0.7), [x, y + sz / 2, z], null, { cast: false });
-    if (!lvl) S.cbox(sz, sz * 2, sz, [x, y + sz, z]);
-  }
-  // sangles d'arrimage du bloc arrière
-  S.B.cable(S.local(3.4, fy + 1.0, 9.4).toArray(), S.local(0.6, fy + 0.02, 9.4).toArray(), -0.4, 0.02, mats.plastic(0xc8901a, 0.6));
+  // (la grille est vide : les caisses des contrats de fret y sont arrimées, voir game/cargo.js)
   // rover garé côté bâbord
-  rover(S, mats, -1.6, fy, 6.5, Math.PI);
+  rover(S, mats, -2.3, fy, 9.0, Math.PI);
   // escalier vers le pont supérieur (bâbord avant, monte vers l'avant)
   const sx0 = -2.9, sw = 1.2, sBot = 0.4, sTop = -4.4; // z
   const upY = 5.2;

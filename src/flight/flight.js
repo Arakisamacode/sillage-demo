@@ -32,7 +32,15 @@ export class Flight {
       [0, 9.3, 2, 0.9], [-3, 6.6, 16.6, 1.3], [3, 6.6, 16.6, 1.3], [-2.6, 0.3, -11, 0.5], [2.6, 0.3, -11, 0.5], [-3.2, 0.3, 9.5, 0.5], [3.2, 0.3, 9.5, 0.5]]
       .map(([x, y, z, r]) => ({ p: new THREE.Vector3(x, y, z), r }));
     this._plumes();
+    // aires d'atterrissage connues : l'aire 02 du hangar, puis celles des avant-postes (ajoutées par addPad)
+    this.home = { id: 'home', name: 'Halden-7 · aire 02', pos: this.restPos.clone(), q: this.restQ.clone(), inHangar: true };
+    this.pads = [this.home];
+    this.dockedAt = this.home;
   }
+
+  addPad(pad) { this.pads.push(pad); }
+  /** Posé ailleurs qu'au hangar : le joueur reste à bord, la caméra suit le vaisseau. */
+  get away() { return this.state === 'parked' && this.dockedAt !== this.home; }
 
   _bvh() {
     if (this.bvh) return this.bvh;
@@ -72,22 +80,32 @@ export class Flight {
     S.group.add(this.engineLight);
   }
 
-  get active() { return this.state !== 'parked'; }
+  get active() { return this.state !== 'parked' || this.away; }
   insideHangar(p = this.pos) { return p.x > -HX && p.x < HX && p.z > Z_BAY && p.z < Z_BACK && p.y < H + 2; }
+  /** Aire d'atterrissage à portée (à moins de 22 m à l'horizontale, 18 m au-dessus, vitesse réduite). */
   nearPad() {
-    return Math.hypot(this.pos.x - this.restPos.x, this.pos.z - this.restPos.z) < 22 && this.pos.y < 18 && this.insideHangar() && this.vel.length() < 9;
+    if (this.vel.length() >= 9) return null;
+    for (const p of this.pads) {
+      const dy = this.pos.y - p.pos.y;
+      if (Math.hypot(this.pos.x - p.pos.x, this.pos.z - p.pos.z) < 22 && dy < 18 && dy > -3 && (!p.inHangar || this.insideHangar())) return p;
+    }
+    return null;
   }
 
   takeOff() {
     if (this.state !== 'parked') return;
     this.state = 'spool'; this.timer = 0;
+    this.spoolFrom = this.pos.clone();
+    this.dockedAt = null;
     this._bvh();
     this.onEvent && this.onEvent('takeoff');
   }
 
   land() {
-    if (this.state !== 'flying' || !this.nearPad()) return false;
+    const pad = this.state === 'flying' && this.nearPad();
+    if (!pad) return false;
     this.state = 'landing'; this.timer = 0;
+    this.target = pad;
     this.landFrom = { pos: this.pos.clone(), q: this.q.clone() };
     this.onEvent && this.onEvent('landing');
     return true;
@@ -101,22 +119,25 @@ export class Flight {
       // montée en régime puis décollage vertical à 2,5 m
       this.timer += dt;
       this.throttle = Math.min(1, this.timer / 2.5) * 0.35;
-      if (this.timer > 2.5) this.pos.y = this.restPos.y + Math.min(2.5, (this.timer - 2.5) * 0.9);
+      if (this.timer > 2.5) this.pos.y = this.spoolFrom.y + Math.min(2.5, (this.timer - 2.5) * 0.9);
       if (this.timer > 5.4) { this.state = 'flying'; this.onEvent && this.onEvent('airborne'); }
+      if (this.timer > 2.5) this.vel.set(0, 0.9, 0); 
     } else if (this.state === 'landing') {
       this.timer += dt;
       const k = Math.min(1, this.timer / 6), e = k * k * (3 - 2 * k);
       // approche à 3 m au-dessus de l'aire, puis descente
-      const hover = this.restPos.clone(); hover.y += 3;
+      const T = this.target;
+      const hover = T.pos.clone(); hover.y += 3;
       if (k < 0.75) this.pos.lerpVectors(this.landFrom.pos, hover, Math.min(1, e / 0.75 * 1.05));
-      else this.pos.lerpVectors(hover, this.restPos, (k - 0.75) / 0.25);
-      this.q.slerpQuaternions(this.landFrom.q, this.restQ, Math.min(1, e * 1.4));
+      else this.pos.lerpVectors(hover, T.pos, (k - 0.75) / 0.25);
+      this.q.slerpQuaternions(this.landFrom.q, T.q, Math.min(1, e * 1.4));
       this.vel.set(0, 0, 0);
       this.throttle = 0.25 * (1 - k);
       if (k >= 1) {
-        this.pos.copy(this.restPos); this.q.copy(this.restQ);
+        this.pos.copy(T.pos); this.q.copy(T.q);
         this.state = 'parked'; this.throttle = 0;
-        this.onEvent && this.onEvent('landed');
+        this.dockedAt = T;
+        this.onEvent && this.onEvent('landed', T);
       }
     } else if (this.state === 'flying') {
       this._fly(dt, input);

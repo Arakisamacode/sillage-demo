@@ -103,6 +103,7 @@ export class Player {
     for (const door of doors) {
       if (door.open > 0.85) continue;
       const b = door.box;
+      if (b.max.y < this.pos.y + 0.3 || b.min.y > this.pos.y + 1.7) continue;
       const cx = THREE.MathUtils.clamp(_seg.start.x, b.min.x, b.max.x), cz = THREE.MathUtils.clamp(_seg.start.z, b.min.z, b.max.z);
       const dx = _seg.start.x - cx, dz = _seg.start.z - cz, d = Math.hypot(dx, dz);
       if (d < RADIUS && d > 1e-5) { const k = (RADIUS - d) / d; _seg.start.x += dx * k; _seg.start.z += dz * k; _seg.end.x += dx * k; _seg.end.z += dz * k; }

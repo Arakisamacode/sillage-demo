@@ -31,6 +31,7 @@ export class ShopUI {
   get isOpen() { return this.open; }
 
   openStore(storeId) { this.mode = 'store'; this.store = storeId; this.tab = 'buy'; this.filter = null; this._show(); }
+  openBoard(missions) { this.mode = 'board'; this.missions = missions; this.tab = missions.active.length ? 'active' : 'offers'; this._show(); }
   openInventory() { this.mode = 'inv'; this.tab = 'perso'; this._show(); }
   _show() { this.open = true; this.root.classList.remove('hidden'); this.msg = ''; this.render(); }
   close() { if (!this.open) return; this.open = false; this.root.classList.add('hidden'); this.onClose && this.onClose(); }
@@ -40,12 +41,16 @@ export class ShopUI {
     const S = this.state;
     const head = this.mode === 'store'
       ? `<div class="sh-title">${STORES[this.store].name}</div><div class="sh-greet">${STORES[this.store].greet}</div>`
-      : `<div class="sh-title">INVENTAIRE</div><div class="sh-greet">Équipement personnel, vaisseau et objets.</div>`;
+      : this.mode === 'board'
+        ? `<div class="sh-title">CONTRATS DE FRET</div><div class="sh-greet">Quai de fret · aire 02 · paiement à la livraison.</div>`
+        : `<div class="sh-title">INVENTAIRE</div><div class="sh-greet">Équipement personnel, vaisseau et objets.</div>`;
     const tabs = this.mode === 'store'
       ? [['buy', 'Acheter'], ['sell', 'Vendre']]
-      : [['perso', 'Personnage'], ['ship', 'Héron Mk II'], ['bag', 'Sac']];
+      : this.mode === 'board' ? [['offers', 'Offres'], ['active', `En cours (${this.missions.active.length})`]]
+        : [['perso', 'Personnage'], ['ship', 'Héron Mk II'], ['bag', 'Sac']];
     let body = '';
     if (this.mode === 'store') body = this.tab === 'buy' ? this._buyList() : this._sellList();
+    else if (this.mode === 'board') body = this.tab === 'offers' ? this._offers() : this._activeJobs();
     else if (this.tab === 'perso') body = this._persoPanel();
     else if (this.tab === 'ship') body = this._shipPanel();
     else body = this._bagPanel();
@@ -142,11 +147,33 @@ export class ShopUI {
       <div class="sh-side">${it.cat === 'consumable' ? `<button data-a="use" data-v="${it.id}">Utiliser</button>` : ''}</div></div>`).join('');
   }
 
+  _offers() {
+    const M = this.missions;
+    return M.offers.slice(0, 6).map((o) => `<div class="sh-item"><div class="sh-main"><b>${o.title}</b><p>${o.route} · ${o.km.toFixed(1).replace('.', ',')} km · ${o.client}</p><p>${o.desc}</p></div>
+      <div class="sh-side"><div class="sh-price">${fmt(o.reward)}</div><button data-a="accept" data-v="${o.id}">Accepter</button></div></div>`).join('');
+  }
+
+  _activeJobs() {
+    const M = this.missions;
+    if (!M.active.length) return '<div class="sh-empty">Aucun contrat en cours. Consultez l\'onglet Offres.</div>';
+    return M.active.map((o) => `<div class="sh-item"><div class="sh-main"><b>${o.title}</b><p>${o.route} · ${o.client}</p><p class="sh-step">▸ ${M.status(o)}</p></div>
+      <div class="sh-side"><div class="sh-price">${fmt(o.reward)}</div><button class="sec" data-a="abandon" data-v="${o.id}">Abandonner</button></div></div>`).join('')
+      + '<div class="sh-note">Abandonner coûte 10 % de la prime. Les caisses du contrat sont retirées.</div>';
+  }
+
   _click(e) {
     const b = e.target.closest('button'); if (!b) return;
     const a = b.dataset.a, v = b.dataset.v, S = this.state;
     if (a === 'close') return this.close();
     if (a === 'tab') { this.tab = v; this.msg = ''; return this.render(); }
+    if (a === 'accept') {
+      const o = this.missions.offers.find((x) => x.id === +v);
+      const err = this.missions.accept(o);
+      if (err) return this.flash(err, true);
+      this.tab = 'active'; this.onAction('accept', o);
+      return this.flash(o.type === 'out' ? `${o.n} caisses vous attendent sur le quai de fret.` : o.type === 'container' ? 'Le conteneur est chargé dans votre soute.' : `Rendez-vous à ${o.dest.name} pour charger.`);
+    }
+    if (a === 'abandon') { const o = this.missions.active.find((x) => x.id === +v); this.missions.abandon(o); return this.flash('Contrat abandonné.', true); }
     if (a === 'buy') {
       const it = ITEM[v];
       if (!S.buy(v)) return this.flash('Crédits insuffisants.', true);

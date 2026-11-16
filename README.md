@@ -47,6 +47,19 @@ Pour tester sur un téléphone pendant le développement : `npm run dev`, puis o
 Le vaisseau du joueur (Héron, aire 02) s'ouvre par la rampe arrière : on monte à bord sans
 chargement, on traverse la soute, on gravit les marches du cockpit et on s'assoit aux commandes (E).
 
+## Missions de fret
+
+Au **quai de fret** (zone jaune à gauche de la rampe du Héron), le **terminal des contrats** propose des offres :
+- **Livraison** : les caisses apparaissent sur le quai ; on les porte (E) jusque dans la soute, où elles sont arrimées
+  automatiquement sur la grille, puis on vole jusqu'à l'avant-poste et on livre (E une fois posé).
+- **Collecte** : on se pose à l'avant-poste, on charge (E), on revient et on dépose chaque caisse sur le quai.
+- **Conteneur** : la manutention charge un conteneur dans la soute (4 rangées libres nécessaires).
+
+Trois avant-postes en orbite : **Relais Corvin** (dépôt), **Plateforme Ardent-3** (mine et raffinerie),
+**Station agricole Lys** (serres). Un repère à l'écran indique la destination et la distance ; on s'y pose avec L
+(ou ⏻) quand on est à moins de 22 m au-dessus de l'aire. Paiement à la livraison ; abandon : pénalité de 10 %.
+Code : `src/game/cargo.js`, `src/game/missions.js`, `src/world/outposts.js`.
+
 ## Économie et boutiques
 
 On démarre avec 15 000 ¤. Dans la galerie, chaque vendeur ouvre sa boutique (E au comptoir) :

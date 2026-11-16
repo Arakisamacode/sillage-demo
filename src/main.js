@@ -23,6 +23,9 @@ import { GameState } from './game/state.js';
 import { ITEM, STORES } from './game/catalog.js';
 import { HeronLoadout } from './game/shipgear.js';
 import { ShopUI } from './ui/shop.js';
+import { buildOutposts } from './world/outposts.js';
+import { Cargo, buildQuai } from './game/cargo.js';
+import { Missions } from './game/missions.js';
 
 const params = new URLSearchParams(location.search);
 const HX_ = 32;
@@ -65,8 +68,10 @@ async function boot() {
   buildHangar(ctx);
   ctx.ships = buildShips(ctx);
   buildProps(ctx);
+  ctx.quai = buildQuai(ctx);
   buildGallery(ctx);
   buildExterior(ctx);
+  ctx.outposts = buildOutposts(ctx);
   ctx.lights = buildLighting(ctx);
   const lib = new CharacterLibrary(manager, quality);
   const libReady = lib.load(undefined, (p) => progress(0.6 + 0.3 * p, 'Chargement des personnages'));
@@ -83,7 +88,16 @@ async function boot() {
   const player = new Player(ctx, builder.collisionGeometry());
   const flight = new Flight(ctx, ctx.ships.heron);
   ctx.flight = flight;
-  flight.onEvent = (e) => {
+  for (const o of ctx.outposts) flight.addPad(o.pad);
+  flight.onEvent = (e, pad) => {
+    const away = pad && pad !== flight.home;
+    if (e === 'landing' && (away || flight.target !== flight.home)) {
+      const T = flight.target;
+      audio.say(`${T.name}, contrôle : Héron, vous êtes autorisé à vous poser. Bienvenue.`);
+      return toast(`Atterrissage autorisé · ${T.name}`);
+    }
+    if (e === 'landed' && away) return toast(`Posé · ${pad.name} · E : opérations de fret · Espace : décoller`);
+    if (e === 'takeoff' && flight.spoolFrom && flight.spoolFrom.distanceTo(flight.home.pos) > 50) return toast('Décollage · moteurs en montée de régime');
     const msg = {
       takeoff: ['Contrôle de pont : Héron, autorisation de décollage accordée, aire zéro deux. Champ de confinement ouvert.', 'Décollage autorisé · aire 02'],
       airborne: [null, 'En vol · ZQSD : poussée · souris : orientation · Espace / C : monter / descendre · Q / E : roulis · V : vue'],
@@ -109,6 +123,11 @@ async function boot() {
   const heronGear = new HeronLoadout(ctx.ships.heron);
   heronGear.apply(game.d.ship);
   game.on(() => { dressPerson(player.avatar, game.person('me')); heronGear.apply(game.d.ship); });
+  // ------------------------------------------------------------------ fret : caisses, contrats
+  const cargo = new Cargo(ctx, ctx.ships.heron, flight);
+  const missions = new Missions(ctx, cargo, ctx.outposts, game, flight);
+  ctx.cargo = cargo; ctx.missions = missions;
+  ctx.missionsBoard = () => missions.board();
   player.thirdPerson = true; player.camDist = 2.6;
   if (shotName === 'lineup' || shotName === 'portrait') {
     const roles = [['mécanicien', 'M'], ['pilote', 'F'], ['sécurité', 'M'], ['client', 'F'], ['ravitailleur', 'M'], ['client', 'M'], ['entretien', 'F']];
@@ -153,6 +172,12 @@ async function boot() {
     { pos: new THREE.Vector3(-29.9, 0, 3.1), r: 1.4, label: 'E — Prendre un café (3 ¤)', fn: () => { if (game.pay(3)) { audio.coffee(); toast('Café serré · 3 ¤ débités'); } else toast('Crédits insuffisants'); } },
     { pos: new THREE.Vector3(ctx.kiosk.x, 0, ctx.kiosk.z), r: 3.7, label: 'E — Commander au kiosque (5 ¤)', fn: () => { if (game.pay(5)) { audio.coffee(); toast('« Et voilà, bonne escale ! » · 5 ¤'); } else toast('Crédits insuffisants'); } },
   ];
+  interactables.push({ pos: ctx.quai.terminal, r: 1.5, label: 'E — Terminal des contrats de fret', fn: () => openUI(() => shop.openBoard(missions)) });
+  missions.onEvent = (e, o, fee) => {
+    if (e === 'complete') { toast(`Contrat rempli · ${o.client} · +${o.reward.toLocaleString('fr-FR').replace(/\u202f/g, ' ')} ¤`); audio.say('Livraison confirmée. Paiement transféré.'); }
+    if (e === 'loaded') toast(`${o.n} caisses chargées dans la soute · retour à Halden-7`);
+    if (e === 'abandon') toast(`Contrat abandonné · pénalité ${fee} ¤`);
+  };
   for (const [id, sp] of Object.entries(ctx.shopSpots)) {
     if (!STORES[id]) continue;
     interactables.push({ pos: sp.customer.clone().setY(0), r: 1.6, label: `E — ${STORES[id].label} : parler au vendeur`, fn: () => openUI(() => shop.openStore(id)) });
@@ -256,6 +281,32 @@ async function boot() {
 
   $('start').classList.remove('hidden');
 
+  // ------------------------------------------------------------------ HUD du fret : contrats en cours et repère de navigation
+  const navEl = $('nav'), navTxt = navEl.querySelector('span'), jobsEl = $('jobs');
+  let jobsAcc = 1;
+  const _p = new THREE.Vector3();
+  function updateFreightHud() {
+    jobsAcc += 1 / 60;
+    if (jobsAcc > 0.25) {
+      jobsAcc = 0;
+      jobsEl.innerHTML = missions.active.map((o) => `<b>${o.type === 'in' ? 'COLLECTE' : o.type === 'container' ? 'CONTENEUR' : 'LIVRAISON'}</b> ${o.goods} · ${missions.status(o)}`).join('<br>');
+    }
+    const T = missions.navTarget();
+    if (!T || shop.isOpen) { navEl.classList.add('hidden'); return; }
+    const from = flight.active ? flight.pos : player.pos;
+    const d = from.distanceTo(T.pos);
+    _p.copy(T.pos).project(camera);
+    const behind = _p.z > 1;
+    let x = _p.x, y = _p.y;
+    if (behind) { x = -x; y = -y; }
+    const edge = behind || Math.abs(x) > 0.92 || Math.abs(y) > 0.86;
+    if (edge) { const k = Math.max(Math.abs(x) / 0.92, Math.abs(y) / 0.86, 1e-3); x /= k; y /= k; }
+    navEl.style.left = `${(x * 0.5 + 0.5) * innerWidth}px`; navEl.style.top = `${(-y * 0.5 + 0.5) * innerHeight}px`;
+    navEl.classList.toggle('edge', edge);
+    navEl.classList.remove('hidden');
+    navTxt.textContent = `${T.name} · ${d > 1000 ? (d / 1000).toFixed(1).replace('.', ',') + ' km' : Math.round(d) + ' m'}`;
+  }
+
   // ------------------------------------------------------------------ boucle
   let last = performance.now(), t = 0, fpsAcc = 0, fpsN = 0, shadowTick = 0;
   const clockEl = $('clock'), fpsEl = $('fps'), promptEl = $('prompt');
@@ -272,22 +323,34 @@ async function boot() {
         // ------------------------------------------------ en vol
         if (input.consume('view')) flight.toggleView();
         flight.update(dt, input);
-        let label = flight.state === 'flying'
-          ? (flight.nearPad() ? (touch ? '⏻ — Atterrir sur l\'aire 02' : 'L — Atterrir sur l\'aire 02') : (flight.insideHangar() ? 'Sortie par la baie · vitesse limitée dans le hangar' : `${Math.round(flight.vel.length())} m/s · Maj : postcombustion`))
-          : flight.state === 'spool' ? 'Démarrage des moteurs…' : 'Atterrissage automatique…';
+        const np = flight.state === 'flying' && flight.nearPad();
+        let label;
+        if (flight.away) {
+          const acts = missions.dockActions(flight.dockedAt);
+          label = (acts.length ? `E — ${acts[0].label} · ` : '') + (touch ? '⏻ — Décoller' : 'ESPACE — Décoller');
+          if (acts.length && input.consume('use')) { const err = acts[0].fn(); if (typeof err === 'string') toast(err); }
+          if (input.consume('fly') || input.consume('flyKey')) flight.takeOff();
+        } else {
+          label = flight.state === 'flying'
+            ? (np ? `${touch ? '⏻' : 'L'} — Atterrir · ${np.name}` : (flight.insideHangar() ? 'Sortie par la baie · vitesse limitée dans le hangar' : `${Math.round(flight.vel.length())} m/s · Maj : postcombustion`))
+            : flight.state === 'spool' ? 'Démarrage des moteurs…' : 'Atterrissage automatique…';
+          if ((input.consume('fly') || input.consume('land')) && flight.state === 'flying') flight.land();
+        }
         promptEl.classList.remove('hidden'); promptEl.textContent = label;
-        if ((input.consume('fly') || input.consume('land')) && flight.state === 'flying') flight.land();
-        input.consume('flyKey');
+        input.consume('flyKey'); input.consume('use');
       } else {
         if (input.consume('view')) player.toggleView();
-        player.update(dt, input, crowd.agents.filter((a) => !a.attached), ctx.doors);
+        if (cargo.carried) input.run = false;
+        player.update(dt, input, crowd.agents.filter((a) => !a.attached), [...ctx.doors, ...cargo.blockers()]);
+        cargo.update(player);
         let near = null;
         if (player.seated) near = { label: touch ? '⏻ — Décoller · E — Se lever' : 'ESPACE — Décoller · E — Se lever', fn: () => player.stand() };
-        else for (const it of interactables) if (it.pos.distanceTo(player.pos) < it.r) { near = it; break; }
+        else near = cargo.prompt(player);
+        if (!near && !player.seated) for (const it of interactables) if (it.pos.distanceTo(player.pos) < it.r) { near = it; break; }
         promptEl.classList.toggle('hidden', !near);
         if (near) promptEl.textContent = near.label;
         if (player.seated && (input.consume('fly') || input.consume('flyKey'))) { flight.takeOff(); if (player.avatar) player.avatar.root.visible = false; }
-        else if (near && input.consume('use')) near.fn();
+        else if (near && input.consume('use')) { const err = near.fn(); if (typeof err === 'string') toast(err); }
         input.consume('fly'); input.consume('flyKey'); input.consume('land');
       }
       input.consume('use');
@@ -300,6 +363,7 @@ async function boot() {
     if (toastT > 0) { toastT -= dt; if (toastT <= 0) $('toast').classList.add('hidden'); }
     const st = 14 * 3600 + 7 * 60 + t * 10; // 1 s réelle = 10 s à bord
     clockEl.textContent = `HALDEN-7 · ${String(Math.floor(st / 3600) % 24).padStart(2, '0')}:${String(Math.floor(st / 60) % 60).padStart(2, '0')} · ${crowd.agents.length} pers.`;
+    updateFreightHud();
     if (quality.name === 'medium') { renderer.three.shadowMap.autoUpdate = false; renderer.three.shadowMap.needsUpdate = (++shadowTick % 2) === 0; }
     renderer.render(dt);
     fpsAcc += dt; fpsN++;
