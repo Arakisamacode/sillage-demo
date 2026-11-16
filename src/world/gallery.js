@@ -321,7 +321,10 @@ function shop(ctx, s, wall, wallDark, trim) {
   L.obstacle(1.8, 0.6, -1.6, 3.2);
   // étagères chargées
   for (const sx of [-1, 1]) {
-    L.box(0.45, 2.4, depth - 1.5, mats.metal(0x4b4f52), [sx * (w / 2 - 0.3), 1.2, depth / 2 + 0.4], null, { collide: true });
+    // étagère ouverte : fond, montants, tablettes (les articles sont visibles)
+    L.box(0.05, 2.4, depth - 1.5, mats.metal(0x3a3e42, { rough: 0.6 }), [sx * (w / 2 - 0.06), 1.2, depth / 2 + 0.4]);
+    for (const dz of [-(depth - 1.5) / 2, 0, (depth - 1.5) / 2]) L.box(0.5, 2.4, 0.05, mats.metal(0x6b6f72), [sx * (w / 2 - 0.3), 1.2, depth / 2 + 0.4 + dz]);
+    L.cbox(0.5, 2.4, depth - 1.5, [sx * (w / 2 - 0.3), 1.2, depth / 2 + 0.4]);
     for (let k = 0; k < 4; k++) {
       L.box(0.5, 0.04, depth - 1.5, mats.metal(0x6b6f72), [sx * (w / 2 - 0.3), 0.4 + k * 0.55, depth / 2 + 0.4], null, { cast: false });
       for (let i = 0; i < 8; i++) {
