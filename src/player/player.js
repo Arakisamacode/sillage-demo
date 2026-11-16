@@ -135,7 +135,7 @@ export class Player {
 
   _updateCamera(dt) {
     const cam = this.camera;
-    const want = this.thirdPerson ? (this.aiming ? 2.0 : 2.35) : 0;
+    const want = this.thirdPerson ? (this.aiming ? 2.6 : 2.9) : 0;
     this.camDist += (want - this.camDist) * (1 - Math.exp(-dt * 6));
     const moving = this.grounded && this.speed > 0.3;
     this.bob += dt * this.speed * 2.2 * (moving ? 1 : 0);
@@ -145,7 +145,8 @@ export class Player {
     const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(this.pitch, this.yaw, 0, 'YXZ'));
     if (this.camDist > 0.05) {
       // épaule droite, recul limité par la géométrie
-      const back = new THREE.Vector3(this.aiming ? 0.85 : 0.58, this.aiming ? 0.12 : 0.02, this.camDist).applyQuaternion(q);
+      // caméra centrée derrière le personnage, légèrement au-dessus (le viseur passe au-dessus de la tête)
+      const back = new THREE.Vector3(0, this.aiming ? 0.55 : 0.4, this.camDist).applyQuaternion(q);
       const len = back.length();
       _ray.origin.copy(eye); _ray.direction.copy(back).normalize();
       const hit = this.bvh.raycastFirst(_ray, THREE.DoubleSide);
@@ -199,7 +200,7 @@ export class Player {
     this.yaw = THREE.MathUtils.clamp(this.yaw, s.yaw + Math.PI - 1.4, s.yaw + Math.PI + 1.4);
     const eye = s.eye.clone();
     const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(this.pitch, this.yaw, 0, 'YXZ'));
-    if (this.thirdPerson) eye.add(new THREE.Vector3(0.3, 0.3, 2.2).applyQuaternion(q));
+    if (this.thirdPerson) eye.add(new THREE.Vector3(0, 0.4, 2.3).applyQuaternion(q));
     this.camera.position.lerp(eye, 1 - Math.exp(-dt * 8));
     this.camera.quaternion.slerp(q, 1 - Math.exp(-dt * 12));
     this.camPos.copy(this.camera.position);
