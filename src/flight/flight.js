@@ -155,6 +155,14 @@ export class Flight {
       p.m.visible = t > 0.02;
     }
     this.engineLight.intensity = this.throttle * 60;
+    // rampe arrière : relevée en vol, abaissée posé
+    const R = S.ramp;
+    if (R) {
+      const close = this.state === 'flying' || this.state === 'dead' || (this.state === 'spool' && this.timer > 1.2) || (this.state === 'landing' && this.timer < 4.5);
+      R.k += THREE.MathUtils.clamp((close ? 1 : 0) - R.k, -dt * 0.45, dt * 0.45);
+      const e = R.k * R.k * (3 - 2 * R.k);
+      R.pivot.rotation.x = R.closed * e;
+    }
     this._camera(dt);
   }
 

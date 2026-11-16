@@ -27,6 +27,36 @@ export class Missions {
     this.home = new THREE.Vector3(0, 12, -46); // entrée de la baie du hangar
     for (let i = 0; i < 6; i++) this.offers.push(this._offer(i));
     cargo.onDrop = () => this._checkQuai();
+    this._restore();
+  }
+
+  // ------------------------------------------------------------------ sauvegarde des contrats en cours (et des caisses)
+  persist() {
+    const keep = ['id', 'type', 'goods', 'n', 'reward', 'client', 'crateColor', 'tagColor', 'step', 'short', 'title', 'route', 'desc', 'km'];
+    this.game.d.contracts = this.active.map((o) => {
+      const r = Object.fromEntries(keep.map((k) => [k, o[k]]));
+      r.destId = o.dest.id;
+      const mine = this.cargo.crates.filter((c) => c.contract === o);
+      r.hold = mine.filter((c) => c.where === 'hold' && !c.container).length;
+      r.ground = mine.filter((c) => c.where !== 'hold' && !c.container).length;
+      r.container = mine.some((c) => c.container);
+      return r;
+    });
+    this.game.save();
+  }
+  _restore() {
+    for (const r of this.game.d.contracts || []) {
+      const dest = this.outposts.find((x) => x.id === r.destId);
+      if (!dest) continue;
+      const o = { ...r, dest };
+      delete o.destId; delete o.hold; delete o.ground; delete o.container;
+      if (o.type === 'raid' && o.step === 'fight') o.step = 'go';
+      this.active.push(o);
+      seq = Math.max(seq, o.id + 1);
+      if (r.container) this.cargo.loadContainer(o);
+      for (let i = 0; i < r.hold; i++) this.cargo.spawn(o, 'hold');
+      for (let i = 0; i < r.ground; i++) this.cargo.spawn(o, 'ground');
+    }
   }
 
   _offer(i = Math.floor(Math.random() * 3)) {

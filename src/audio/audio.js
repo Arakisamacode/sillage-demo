@@ -299,6 +299,31 @@ export class Audio {
       s.connect(bp).connect(g); s.start(t, Math.random() * 2, 0.5);
     }
   }
+  /** Bourdonnement continu du laser de minage (on : actif ; k : charge 0..1 ; extract : aspiration). */
+  laserHum(on, k = 0, extract = false) {
+    if (!this.ac || (!this._hum && !on)) return;
+    const ac = this.ac, t = ac.currentTime;
+    if (!this._hum) {
+      const o1 = ac.createOscillator(); o1.type = 'sawtooth'; o1.frequency.value = 70;
+      const o2 = ac.createOscillator(); o2.type = 'square'; o2.frequency.value = 141;
+      const n = this._src(); const bp = ac.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1800; bp.Q.value = 1.4;
+      const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 900; lp.Q.value = 4;
+      const g = ac.createGain(); g.gain.value = 0;
+      const gn = ac.createGain(); gn.gain.value = 0.35;
+      o1.connect(lp); o2.connect(lp); n.connect(bp).connect(gn).connect(g); lp.connect(g); g.connect(this.master);
+      o1.start(); o2.start(); n.start();
+      this._hum = { o1, o2, lp, bp, g };
+    }
+    const H = this._hum;
+    H.g.gain.setTargetAtTime(on && this.enabled ? 0.07 + k * 0.06 : 0, t, 0.06);
+    if (on) {
+      H.o1.frequency.setTargetAtTime(extract ? 52 : 62 + k * 70, t, 0.1);
+      H.o2.frequency.setTargetAtTime(extract ? 104 : 124 + k * 150 + Math.random() * 6, t, 0.05);
+      H.lp.frequency.setTargetAtTime(extract ? 500 : 700 + k * 2200, t, 0.1);
+      H.bp.frequency.setTargetAtTime(extract ? 900 : 1500 + k * 1500, t, 0.1);
+    }
+  }
+
   /** Tonalité de verrouillage missile. */
   lockTone() {
     if (!this.ac || !this.enabled) return;

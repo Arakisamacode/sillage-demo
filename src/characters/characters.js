@@ -343,6 +343,40 @@ export class Character {
     this.root.worldToLocal(_v);
     h.position.copy(_v);
     h.rotation.set(-(this.aimPitch || 0), 0, 0);
+    // arme longue : main gauche sur le garde-main (IK à deux os)
+    const L = h.userData.len;
+    if (L > 0.3 && this.upperRole !== 'reloadU' && !this.override) {
+      h.updateMatrixWorld(true);
+      this._ik2(this.bones.upperarm_l, this.bones.lowerarm_l, this.bones.hand_l, new THREE.Vector3(0, -0.02, L * 0.42).applyMatrix4(h.matrixWorld));
+    }
+  }
+  /** IK analytique à deux os (épaule-coude-poignet) vers une cible monde. */
+  _ik2(A, B, C, t) {
+    if (!A || !B || !C) return;
+    A.updateMatrixWorld(true);
+    const a = A.getWorldPosition(new THREE.Vector3()), b = B.getWorldPosition(new THREE.Vector3()), c = C.getWorldPosition(new THREE.Vector3());
+    const lab = a.distanceTo(b), lcb = b.distanceTo(c);
+    const lat = THREE.MathUtils.clamp(a.distanceTo(t), 0.02, lab + lcb - 0.002);
+    const ang = (u, v) => Math.acos(THREE.MathUtils.clamp(u.clone().normalize().dot(v.clone().normalize()), -1, 1));
+    const ac = c.clone().sub(a), ab = b.clone().sub(a), ba = a.clone().sub(b), bc = c.clone().sub(b);
+    const acab0 = ang(ac, ab), babc0 = ang(ba, bc);
+    const acab1 = Math.acos(THREE.MathUtils.clamp((lcb * lcb - lab * lab - lat * lat) / (-2 * lab * lat), -1, 1));
+    const babc1 = Math.acos(THREE.MathUtils.clamp((lat * lat - lab * lab - lcb * lcb) / (-2 * lab * lcb), -1, 1));
+    let axis0 = ac.clone().cross(ab);
+    if (axis0.lengthSq() < 1e-8) axis0.set(0, 1, 0).applyQuaternion(this.root.quaternion);
+    axis0.normalize();
+    const rotWorld = (bone, axis, angle) => {
+      const pq = bone.parent.getWorldQuaternion(new THREE.Quaternion());
+      const r = new THREE.Quaternion().setFromAxisAngle(axis, angle);
+      bone.quaternion.premultiply(pq.clone().invert().multiply(r).multiply(pq)).normalize();
+      bone.updateMatrixWorld(true);
+    };
+    rotWorld(A, axis0, acab1 - acab0);
+    rotWorld(B, axis0, babc1 - babc0);
+    const c2 = C.getWorldPosition(new THREE.Vector3()), a2 = A.getWorldPosition(new THREE.Vector3());
+    const v1 = c2.sub(a2), v2 = t.clone().sub(a2);
+    const axis1 = v1.clone().cross(v2);
+    if (axis1.lengthSq() > 1e-10) rotWorld(A, axis1.normalize(), ang(v1, v2));
   }
 
   lookAt(p) { this.lookTarget = p; }

@@ -223,6 +223,7 @@ export class Ground {
   /** Fin du raid : nettoyage (départ du vaisseau, joueur à terre) ou victoire. */
   endRaid(silent) {
     for (const u of this.units) { this.ctx.scene.remove(u.ch.root); }
+    this._clearLoot();
     this.units = [];
     if (this.raid?.contract && this.raid.contract.step === 'fight' && !this.raid.done) this.raid.contract.step = 'go';
     this.raid = null;
@@ -264,6 +265,12 @@ export class Ground {
     this.onFoot = true;
     this.hp = Math.max(this.hp, 1);
     this.boardPos = A.W(l.x - 0.8, l.z, 0);
+    // la coque du Héron bloque le passage (fuselage et ailes, repère de l'aire du vaisseau)
+    const S = this.ctx.ships.heron;
+    S.root.updateMatrixWorld(true);
+    const gm = S.group.matrixWorld;
+    const obb = (hx, hz, cx, cz) => { const mat = gm.clone().multiply(new THREE.Matrix4().makeTranslation(cx, 0, cz)); return { mat, inv: mat.clone().invert(), hx, hz, y0: A.origin.y - 1, y1: A.origin.y + 6 }; };
+    P.obbs = [obb(4.8, 17.5, 0, -1.5), obb(11, 4.6, 0, 2.0)];
     if (this.raid) this.draw(true);
     // gardes armés : descendent avec le joueur
     let i = 0;
@@ -291,7 +298,7 @@ export class Ground {
     this.onFoot = false;
     for (const u of this.units.filter((x) => x.side === 'friend')) this.ctx.scene.remove(u.ch.root);
     this.units = this.units.filter((x) => x.side !== 'friend');
-    P.fallY = undefined; P.resetPos = null;
+    P.fallY = undefined; P.resetPos = null; P.obbs = null;
     P.sit(this.ctx.seat);
     if (P.avatar) P.avatar.root.visible = false;
     this.onEvent('reboard');
@@ -422,12 +429,50 @@ export class Ground {
         const b = Math.round((420 + Math.random() * 300) / 10) * 10;
         this.game.earn(b);
         this.raid.kills++; this.raid.bounty += b;
+        if (Math.random() < 0.65) this._dropLoot(u);
         this.onEvent('kill', u, b, from, this.enemiesLeft());
       } else this.onEvent('guardDown', u);
     } else if (!u.crouch && Math.random() < 0.3 && !u.ch.override) {
       u.ch.play('hit', { fade: 0.08, onDone: () => { if (!u.down) u.ch.stop(0.2); } });
     }
   }
+  /** Sacoche de butin au pied d'un pirate neutralisé : ramassée en passant dessus. */
+  _dropLoot(u) {
+    const g = new THREE.Group();
+    const bag = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.26, 0.34), new THREE.MeshStandardMaterial({ color: 0x3a3428, roughness: 0.85 }));
+    bag.position.y = 0.13; bag.castShadow = true; g.add(bag);
+    const strap = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.04, 0.08), new THREE.MeshStandardMaterial({ color: 0x8a2a1a, roughness: 0.6 }));
+    strap.position.y = 0.27; g.add(strap);
+    const glow = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 6), new THREE.MeshBasicMaterial({ color: new THREE.Color(4, 3, 0.6) }));
+    glow.position.set(0.18, 0.3, 0); g.add(glow);
+    const p = u.pos.clone().add(new THREE.Vector3(Math.random() - 0.5, 0, Math.random() - 0.5).multiplyScalar(0.8));
+    const l = this._clampLocal(this.raid.A.L(p));
+    g.position.copy(this.raid.A.W(l.x, l.z, 0.01));
+    g.rotation.y = Math.random() * 6;
+    this.ctx.scene.add(g);
+    const r = Math.random();
+    (this.loot || (this.loot = [])).push({ g, glow, pos: g.position.clone(), credits: Math.round((60 + Math.random() * 180) / 10) * 10, med: r < 0.35, gun: r > 0.85 ? u.gid : null });
+  }
+  _updateLoot() {
+    if (!this.loot?.length) return;
+    for (const L of this.loot) {
+      L.glow.visible = (this.t * 2) % 1 < 0.5;
+      if (this.onFoot && !this.dead && this.player.pos.distanceTo(L.pos) < 1.3) {
+        L.done = true;
+        this.ctx.scene.remove(L.g);
+        this.game.earn(L.credits);
+        const got = [`${fmt(L.credits)} ¤`];
+        if (L.med) { this.game.d.owned.medpen = (this.game.d.owned.medpen || 0) + 1; got.push('stylo médical'); }
+        if (L.gun) { this.game.d.owned[L.gun] = (this.game.d.owned[L.gun] || 0) + 1; got.push(ITEM[L.gun].name.split('«')[0].trim()); }
+        this.game.save();
+        this.audio?.blip?.();
+        this.onEvent('loot', got.join(' · '));
+      }
+    }
+    this.loot = this.loot.filter((L) => !L.done);
+  }
+  _clearLoot() { for (const L of this.loot || []) this.ctx.scene.remove(L.g); this.loot = []; }
+
   _revive(u) { u.down = false; u.hp = 60; u.ch.stop(0.3); u.ch.upper('aimU'); }
   _playerDown() {
     this.dead = true; this.deadT = 0;
@@ -579,6 +624,7 @@ export class Ground {
     if (av && this.drawn) av.aimPitch = this.player.pitch * 0.9;
     if (this.dead) { this.deadT += dt; if (this.deadT > 2.6) this._evac(); }
     else if (this.onFoot && this.hp < HP && this.t - (this._lastHurt || 0) > 6) this.hp = Math.min(HP, this.hp + dt * 2);
+    this._updateLoot();
     this._updateFx(dt);
     this._hud();
   }

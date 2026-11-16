@@ -108,6 +108,16 @@ export class Player {
       const dx = _seg.start.x - cx, dz = _seg.start.z - cz, d = Math.hypot(dx, dz);
       if (d < RADIUS && d > 1e-5) { const k = (RADIUS - d) / d; _seg.start.x += dx * k; _seg.start.z += dz * k; _seg.end.x += dx * k; _seg.end.z += dz * k; }
     }
+    // obstacles orientés (coque du Héron posé sur un avant-poste)
+    for (const ob of this.obbs || []) {
+      if (this.pos.y + 1.7 < ob.y0 || this.pos.y + 0.2 > ob.y1) continue;
+      const l = _v.set(_seg.start.x, 0, _seg.start.z).applyMatrix4(ob.inv);
+      const ex = ob.hx + RADIUS - Math.abs(l.x), ez = ob.hz + RADIUS - Math.abs(l.z);
+      if (ex <= 0 || ez <= 0) continue;
+      const push = ex < ez ? _v2.set(Math.sign(l.x || 1) * ex, 0, 0) : _v2.set(0, 0, Math.sign(l.z || 1) * ez);
+      push.transformDirection(ob.mat).multiplyScalar(ex < ez ? ex : ez);
+      _seg.start.add(push); _seg.end.add(push);
+    }
     // PNJ (cercles)
     for (const n of npcs) {
       const dx = _seg.start.x - n.pos.x, dz = _seg.start.z - n.pos.z;

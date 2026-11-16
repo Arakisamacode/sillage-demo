@@ -306,10 +306,50 @@ export class Combat {
     const [a, b] = p.K.bounty, bounty = Math.round((a + Math.random() * (b - a)) / 50) * 50;
     this.game.earn(bounty);
     this.kills++; this.waveBounty += bounty;
+    this._dropPod(p);
     if (this.target === p) { this.target = null; this.lockT = 0; }
     const left = this.pirates.filter((x) => !x.dead && x !== p).length;
     this.onEvent('kill', p, bounty, left);
     if (!left) this.onEvent('clear', this.waveBounty);
+  }
+
+  // ------------------------------------------------------------------ épaves : capsules de récupération
+  _dropPod(p) {
+    if (!this.pods) this.pods = [];
+    const g = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 0.9, 2.6, 12), pirateMats().plate);
+    body.rotation.z = Math.PI / 2; g.add(body);
+    for (const x of [-1.0, 1.0]) { const r = new THREE.Mesh(new THREE.CylinderGeometry(0.95, 0.95, 0.18, 12), pirateMats().rust); r.rotation.z = Math.PI / 2; r.position.x = x; g.add(r); }
+    const beacon = new THREE.Mesh(new THREE.SphereGeometry(0.35, 10, 8), new THREE.MeshBasicMaterial({ color: new THREE.Color(5, 3.6, 0.6) }));
+    beacon.position.y = 1.0; g.add(beacon);
+    const halo = new THREE.Mesh(new THREE.SphereGeometry(1, 12, 8), additive(new THREE.Color(1.2, 0.8, 0.15)));
+    halo.scale.setScalar(4); g.add(halo);
+    g.position.copy(p.pos);
+    this.ctx.scene.add(g);
+    const value = Math.round((p.K.bounty[0] * 0.35 + Math.random() * 500) / 10) * 10;
+    this.pods.push({ g, beacon, halo, pos: p.pos.clone(), vel: p.vel.clone().multiplyScalar(0.15), spin: new THREE.Vector3(Math.random(), Math.random(), Math.random()).multiplyScalar(0.8), value, life: 240, msl: Math.random() < 0.3 });
+  }
+  _updatePods(dt) {
+    if (!this.pods?.length) return;
+    const F = this.flight;
+    for (const pod of this.pods) {
+      pod.life -= dt;
+      pod.pos.addScaledVector(pod.vel, dt); pod.vel.multiplyScalar(Math.exp(-dt * 0.3));
+      pod.g.position.copy(pod.pos);
+      pod.g.rotation.x += pod.spin.x * dt; pod.g.rotation.y += pod.spin.y * dt;
+      const blink = (this.t * 1.5 + pod.value) % 1 < 0.25;
+      pod.beacon.visible = blink; pod.halo.visible = blink;
+      if (F.state === 'flying' && !this.dead && F.pos.distanceTo(pod.pos) < 32) {
+        pod.done = true;
+        this.game.earn(pod.value);
+        let extra = '';
+        if (pod.msl && this.launchers && this.msl < this.launchers * 4) { this.msl++; extra = ' · 1 missile récupéré'; }
+        this.onEvent('salvage', pod.value, extra);
+      }
+      if (pod.life <= 0) pod.done = true;
+      if (pod.done) this.ctx.scene.remove(pod.g);
+    }
+    this.pods = this.pods.filter((p) => !p.done);
   }
 
   // ------------------------------------------------------------------ tirs
@@ -566,6 +606,7 @@ export class Combat {
     } else { this.target = null; this.lockT = 0; if (this.crew) this.crew.turretAim = null; }
     this._updateBolts(dt);
     this._updateMissiles(dt);
+    this._updatePods(dt);
     // boucliers : recharge après un délai sans impact
     const delay = this.shieldItem.id === 'sh2' ? 2.5 : 3;
     if (this.t - this.lastHit > delay) this.shield = Math.min(this.shieldCap, this.shield + this.shieldItem.regen * dt);
@@ -644,6 +685,7 @@ export class Combat {
     dot(F.home.pos, 'rgba(120,255,170,.9)', 3);
     for (const p of this.pirates) dot(p.pos, p === T ? '#ffd24a' : '#ff5a3a', p === T ? 4 : 3);
     for (const m of this.missiles) dot(m.pos, '#ffffff', 1.5);
+    for (const p of this.pods || []) dot(p.pos, '#ffd24a', 2);
     c.fillStyle = '#9fd8ff'; c.beginPath(); c.moveTo(W / 2, W / 2 - 6); c.lineTo(W / 2 - 4, W / 2 + 4); c.lineTo(W / 2 + 4, W / 2 + 4); c.fill();
   }
 }

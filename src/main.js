@@ -204,6 +204,7 @@ async function boot() {
     if (e === 'disembark') toast(a ? `Sur le pont · ${plural(a, 'garde vous accompagne', 'gardes vous accompagnent')}` : `Sur le pont de ${flight.dockedAt.name}`);
     if (e === 'kill') toast(`${a.name} neutralisé · prime +${money(b)} ¤${d ? ` · ${plural(d, 'pirate restant', 'pirates restants')}` : ''}${c === 'friend' ? ' (garde)' : ''}`);
     if (e === 'cleared') { audio.say('Plateforme sécurisée. Merci, pilote. Paiement transféré.'); toast(`Plateforme sécurisée · ${c}`); }
+    if (e === 'loot') toast(`Butin ramassé · ${a}`);
     if (e === 'guardDown') toast(`${a.name} est à terre !`);
     if (e === 'down') { audio.say('Blessé grave. Évacuation vers le vaisseau.'); toast('Vous êtes à terre !'); }
     if (e === 'evac') toast(`Évacué à bord · soins d'urgence −${money(a)} ¤ · les pirates pillent le dépôt et s'enfuient`);
@@ -223,7 +224,7 @@ async function boot() {
       toast(`Contacts hostiles · ${plural(a, 'chasseur pirate', 'chasseurs pirates')} · ${b} m${mining.mode ? ` · ${touch ? 'MIN' : 'M'} : quitter le minage` : ` · ${fire} : tirer`}`);
     }
     if (e === 'kill') { toast(`${a.K.name} détruit · prime +${b.toLocaleString('fr-FR').replace(/\u202f/g, ' ')} ¤${c ? ` · ${plural(c, 'hostile restant', 'hostiles restants')}` : ''}`); }
-    if (e === 'clear') { audio.say('Menace éliminée. Primes versées par la sécurité de Halden.'); setTimeout(() => toast(`Menace éliminée · primes : +${a.toLocaleString('fr-FR').replace(/\u202f/g, ' ')} ¤`), 2500); }
+    if (e === 'clear') { audio.say('Menace éliminée. Primes versées par la sécurité de Halden.'); setTimeout(() => toast(`Menace éliminée · primes : +${a.toLocaleString('fr-FR').replace(/\u202f/g, ' ')} ¤ · capsules d'épave à récupérer (repères jaunes du radar)`), 2500); }
     if (e === 'gone') toast('Les pirates décrochent');
     if (e === 'safe') toast('Zone protégée de Halden-7 · armes verrouillées');
     if (e === 'nogun') toast('Aucune arme de vaisseau installée · Équipement naval');
@@ -232,6 +233,7 @@ async function boot() {
     if (e === 'nolock') toast('Pas de verrouillage · gardez la cible dans l\'axe pendant 3 s');
     if (e === 'launch') toast(`Missile lancé · ${plural(a, 'restant', 'restants')}`);
     if (e === 'destroyed') { audio.say('Alerte. Perte d\'intégrité de la coque. Éjection.'); toast('Héron détruit !'); }
+    if (e === 'salvage') toast(`Capsule récupérée · composants revendus +${a.toLocaleString('fr-FR').replace(/\u202f/g, ' ')} ¤${b}`);
     if (e === 'respawn') toast(`Rapatrié à Halden-7 · Héron remplacé · franchise d'assurance −${a.toLocaleString('fr-FR').replace(/\u202f/g, ' ')} ¤${b > 0.1 ? ` · minerai perdu` : ''}`);
   };
   for (const d of ctx.doors) d.onMove = (opening) => audio.door(new THREE.Vector3(d.x, 2, d.z), opening);
@@ -376,10 +378,11 @@ async function boot() {
 
   // ------------------------------------------------------------------ HUD du fret : contrats en cours et repère de navigation
   const navEl = $('nav'), navTxt = navEl.querySelector('span'), jobsEl = $('jobs');
-  let jobsAcc = 1;
+  let jobsAcc = 1, persistAcc = 0;
   const _p = new THREE.Vector3();
   function updateFreightHud() {
     jobsAcc += 1 / 60;
+    if ((persistAcc += 1 / 60) > 4) { persistAcc = 0; missions.persist(); }
     if (jobsAcc > 0.25) {
       jobsAcc = 0;
       const lines = missions.active.map((o) => `<b>${o.type === 'in' ? 'COLLECTE' : o.type === 'container' ? 'CONTENEUR' : 'LIVRAISON'}</b> ${o.goods} · ${missions.status(o)}`);

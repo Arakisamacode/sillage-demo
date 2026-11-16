@@ -411,11 +411,17 @@ function buildHeron(ctx) {
   S.box(1.6, 0.03, 0.4, mats.emissive(0x66d0ff, 0.25), [0, bf + 0.92, -10.4], null, { cast: false });
   // rampe arrière (soute)
   const rampLen = Math.hypot(fy, 4.6), rAng = Math.atan2(fy, 4.6);
-  S.box(hw * 2 - 0.3, 0.16, rampLen, mats.metal(0x5a5e60, { rough: 0.5 }), [0, fy / 2 + 0.02, hz1 + 2.3], [rAng, 0, 0], { tex: 1 });
+  // rampe mobile : pivot à la charnière (haut de la rampe), relevée en vol
+  const rampPivot = new THREE.Group();
+  rampPivot.position.set(0, fy, hz1);
+  S.group.add(rampPivot);
+  const rampMesh = (geo, mat, p, cast = true) => { const m = new THREE.Mesh(geo, mat); m.position.set(p[0], p[1] - fy, p[2] - hz1); m.rotation.x = rAng; m.castShadow = cast; m.receiveShadow = true; rampPivot.add(m); return m; };
+  rampMesh(metricBox(hw * 2 - 0.3, 0.16, rampLen, 1), mats.metal(0x5a5e60, { rough: 0.5 }), [0, fy / 2 + 0.02, hz1 + 2.3]);
   for (const sx of [-1, 1]) {
-    S.box(0.08, 0.28, rampLen, yellow, [sx * (hw - 0.25), fy / 2 + 0.2, hz1 + 2.3], [rAng, 0, 0], { cast: false });
-    S.cyl(0.07, 0.07, 2.4, chrome, [sx * (hw - 0.5), fy * 0.75 + 0.3, hz1 + 1.0], [Math.PI / 2 - 0.85, 0, 0]);
+    rampMesh(metricBox(0.08, 0.28, rampLen, 2), yellow, [sx * (hw - 0.25), fy / 2 + 0.2, hz1 + 2.3], false);
+    const v = new THREE.CylinderGeometry(0.07, 0.07, 2.4, 16); const vm = new THREE.Mesh(v, chrome); vm.position.set(sx * (hw - 0.5), fy * 0.75 + 0.3 - fy, hz1 + 1.0 - hz1); vm.rotation.x = Math.PI / 2 - 0.85; rampPivot.add(vm);
   }
+  S.ramp = { pivot: rampPivot, closed: -(rAng + Math.PI / 2), k: 0 };
   // cadre de porte arrière (soute) et fermeture du pont supérieur
   S.box(0.3, cy - fy + 0.4, 0.4, trim, [-hw - 0.05, (fy + cy) / 2, hz1 + 0.2]);
   S.box(0.3, cy - fy + 0.4, 0.4, trim, [hw + 0.05, (fy + cy) / 2, hz1 + 0.2]);

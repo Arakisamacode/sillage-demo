@@ -174,6 +174,28 @@ export class Mining {
       k.mesh.rotation.x += k.spin.x * dt; k.mesh.rotation.y += k.spin.y * dt;
       if (k.vel.lengthSq() > 1e-4) { k.pos.addScaledVector(k.vel, dt); k.mesh.position.copy(k.pos); k.vel.multiplyScalar(Math.exp(-dt * 0.15)); }
     }
+    // le champ se reconstitue : une nouvelle roche toutes les 90 s tant qu'il en manque (loin du joueur)
+    this._regrowT = (this._regrowT || 0) + dt;
+    if (this._regrowT > 90) {
+      this._regrowT = 0;
+      const whole = this.rocks.filter((k) => k.alive && k.state === 'whole').length;
+      if (whole < 64) {
+        const oreIds = Object.keys(ORES), totalW = oreIds.reduce((s, k) => s + ORES[k].w, 0);
+        const pickOre = () => { let x = Math.random() * totalW; for (const k of oreIds) { x -= ORES[k].w; if (x <= 0) return k; } return 'fer'; };
+        for (let tries = 0; tries < 10; tries++) {
+          const dir = new THREE.Vector3(Math.random() * 2 - 1, (Math.random() * 2 - 1) * 0.35, Math.random() * 2 - 1).normalize();
+          const pos = FIELD.center.clone().addScaledVector(dir, Math.pow(Math.random(), 0.6) * FIELD.r);
+          if (pos.distanceTo(F.pos) < 300) continue;
+          const main = pickOre(); let second = pickOre(); if (second === main) second = null;
+          const comp = { [main]: 0.18 + Math.random() * 0.3 }; if (second) comp[second] = 0.04 + Math.random() * 0.12;
+          this._addRock(pos, 4 + Math.pow(Math.random(), 1.8) * 16, comp, 'whole', Math.floor(Math.random() * 1e6));
+          break;
+        }
+      }
+      // ménage : fragments épuisés et roches détruites
+      for (const k of this.rocks) if (!k.alive && k.mesh.parent) { this.ctx.scene.remove(k.mesh); k.mesh.geometry.dispose(); }
+      this.rocks = this.rocks.filter((k) => k.alive);
+    }
     // éclat de fracture
     if (this.burst.visible) {
       this.burstT += dt;
@@ -226,6 +248,7 @@ export class Mining {
     } else this.energy = Math.max(0, this.energy - dt * 0.28);
     // faisceau
     const vis = firing;
+    this.ctx.audio?.laserHum?.(vis, Math.min(1, this.energy), !!(this.target && this.target.state === 'frag'));
     this.beam.visible = this.beamCore.visible = vis;
     this.glow.visible = vis && !!hit;
     if (vis) {
@@ -241,7 +264,7 @@ export class Mining {
     } else if (!this.burst.visible) this.light.intensity = 0;
     this._hud(hit);
   }
-  _hideFx() { this.beam.visible = this.beamCore.visible = this.glow.visible = false; if (!this.burst.visible) this.light.intensity = 0; }
+  _hideFx() { this.ctx.audio?.laserHum?.(false); this.beam.visible = this.beamCore.visible = this.glow.visible = false; if (!this.burst.visible) this.light.intensity = 0; }
 
   _fracture(k) {
     k.alive = false; k.mesh.visible = false;
