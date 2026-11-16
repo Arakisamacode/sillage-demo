@@ -157,6 +157,10 @@ export class Agent {
       if (t.face === undefined || Math.abs(Math.atan2(Math.sin(t.face - this.yaw), Math.cos(t.face - this.yaw))) < 0.15) this.task = null;
       return 0;
     }
+    // anti-blocage : sans progrès pendant 2,5 s, on abandonne la tâche (évite de « marcher » contre un mur)
+    t.stuckT = (t.stuckT || 0) + (this.vel.length() < 0.12 ? 0 : 0);
+    if (t.lastX === undefined || Math.hypot(this.pos.x - t.lastX, this.pos.z - t.lastZ) > 0.35) { t.lastX = this.pos.x; t.lastZ = this.pos.z; t.lastT = t.t; }
+    else if (t.t - t.lastT > 2.5) { this.task = null; this.vel.set(0, 0, 0); return 0; }
     const [wx, wz] = P[this.pathI];
     const dx = wx - this.pos.x, dz = wz - this.pos.z;
     const d = Math.hypot(dx, dz);

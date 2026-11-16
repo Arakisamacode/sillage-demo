@@ -136,7 +136,16 @@ function* travelerDeparting(a, W) {
 function* shopper(a, W) {
   for (;;) {
     const r = Math.random();
-    if (r < 0.35) {
+    if (r < 0.12) {
+      // un bol de nouilles debout au comptoir
+      const sp = W.shops.nouilles, dx = pick([1.0, 2.6]);
+      yield goto(sp.entry.x, sp.entry.z);
+      yield goto(sp.customer.x + R(-0.4, 0.4), sp.customer.z);
+      yield act('talk', R(3, 5), { face: sp.clerk });
+      yield goto(sp.entry.x + dx, sp.entry.z + 2.0);
+      yield act('interact', R(12, 22), { face: { x: sp.entry.x + dx, z: sp.entry.z + 2.8 } });
+      yield goto(sp.entry.x, sp.entry.z);
+    } else if (r < 0.35) {
       const shop = pick(SHOPS);
       const sp = W.shops[shop.id];
       yield goto(sp.entry.x, sp.entry.z);
@@ -158,16 +167,38 @@ function* shopper(a, W) {
   }
 }
 
-/** Commerçant : reste à sa boutique. */
+/** Commerçant : reste derrière son comptoir. Caisse, rangement de l'étagère du fond, accueil des clients
+ *  (joueur ou figurants) qui se présentent au comptoir : il se tourne vers eux et leur parle. */
 function shopkeeper(shopId) {
   return function* (a, W) {
     const sp = W.shops[shopId];
-    a.pos.set(sp.clerk.x, 0, sp.clerk.z);
+    const extra = W.ctx.shopSpots?.[shopId] || {};
+    const post = sp.clerk;
+    a.pos.set(post.x, 0, post.z);
+    const customer = () => {
+      const pl = W.ctx.player;
+      if (pl && pl.pos.y < 1.5 && Math.hypot(pl.pos.x - sp.customer.x, pl.pos.z - sp.customer.z) < 2.4) return pl.pos;
+      const crowd = W.ctx.crowd;
+      if (crowd) for (const o of crowd.agents) if (o !== a && Math.hypot(o.pos.x - sp.customer.x, o.pos.z - sp.customer.z) < 1.0) return o.pos;
+      return null;
+    };
+    const busy = () => !!customer();
     for (;;) {
-      yield goto(sp.clerk.x + R(-0.8, 0.8), sp.clerk.z);
+      const c = customer();
+      if (c) {
+        // retour au poste si besoin, puis on s'occupe du client
+        if (Math.hypot(a.pos.x - post.x, a.pos.z - post.z) > 0.3) yield move(post.x, 0, post.z, { speed: 1.0 });
+        yield act(Math.random() < 0.65 ? 'talk' : 'idle', R(2.5, 4.5), { face: { x: c.x, z: c.z } });
+        if (Math.random() < 0.3) yield act('interact', 2.2, { face: sp.clerkFace });
+        continue;
+      }
       const r = Math.random();
-      yield act(r < 0.4 ? 'talk' : r < 0.7 ? 'interact' : 'idle', R(4, 9), { face: sp.clerkFace });
-      if (Math.random() < 0.15) { yield goto(sp.entry.x + R(-1, 1), sp.entry.z + 1.6); yield act('idle', R(4, 8), { face: 0 + Math.PI }); }
+      if (r < 0.5) yield act(Math.random() < 0.6 ? 'interact' : 'idle', R(4, 8), { face: sp.clerkFace, abort: busy });
+      else if (r < 0.78 && extra.back) {
+        yield move(extra.back.x, 0, extra.back.z, { speed: 0.9 });
+        yield act('interact', R(3, 6), { face: extra.backFace, abort: busy });
+        yield move(post.x, 0, post.z, { speed: 0.9 });
+      } else yield act('idle', R(3, 6), { face: sp.entry, abort: busy });
     }
   };
 }

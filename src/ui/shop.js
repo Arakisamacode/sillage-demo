@@ -1,6 +1,7 @@
 import { ITEMS, ITEM, CATEGORIES, STORES, HERON_SLOTS } from '../game/catalog.js';
 import { ROLES } from '../game/crew.js';
 import { ORES, REFINE, MARKETS } from '../game/catalog.js';
+import { thumb } from './thumbs.js';
 
 // Interfaces de commerce et d'inventaire (HTML par-dessus la vue 3D).
 const fmt = (n) => n.toLocaleString('fr-FR').replace(/ /g, ' ') + ' ¤';
@@ -101,7 +102,7 @@ export class ShopUI {
       const own = S.count(it.id), equipable = ['sidearm', 'primary', 'outfit', 'armor'].includes(it.cat);
       const worn = equipable && S.person(this.who)[it.cat] === it.id;
       const can = S.credits >= it.price;
-      h += `<div class="sh-item">
+      h += `<div class="sh-item"><img class="sh-thumb" src="${thumb(it.id)}" alt="">
         <div class="sh-main"><b>${it.name}</b><p>${it.desc}</p>${this._stats(it)}</div>
         <div class="sh-side"><div class="sh-price">${fmt(it.price)}</div>
           ${own ? `<div class="sh-own">Possédé ×${own}</div>` : ''}
@@ -119,7 +120,7 @@ export class ShopUI {
     if (!list.length) return '<div class="sh-empty">Vous n\'avez rien que ce magasin rachète.</div>';
     return list.map((it) => {
       const free = S.free(it.id);
-      return `<div class="sh-item"><div class="sh-main"><b>${it.name}</b><p>Possédé ×${S.count(it.id)}${free < S.count(it.id) ? ` · ${S.count(it.id) - free} équipé(s)` : ''}</p></div>
+      return `<div class="sh-item"><img class="sh-thumb" src="${thumb(it.id)}" alt=""><div class="sh-main"><b>${it.name}</b><p>Possédé ×${S.count(it.id)}${free < S.count(it.id) ? ` · ${S.count(it.id) - free} équipé(s)` : ''}</p></div>
         <div class="sh-side"><div class="sh-price">${fmt(S.sellPrice(it.id))}</div><button data-a="sell" data-v="${it.id}" ${free > 0 ? '' : 'disabled'}>Vendre</button></div></div>`;
     }).join('');
   }

@@ -4,6 +4,7 @@ import { metricBox, worldUV } from './materials.js';
 import { AIRLOCK, GALLERY, HX } from './layout.js';
 import { neonTexture, neonMaterial, paintedText, decalMaterial, Screen, FONT, rand, seed, pictogram, canvas } from './signage.js';
 import { Local, bench, crate } from './props.js';
+import { shopDecor, SHELF_PALETTE } from './shopdecor.js';
 
 // Sas + galerie marchande : vitrine panoramique sur la planète, boutiques, kiosque café,
 // panneau des départs, bancs, jardinières.
@@ -321,7 +322,8 @@ function shop(ctx, s, wall, wallDark, trim) {
     for (let k = 0; k < 4; k++) {
       L.box(0.5, 0.04, depth - 1.5, mats.metal(0x6b6f72), [sx * (w / 2 - 0.3), 0.4 + k * 0.55, depth / 2 + 0.4], null, { cast: false });
       for (let i = 0; i < 8; i++) {
-        const col = [0xb8452e, 0x2f6f9a, 0xd9b44a, 0x4a7d3a, 0xe6e1d6, 0x6a3f7a, 0x2b2b2b][Math.floor(rand() * 7)];
+        const pal = SHELF_PALETTE[s.id] || [0xb8452e, 0x2f6f9a, 0xd9b44a, 0x4a7d3a, 0xe6e1d6, 0x6a3f7a, 0x2b2b2b];
+        const col = pal[Math.floor(rand() * pal.length)];
         L.box(0.3, 0.15 + rand() * 0.25, 0.25 + rand() * 0.2, mats.plastic(col, 0.6), [sx * (w / 2 - 0.3), 0.55 + k * 0.55 + 0.1, 1.2 + i * 0.52], null, { cast: false });
       }
     }
@@ -351,24 +353,15 @@ function shop(ctx, s, wall, wallDark, trim) {
     // râteliers muraux : silhouettes d'armes longues et de pistolets sous vitrine
     const gunM = mats.metal(0x23262a, { rough: 0.45, grime: 0.2 }), stockM = mats.plastic(0x15171a, 0.8);
     L.box(4.2, 2.0, 0.08, mats.paint(0x2a2e31, { plain: true }), [1.5, 2.2, depth - 0.05], null, { cast: false });
-    for (let i = 0; i < 5; i++) {
-      const y = 1.5 + (i % 3) * 0.55, xx = 0.1 + i * 0.7;
-      L.box(0.9, 0.08, 0.06, gunM, [xx + 0.2, y, depth - 0.15], [0, 0, 0.0], { cast: false });
-      L.box(0.3, 0.12, 0.06, stockM, [xx - 0.35, y - 0.02, depth - 0.15], null, { cast: false });
-      L.box(0.05, 0.14, 0.05, stockM, [xx + 0.05, y - 0.1, depth - 0.15], null, { cast: false });
-    }
     L.box(2.8, 0.9, 0.7, mats.paint(0x3a3e42, { plain: true }), [1.5, 0.45, 1.6], null, { collide: true });
     L.box(2.8, 0.25, 0.7, mats.glass(0xaac4d4, 0.15), [1.5, 1.03, 1.6], null, { cast: false });
-    for (let i = 0; i < 4; i++) L.box(0.22, 0.05, 0.12, gunM, [0.6 + i * 0.6, 0.93, 1.6], [0, 0.4, 0], { cast: false });
+    void gunM; void stockM;
     L.obstacle(1.5, 0.45, 1.5, 1.6);
   }
   if (s.id === 'combis') {
-    // mannequins de combinaisons (formes simples)
-    for (const dx of [1.2, 2.6]) {
-      L.cyl(0.25, 0.22, 1.1, mats.plastic(0xd8d4cc, 0.5), [dx, 1.45, 1.4], null, { seg: 14 });
-      L.cyl(0.17, 0.17, 0.4, mats.glass(0x9ab8cc, 0.5), [dx, 2.2, 1.4], null, { seg: 14 });
-      L.cyl(0.1, 0.1, 0.9, mats.plastic(0xd8d4cc, 0.5), [dx, 0.45, 1.4], null, { seg: 10 });
-    }
+    // socles des mannequins
+    for (const dx of [1.2, 2.6]) { L.cyl(0.4, 0.42, 0.12, mats.plastic(0x2a2c2e, 0.4), [dx, 0.06, 1.4], null, { seg: 18 }); L.obstacle(0.45, 0.45, dx, 1.4); }
+    L.cyl(0.4, 0.42, 0.12, mats.plastic(0x2a2c2e, 0.4), [-3.0, 0.06, 1.2], null, { seg: 18 });
   }
   if (s.id === 'pieces') {
     for (let i = 0; i < 3; i++) crate(ctx, ...L.world(1.5 + (i % 2) * 1.3, 0, 1.4 + Math.floor(i / 2) * 1.2).toArray(), 0.2 * i, 0.7, i);
@@ -378,6 +371,7 @@ function shop(ctx, s, wall, wallDark, trim) {
     clerk: L.world(-1.6, 0, 4.0), clerkFace: L.world(-1.6, 0, 2.0),
     customer: L.world(-1.6, 0, 2.25), entry: L.world(0, 0, -1.2), inside: L.world(0.8, 0, 2.2),
   };
+  shopDecor(ctx, s, L, depth);
 }
 
 function kiosk(ctx, x, z) {

@@ -27,6 +27,7 @@ import { buildOutposts } from './world/outposts.js';
 import { buildDerelict } from './world/derelict.js';
 import { buildBayCover, buildAirlockSign } from './world/baycover.js';
 import { buildHabitat, DECK_Y, Elevators } from './world/habitat.js';
+import { buildFurnish } from './world/furnish.js';
 import { Cargo, buildQuai } from './game/cargo.js';
 import { Missions } from './game/missions.js';
 import { Crew } from './game/crew.js';
@@ -83,6 +84,7 @@ async function boot() {
   buildBayCover(ctx);
   buildAirlockSign(ctx);
   ctx.habitat = buildHabitat(ctx);
+  ctx.furnish = buildFurnish(ctx);
   ctx.lights = buildLighting(ctx);
   const lib = new CharacterLibrary(manager, quality);
   const libReady = lib.load(undefined, (p) => progress(0.6 + 0.3 * p, 'Chargement des personnages'));
@@ -171,6 +173,20 @@ async function boot() {
       for (;;) yield { type: 'sit', x: st.x, z: st.z, yaw: st.yaw, dur: 999, talk: i % 2 === 1 };
     }));
   } else crowd.populate();
+  // mannequins habillés de la boutique de combinaisons (pose figée, mis à jour une fois)
+  {
+    const mq = ctx.shopSpots.combis?.mannequins || [];
+    const looks = [['UM_light', 'o_navy', 'a_light'], ['UF_light', 'o_sand', null], ['UM_dark', 'o_black', 'a_med_w']];
+    mq.forEach((m, i) => {
+      const [model, outfit, armor] = looks[i % looks.length];
+      const c = lib.create(model, { height: model.startsWith('UF') ? 1.7 : 1.8 });
+      c.setOutfit(ITEM[outfit].outfit);
+      if (armor) c.setArmor(ITEM[armor].armor);
+      c.root.position.copy(m.p); c.root.position.y = 0.12; c.root.rotation.y = m.yaw;
+      c.update(0.016, null);
+      scene.add(c.root);
+    });
+  }
   // habitants du pont habitat : barman, médecin, clients (animés seulement quand le joueur est sur le pont)
   {
     const HB = ctx.habitat, people = [];
@@ -185,6 +201,7 @@ async function boot() {
     const seats = [...HB.chairs.slice(0, 4), HB.benches[1], HB.benches[4]];
     const looks = [['UM_light', 'Hair_SimpleParted'], ['UF_dark', 'Hair_Long'], ['UM_dark', 'Hair_Buzzed'], ['UF_light', 'Hair_BuzzedFemale'], ['UM_light', 'Hair_Beard'], ['UF_dark', 'Hair_Buns']];
     const tops = [0x6a4a32, 0x1a2436, 0x5d6168, 0xa89470, 0x2b3036, 0x7a2a24];
+    seats.forEach((st) => { st.taken = true; });
     seats.forEach((st, i) => put(looks[i][0], { height: looks[i][0].startsWith('UF') ? 1.68 : 1.8, hair: looks[i][1] }, st.p, st.yaw, i % 2 ? 'sitTalk' : 'sit', { top: tops[i], accent: 0xc8b48a, belt: true }));
     put('UM_light', { height: 1.78, hair: 'Hair_Buzzed' }, HB.stools[2].clone().add(new THREE.Vector3(-0.3, 0, 0)), Math.PI / 2, 'talk', { top: 0x3a4a2a, accent: 0xd0a040 });
     // habitants qui circulent : serveur, couple en promenade le long de la baie, résident qui rentre en cabine
@@ -356,6 +373,25 @@ async function boot() {
       interactables.push({ pos: new THREE.Vector3(S.x1 + 1.3, y, S.c), r: 1.3, when: () => S.moving, label: 'Ascenseur en mouvement…', fn: () => null });
     }
   }
+  // ------------------------------------------------------------------ mobilier interactif : distributeurs, borne, sièges
+  const CANS = ['Soda d\'agrumes', 'Thé glacé de Lys', 'Boisson énergisante « Postcombustion »', 'Eau minérale de comète'];
+  for (const v of ctx.furnish.vending) interactables.push({ pos: v.pos, r: 1.4, label: 'E — Distributeur : canette (4 ¤)', fn: () => {
+    if (!game.pay(4)) return 'Crédits insuffisants';
+    audio.blip(); toast(`${CANS[Math.floor(Math.random() * CANS.length)]} · −4 ¤`);
+  } });
+  for (const tm of ctx.furnish.terminals) interactables.push({ pos: tm.pos, r: 1.4, label: 'E — Borne : plan de la station', fn: () => {
+    audio.blip(); toast('Hangar 07 : est, par le sas · Boutiques : côté nord · Module habitat et ascenseurs : porte ouest · Contrats de fret : quai du hangar');
+  } });
+  /** Sièges pour le joueur : bancs de la galerie, chaises, banquettes et canapés du pont. */
+  const playerSeat = (x, y, z, yaw, ref) => {
+    const fw = new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw));
+    const S = { pos: new THREE.Vector3(x, y, z), yaw, eye: new THREE.Vector3(x, y + 1.15, z).addScaledVector(fw, 0.08), exit: new THREE.Vector3(x, y, z).addScaledVector(fw, 0.75), ref };
+    interactables.push({ pos: new THREE.Vector3(x, y, z).addScaledVector(fw, 0.6), r: 0.9, when: () => !ref.taken && !player.seated, label: 'E — S\'asseoir', fn: () => { ref.taken = 'player'; player.sit(S); } });
+  };
+  const CW = crowd.world;
+  for (const b of [...(CW.benchesWindow || []), ...(CW.benchesMid || [])]) playerSeat(b.x, 0, b.z, b.yaw, b);
+  for (const c of [...HB.chairs, ...HB.benches]) playerSeat(c.p.x, c.p.y, c.p.z, c.yaw, c);
+  for (const s2 of ctx.furnish.sofas) playerSeat(s2.x, s2.y, s2.z, s2.yaw, s2);
   const OCCUPANTS = { '08': 'un mécanicien de nuit', '10': 'une pilote de convoi', '14': 'un négociant de Corvin' };
   for (const d of HB.cabinDoors) interactables.push({ pos: d.pos, r: 1.3, label: `E — Cabine ${d.num}`, fn: () => {
     audio.blip();
@@ -499,7 +535,19 @@ async function boot() {
   const navEl = $('nav'), navTxt = navEl.querySelector('span'), jobsEl = $('jobs');
   let jobsAcc = 1, persistAcc = 0;
   const _p = new THREE.Vector3();
+  let inShop = null;
+  const VENDORS = { nouilles: 'Mei', armes: 'Bastien Kestrel', pieces: 'Oriane', pharma: 'Dr Salek', combis: 'Ines Vega' };
+  function shopGreeting() {
+    let here = null;
+    for (const [id, sp] of Object.entries(ctx.shopSpots || {})) {
+      if (!STORES[id]) continue;
+      if (Math.abs(player.pos.x - sp.inside.x) < 4 && player.pos.z > sp.entry.z + 1.3 && player.pos.z < sp.entry.z + 8 && player.pos.y < 2) { here = id; break; }
+    }
+    if (here && here !== inShop && !flight.active) toast(`${VENDORS[here] || 'Le vendeur'} : ${STORES[here].greet}`);
+    inShop = here;
+  }
   function updateFreightHud() {
+    shopGreeting();
     jobsAcc += 1 / 60;
     if ((persistAcc += 1 / 60) > 4) { persistAcc = 0; missions.persist(); }
     if (jobsAcc > 0.25) {
@@ -559,9 +607,12 @@ async function boot() {
         if (combat.launchers && !mining.mode) add('t-msl', 'MSL', 4);
         add('t-view', 'VUE', 5);
       } else add('t-view', 'VUE', 0);
-    } else if (player.seated) {
+    } else if (player.seated === seat) {
       main.id = 't-fly'; main.label = 'DÉCOL.';
       add('t-use', 'LEVER', 0); add('t-view', 'VUE', 1);
+    } else if (player.seated) {
+      main.id = 't-use'; main.label = 'LEVER';
+      add('t-view', 'VUE', 0);
     } else if (ground.drawn) {
       main.id = 't-fire'; main.label = 'TIR';
       add('t-msl', 'RECH.', 0); add('t-gun', 'RANGER', 1);
@@ -649,12 +700,13 @@ async function boot() {
         player.update(dt, input, ground.onFoot ? ground.units.filter((u) => !u.down) : [...crowd.agents.filter((a) => !a.attached), ...ground.units.filter((u) => !u.down)], ground.onFoot ? [] : [...ctx.doors, ...cargo.blockers()]);
         let near = null;
         if (ground.onFoot) near = ground.nearBoard() && !ground.dead ? { label: `E — Remonter à bord du Héron${ground.raid && !ground.raid.done ? ' (le raid continue)' : ''}`, fn: () => ground.reboard() } : null;
-        else if (player.seated) near = { label: touch ? 'DÉCOL. — Décoller · LEVER — Se lever' : 'ESPACE — Décoller · E — Se lever', fn: () => player.stand() };
+        else if (player.seated === seat) near = { label: touch ? 'DÉCOL. — Décoller · LEVER — Se lever' : 'ESPACE — Décoller · E — Se lever', fn: () => player.stand() };
+        else if (player.seated) near = { label: 'E — Se lever', fn: () => { if (player.seated.ref) player.seated.ref.taken = null; player.stand(); } };
         else near = cargo.prompt(player);
         if (!near && !player.seated && !ground.onFoot) for (const it of interactables) if (it.pos.distanceTo(player.pos) < it.r && (!it.when || it.when())) { near = it; break; }
         promptEl.classList.toggle('hidden', !near);
         if (near) promptEl.textContent = near.label;
-        if (player.seated && (input.consume('fly') || input.consume('flyKey'))) { flight.takeOff(); if (player.avatar) player.avatar.root.visible = false; }
+        if (player.seated === seat && (input.consume('fly') || input.consume('flyKey'))) { flight.takeOff(); if (player.avatar) player.avatar.root.visible = false; }
         else if (near && input.consume('use')) { const err = near.fn(); if (typeof err === 'string') toast(err); }
         input.consume('fly'); input.consume('flyKey'); input.consume('land'); input.consume('mine'); input.consume('missile'); input.consume('target'); input.consume('draw'); input.consume('hud');
       }
