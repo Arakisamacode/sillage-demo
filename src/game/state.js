@@ -18,6 +18,7 @@ export class GameState {
     let d = null;
     try { d = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch { d = null; }
     this.d = d && d.owned ? d : fresh();
+    this.d.crew = this.d.crew || [];
     if (!this.d.owned.a_med && this.d.people.me.armor === 'a_med') this.d.owned.a_med = 1;
   }
   get credits() { return this.d.credits; }
@@ -65,11 +66,14 @@ export class GameState {
   }
 
   person(who = 'me') { return this.d.people[who]; }
+  addPerson(id, p) { this.d.people[id] = p; this._changed('people'); }
+  removePerson(id) { delete this.d.people[id]; this._changed('people'); }
+  save() { this._changed('save'); }
   /** Équipe un objet possédé (ou null pour retirer) dans l'emplacement d'une personne. */
   equip(who, slot, id) {
     const p = this.d.people[who];
     if (id && p[slot] !== id && this.free(id) <= 0) return false;
-    if (slot === 'outfit' && !id) id = 'o_flight';
+    if (slot === 'outfit' && !id && who === 'me') id = 'o_flight';
     p[slot] = id;
     this._changed('equip:' + who);
     return true;

@@ -86,7 +86,7 @@ export class Cargo {
     c.mesh.parent?.remove(c.mesh);
     if (c.slot >= 0) this.slots[c.slot] = null;
     if (this.carried === c) this.carried = null;
-    c.where = 'gone';
+    c.where = 'gone'; c.carrier = null;
     this.crates = this.crates.filter((x) => x !== c);
   }
 
@@ -96,7 +96,10 @@ export class Cargo {
   inQuai(contract) { return this.crates.filter((c) => c.contract === contract && c.where === 'ground' && this.inQuaiZone(c.mesh.position)).length; }
   inQuaiZone(p) { return Math.abs(p.x - QUAI.x) < QUAI.w / 2 + 0.3 && Math.abs(p.z - QUAI.z) < QUAI.d / 2 + 0.3 && p.y < 0.5; }
 
-  _detach(c) { if (c.slot >= 0) this.slots[c.slot] = null; c.slot = -1; c.spot = -1; c.mesh.parent?.remove(c.mesh); }
+  _detach(c) { if (c.slot >= 0) this.slots[c.slot] = null; c.slot = -1; c.spot = -1; c.carrier = null; c.mesh.parent?.remove(c.mesh); }
+  freeSpot() { const i = SPOTS.findIndex((s, k) => !this.crates.some((o) => o.where === 'ground' && o.spot === k)); return i < 0 ? null : SPOTS[i]; }
+  /** Caisse portée par un membre d'équipage. */
+  carryBy(c, agent) { this._detach(c); c.where = 'npc'; c.carrier = agent; this.ctx.scene.add(c.mesh); }
 
   toQuai(c) {
     const i = SPOTS.findIndex((s, k) => !this.crates.some((o) => o !== c && o.where === 'ground' && o.spot === k));
@@ -177,7 +180,7 @@ export class Cargo {
     // caisse la plus proche devant le joueur (au sol ou en soute, sans rien dessus)
     let best = null, bd = 1.9;
     for (const c of this.crates) {
-      if (c.container || c.where === 'gone' || c.where === 'carried') continue;
+      if (c.container || c.where === 'gone' || c.where === 'carried' || c.where === 'npc') continue;
       if (c.where === 'hold') {
         if (this.flight.state !== 'parked' || this.flight.dockedAt !== this.flight.home) continue;
         if (c.slot % 2 === 0 && this.slots[c.slot + 1]) continue;
@@ -200,6 +203,12 @@ export class Cargo {
 
   /** Suit le joueur (caisse portée devant lui, à hauteur de taille). */
   update(player) {
+    for (const k of this.crates) {
+      if (k.where !== 'npc' || !k.carrier) continue;
+      const a = k.carrier;
+      k.mesh.position.set(a.pos.x + Math.sin(a.yaw) * 0.62, a.pos.y + 0.38, a.pos.z + Math.cos(a.yaw) * 0.62);
+      k.mesh.rotation.set(0, a.yaw, 0);
+    }
     const c = this.carried;
     if (!c) return;
     c.mesh.position.set(player.pos.x - Math.sin(player.yaw) * 0.75, player.pos.y + 0.35, player.pos.z - Math.cos(player.yaw) * 0.75);

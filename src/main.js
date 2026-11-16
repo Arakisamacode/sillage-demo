@@ -26,6 +26,7 @@ import { ShopUI } from './ui/shop.js';
 import { buildOutposts } from './world/outposts.js';
 import { Cargo, buildQuai } from './game/cargo.js';
 import { Missions } from './game/missions.js';
+import { Crew } from './game/crew.js';
 
 const params = new URLSearchParams(location.search);
 const HX_ = 32;
@@ -90,6 +91,8 @@ async function boot() {
   ctx.flight = flight;
   for (const o of ctx.outposts) flight.addPad(o.pad);
   flight.onEvent = (e, pad) => {
+    if (e === 'takeoff') ctx.crew?.onTakeoff();
+    if (e === 'landed') ctx.crew?.onLanded(pad);
     const away = pad && pad !== flight.home;
     if (e === 'landing' && (away || flight.target !== flight.home)) {
       const T = flight.target;
@@ -113,7 +116,8 @@ async function boot() {
   const game = new GameState();
   ctx.game = game;
   const dressPerson = (ch, p) => {
-    ch.setOutfit(ITEM[p.outfit || 'o_flight'].outfit);
+    if (!p) return;
+    ch.setOutfit(p.outfit ? ITEM[p.outfit].outfit : (p.base || ITEM.o_flight.outfit));
     ch.setArmor(p.armor ? ITEM[p.armor].armor : null);
     for (const k of ['sidearm', 'primary']) ch.setGear(k, p[k] ? ITEM[p[k]].shape : null, p[k] ? ITEM[p[k]].accent : 0);
   };
@@ -122,7 +126,12 @@ async function boot() {
   dressPerson(player.avatar, game.person('me'));
   const heronGear = new HeronLoadout(ctx.ships.heron);
   heronGear.apply(game.d.ship);
-  game.on(() => { dressPerson(player.avatar, game.person('me')); heronGear.apply(game.d.ship); });
+  game.on((what) => {
+    if (what === 'credits' || what === 'save') return;
+    dressPerson(player.avatar, game.person('me'));
+    heronGear.apply(game.d.ship);
+    if (ctx.crew) for (const m of ctx.crew.members) dressPerson(m.agent.char, game.person(m.data.id));
+  });
   // ------------------------------------------------------------------ fret : caisses, contrats
   const cargo = new Cargo(ctx, ctx.ships.heron, flight);
   const missions = new Missions(ctx, cargo, ctx.outposts, game, flight);
@@ -144,6 +153,10 @@ async function boot() {
     }));
   } else crowd.populate();
   ctx.crowd = crowd; ctx.player = player; ctx.scenes = scenes;
+  // ------------------------------------------------------------------ équipage (bureau de recrutement de la galerie)
+  const crew = new Crew(ctx, { game, cargo, flight, crowd, missions, player, loadout: heronGear });
+  ctx.crew = crew;
+  ctx.recruitBoard = () => crew.board();
 
   // qualité basse : ombre du soleil calculée une fois (décor statique) ; les éléments mobiles n'y projettent pas
   if (quality.name === 'low') {
@@ -172,9 +185,19 @@ async function boot() {
     { pos: new THREE.Vector3(-29.9, 0, 3.1), r: 1.4, label: 'E — Prendre un café (3 ¤)', fn: () => { if (game.pay(3)) { audio.coffee(); toast('Café serré · 3 ¤ débités'); } else toast('Crédits insuffisants'); } },
     { pos: new THREE.Vector3(ctx.kiosk.x, 0, ctx.kiosk.z), r: 3.7, label: 'E — Commander au kiosque (5 ¤)', fn: () => { if (game.pay(5)) { audio.coffee(); toast('« Et voilà, bonne escale ! » · 5 ¤'); } else toast('Crédits insuffisants'); } },
   ];
+  interactables.push({ pos: ctx.recruit.customer, r: 1.6, label: 'E — Guilde des équipages : recruter', fn: () => openUI(() => shop.openRecruit(crew)) });
+  crew.onEvent = (e, x) => {
+    if (e === 'hired') { audio.blip(); }
+    if (e === 'boarded') toast(`Équipage à bord : ${x} ${x > 1 ? 'personnes' : 'personne'}`);
+  };
   interactables.push({ pos: ctx.quai.terminal, r: 1.5, label: 'E — Terminal des contrats de fret', fn: () => openUI(() => shop.openBoard(missions)) });
   missions.onEvent = (e, o, fee) => {
-    if (e === 'complete') { toast(`Contrat rempli · ${o.client} · +${o.reward.toLocaleString('fr-FR').replace(/\u202f/g, ' ')} ¤`); audio.say('Livraison confirmée. Paiement transféré.'); }
+    if (e === 'complete') {
+      const w = crew.wages(), paid = Math.min(w, game.credits);
+      if (paid) game.pay(paid);
+      toast(`Contrat rempli · ${o.client} · +${o.reward.toLocaleString('fr-FR').replace(/\u202f/g, ' ')} ¤${paid ? ` · salaires d'équipage −${paid.toLocaleString('fr-FR').replace(/\u202f/g, ' ')} ¤` : ''}`);
+      audio.say('Livraison confirmée. Paiement transféré.');
+    }
     if (e === 'loaded') toast(`${o.n} caisses chargées dans la soute · retour à Halden-7`);
     if (e === 'abandon') toast(`Contrat abandonné · pénalité ${fee} ¤`);
   };
@@ -236,6 +259,8 @@ async function boot() {
     ctx.actors = blockers;
     for (const d of ctx.doors) d.update(dt, blockers);
     for (const u of ctx.updaters) u(dt, t);
+    ctx.crew?.update(dt);
+    ctx.cargo?.update(player);
     sky.update(dt, t, camera);
     const c = camera.position, insideStation = (c.x > -HX_ && c.x < HX_ && c.z > -46 && c.z < 31 && c.y < 25) || (c.x < -40 && c.x > -103 && c.z > -25 && c.z < 11);
     scene.fog.density += ((insideStation ? 0.0042 : 0.0) - scene.fog.density) * Math.min(1, dt * 3);
@@ -289,7 +314,12 @@ async function boot() {
     jobsAcc += 1 / 60;
     if (jobsAcc > 0.25) {
       jobsAcc = 0;
-      jobsEl.innerHTML = missions.active.map((o) => `<b>${o.type === 'in' ? 'COLLECTE' : o.type === 'container' ? 'CONTENEUR' : 'LIVRAISON'}</b> ${o.goods} · ${missions.status(o)}`).join('<br>');
+      const lines = missions.active.map((o) => `<b>${o.type === 'in' ? 'COLLECTE' : o.type === 'container' ? 'CONTENEUR' : 'LIVRAISON'}</b> ${o.goods} · ${missions.status(o)}`);
+      if (crew.members.length) {
+        const aboard = crew.members.filter((m) => m.aboard).length, g = crew.gunner();
+        lines.push(`<b>ÉQUIPAGE</b> ${crew.members.length} · ${aboard ? `${aboard} à bord` : crew.members.map((m) => `${m.data.name.split(' ')[0]} ${crew.status(m)}`).join(' · ')}${flight.active && heronGear.meshes.dorsal ? (g ? ` · tourelle : ${g.data.name.split(' ')[0]}` : ' · tourelle sans artilleur') : ''}`);
+      }
+      jobsEl.innerHTML = lines.join('<br>');
     }
     const T = missions.navTarget();
     if (!T || shop.isOpen) { navEl.classList.add('hidden'); return; }
@@ -342,7 +372,6 @@ async function boot() {
         if (input.consume('view')) player.toggleView();
         if (cargo.carried) input.run = false;
         player.update(dt, input, crowd.agents.filter((a) => !a.attached), [...ctx.doors, ...cargo.blockers()]);
-        cargo.update(player);
         let near = null;
         if (player.seated) near = { label: touch ? '⏻ — Décoller · E — Se lever' : 'ESPACE — Décoller · E — Se lever', fn: () => player.stand() };
         else near = cargo.prompt(player);

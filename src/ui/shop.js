@@ -1,4 +1,5 @@
 import { ITEMS, ITEM, CATEGORIES, STORES, HERON_SLOTS } from '../game/catalog.js';
+import { ROLES } from '../game/crew.js';
 
 // Interfaces de commerce et d'inventaire (HTML par-dessus la vue 3D).
 const fmt = (n) => n.toLocaleString('fr-FR').replace(/ /g, ' ') + ' ¤';
@@ -32,7 +33,9 @@ export class ShopUI {
 
   openStore(storeId) { this.mode = 'store'; this.store = storeId; this.tab = 'buy'; this.filter = null; this._show(); }
   openBoard(missions) { this.mode = 'board'; this.missions = missions; this.tab = missions.active.length ? 'active' : 'offers'; this._show(); }
-  openInventory() { this.mode = 'inv'; this.tab = 'perso'; this._show(); }
+  openRecruit(crew) { this.mode = 'recruit'; this.crew = crew; this.tab = 'cands'; this._show(); }
+  openInventory(who) {
+    if (who) this.who = who; this.mode = 'inv'; this.tab = 'perso'; this._show(); }
   _show() { this.open = true; this.root.classList.remove('hidden'); this.msg = ''; this.render(); }
   close() { if (!this.open) return; this.open = false; this.root.classList.add('hidden'); this.onClose && this.onClose(); }
   flash(msg, bad = false) { this.msg = msg; this.bad = bad; this.render(); }
@@ -43,14 +46,17 @@ export class ShopUI {
       ? `<div class="sh-title">${STORES[this.store].name}</div><div class="sh-greet">${STORES[this.store].greet}</div>`
       : this.mode === 'board'
         ? `<div class="sh-title">CONTRATS DE FRET</div><div class="sh-greet">Quai de fret · aire 02 · paiement à la livraison.</div>`
+        : this.mode === 'recruit' ? `<div class="sh-title">GUILDE DES ÉQUIPAGES</div><div class="sh-greet">« Des gens sérieux, payés à la mission. Vous signez, ils embarquent. »</div>`
         : `<div class="sh-title">INVENTAIRE</div><div class="sh-greet">Équipement personnel, vaisseau et objets.</div>`;
     const tabs = this.mode === 'store'
       ? [['buy', 'Acheter'], ['sell', 'Vendre']]
       : this.mode === 'board' ? [['offers', 'Offres'], ['active', `En cours (${this.missions.active.length})`]]
+        : this.mode === 'recruit' ? [['cands', 'Candidats'], ['crew', `Mon équipage (${this.crew.members.length})`]]
         : [['perso', 'Personnage'], ['ship', 'Héron Mk II'], ['bag', 'Sac']];
     let body = '';
     if (this.mode === 'store') body = this.tab === 'buy' ? this._buyList() : this._sellList();
     else if (this.mode === 'board') body = this.tab === 'offers' ? this._offers() : this._activeJobs();
+    else if (this.mode === 'recruit') body = this.tab === 'cands' ? this._cands() : this._crewList();
     else if (this.tab === 'perso') body = this._persoPanel();
     else if (this.tab === 'ship') body = this._shipPanel();
     else body = this._bagPanel();
@@ -74,9 +80,16 @@ export class ShopUI {
     return ITEMS.filter((i) => st.cats.includes(i.cat) && i.price > 0 && (!st.filter || st.filter(i)));
   }
 
+  _whoSelect() {
+    const S = this.state, people = Object.keys(S.d.people);
+    if (people.length < 2) return '';
+    return `<div class="sh-row"><label>Pour</label><select data-a="who">${people.map((w) => `<option value="${w}" ${w === this.who ? 'selected' : ''}>${w === 'me' ? 'Moi' : S.d.people[w].name || w}</option>`).join('')}</select></div>`;
+  }
+
   _buyList() {
     const S = this.state;
-    let last = null, h = '';
+    if (!S.person(this.who)) this.who = 'me';
+    let last = null, h = STORES[this.store].cats.some((c) => ['sidearm', 'primary', 'outfit', 'armor'].includes(c)) ? this._whoSelect() : '';
     for (const it of this._storeItems()) {
       if (it.cat !== last) { h += `<div class="sh-cat">${CATEGORIES[it.cat]}</div>`; last = it.cat; }
       const own = S.count(it.id), equipable = ['sidearm', 'primary', 'outfit', 'armor'].includes(it.cat);
@@ -107,20 +120,22 @@ export class ShopUI {
 
   _select(kind, slot, current, options, allowNone) {
     const opts = [];
-    if (allowNone) opts.push(`<option value="">— aucun —</option>`);
+    if (allowNone) opts.push(`<option value="">${slot === 'outfit' ? '— tenue personnelle —' : '— aucun —'}</option>`);
     for (const it of options) opts.push(`<option value="${it.id}" ${it.id === current ? 'selected' : ''}>${it.name}${it.id === current ? '' : ` (×${this.state.free(it.id)})`}</option>`);
     return `<select data-a="${kind}" data-v="${slot}">${opts.join('')}</select>`;
   }
 
   _persoPanel() {
-    const S = this.state, p = S.person(this.who);
+    const S = this.state;
+    if (!S.person(this.who)) this.who = 'me';
+    const p = S.person(this.who);
     const people = Object.keys(S.d.people);
     let h = '';
-    if (people.length > 1) h += `<div class="sh-row"><label>Personne</label><select data-a="who">${people.map((w) => `<option value="${w}" ${w === this.who ? 'selected' : ''}>${w === 'me' ? 'Moi' : S.d.people[w].name || w}</option>`).join('')}</select></div>`;
+    if (people.length > 1) h += this._whoSelect();
     for (const sl of PERSON_SLOTS) {
       const options = ITEMS.filter((i) => i.cat === sl.cat && (S.free(i.id) > 0 || p[sl.id] === i.id));
       const cur = p[sl.id] ? ITEM[p[sl.id]] : null;
-      h += `<div class="sh-slot"><div class="sh-sname">${sl.name}</div>${this._select('pslot', sl.id, p[sl.id], options, sl.id !== 'outfit')}
+      h += `<div class="sh-slot"><div class="sh-sname">${sl.name}</div>${this._select('pslot', sl.id, p[sl.id], options, sl.id !== 'outfit' || this.who !== 'me')}
         ${cur ? this._stats(cur) : ''}</div>`;
     }
     return h + '<div class="sh-note">Astuce : passez en vue 3e personne (V) pour voir votre tenue.</div>';
@@ -145,6 +160,26 @@ export class ShopUI {
     if (!list.length) return '<div class="sh-empty">Sac vide.</div>';
     return list.map((it) => `<div class="sh-item"><div class="sh-main"><b>${it.name}</b><p>${CATEGORIES[it.cat]} · ×${S.count(it.id)}${S.inUse(it.id) ? ` · ${S.inUse(it.id)} équipé(s)` : ''}</p></div>
       <div class="sh-side">${it.cat === 'consumable' ? `<button data-a="use" data-v="${it.id}">Utiliser</button>` : ''}</div></div>`).join('');
+  }
+
+  _cands() {
+    const C = this.crew;
+    if (!C.candidates.length) return '<div class="sh-empty">Plus de candidats pour l\'instant. Revenez dans un moment.</div>';
+    return C.candidates.map((c) => { const d = c.data; return `<div class="sh-item"><div class="sh-main"><b>${d.name}</b><p>${ROLES[d.role].name} · ${'★'.repeat(d.skill)}${'☆'.repeat(5 - d.skill)}</p><p>${d.quote}</p><p>${ROLES[d.role].desc}</p>
+      <div class="sh-stats"><span><i>Salaire</i> ${fmt(d.wage)} / contrat</span></div></div>
+      <div class="sh-side"><div class="sh-price">${fmt(d.fee)}</div><button data-a="hire" data-v="${d.cid}" ${this.state.credits >= d.fee ? '' : 'disabled'}>Recruter</button></div></div>`; }).join('');
+  }
+
+  _crewList() {
+    const C = this.crew;
+    if (!C.members.length) return '<div class="sh-empty">Personne n\'a encore signé avec vous.</div>';
+    const orders = (m) => [['follow', 'Me suivre'], ['wait', 'Attendre ici'], ['work', m.data.role === 'loader' ? 'Manutention du fret' : 'Garder la rampe']];
+    return C.members.map((m) => { const p = this.state.person(m.data.id) || {}; const gear = [p.outfit, p.armor, p.sidearm, p.primary].filter(Boolean).map((i) => ITEM[i].name).join(', ') || 'tenue personnelle, sans arme';
+      return `<div class="sh-slot"><div class="sh-sname">${m.data.name} <i>· ${ROLES[m.data.role].name} · ${'★'.repeat(m.data.skill)} · ${C.status(m)}</i></div>
+      <select data-a="order" data-v="${m.data.id}">${orders(m).map(([k, n]) => `<option value="${k}" ${m.data.order === k ? 'selected' : ''}>${n}</option>`).join('')}</select>
+      <div class="sh-stats"><span><i>Équipement</i> ${gear}</span><span><i>Salaire</i> ${fmt(m.data.wage)} / contrat</span></div>
+      <div class="sh-btns"><button class="sec" data-a="equipcrew" data-v="${m.data.id}">Équiper</button><button class="sec" data-a="fire" data-v="${m.data.id}">Renvoyer</button></div></div>`; }).join('')
+      + '<div class="sh-note">L\'équipage embarque avec vous au décollage (sauf ordre « Attendre ici »). Les salaires sont versés à chaque contrat rempli.</div>';
   }
 
   _offers() {
@@ -173,6 +208,9 @@ export class ShopUI {
       this.tab = 'active'; this.onAction('accept', o);
       return this.flash(o.type === 'out' ? `${o.n} caisses vous attendent sur le quai de fret.` : o.type === 'container' ? 'Le conteneur est chargé dans votre soute.' : `Rendez-vous à ${o.dest.name} pour charger.`);
     }
+    if (a === 'hire') { const c = this.crew.candidates.find((x) => x.data.cid === +v); const err = c && this.crew.hire(c); if (err) return this.flash(err, true); this.onAction('hire'); return this.flash(`${c.data.name} rejoint votre équipage.`); }
+    if (a === 'fire') { const m = this.crew.members.find((x) => x.data.id === v); this.crew.dismiss(m); return this.flash(`${m.data.name} a quitté l'équipage.`, true); }
+    if (a === 'equipcrew') { this.who = v; this.mode = 'inv'; this.tab = 'perso'; this.msg = ''; return this.render(); }
     if (a === 'abandon') { const o = this.missions.active.find((x) => x.id === +v); this.missions.abandon(o); return this.flash('Contrat abandonné.', true); }
     if (a === 'buy') {
       const it = ITEM[v];
@@ -196,6 +234,7 @@ export class ShopUI {
   _change(e) {
     const t = e.target, S = this.state;
     if (t.dataset.a === 'who') { this.who = t.value; return this.render(); }
+    if (t.dataset.a === 'order') { const m = this.crew.members.find((x) => x.data.id === t.dataset.v); this.crew.setOrder(m, t.value); return this.render(); }
     if (t.dataset.a === 'pslot') { S.equip(this.who, t.dataset.v, t.value || null); this.onAction('equip', ITEM[t.value]); }
     if (t.dataset.a === 'sslot') { if (!S.install(t.dataset.v, t.value || null)) this.flash('Incompatible avec cet emplacement.', true); else this.onAction('install', ITEM[t.value]); }
   }

@@ -76,6 +76,7 @@ export class Agent {
     if (!this.task) this._next();
     const t = this.task;
     t.t += dt;
+    if (t.abort && t.abort(this)) { this.task = null; this.char.setSpeed(0); return; }
     const c = this.char;
     let speed = 0;
     switch (t.type) {

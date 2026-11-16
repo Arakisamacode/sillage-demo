@@ -27,6 +27,7 @@ export const SHOTS = {
   lineup: { pos: [0, 1.55, 0.6], look: [0, 1.05, -4], fov: 62 },
   portrait: { pos: [-1.5, 1.3, -1.2], look: [-1.5, 1.05, -4], fov: 45 },
   heronext: { pos: [6, 2.0, 13], look: [-13, 4.5, -11], fov: 62 },
+  topgal: { pos: [-56, 9.6, -7], look: [-56, 0, -6.9], fov: 110 },
   topramp: { pos: [-16, 21, 6], look: [-16, 0, 5.9], fov: 90 },
   herongun: { pos: [-1, 1.4, -32], look: [-12, 3.2, -18], fov: 55 },
   herontop: { pos: [6, 16, -4], look: [-10, 6, -12], fov: 60 },

@@ -187,6 +187,8 @@ export function buildGallery(ctx) {
   for (const x of [-86, -58]) { bench(ctx, x, 1.0, Math.PI, 2.6); bench(ctx, x, 3.0, 0, 2.6); }
   // tableau des départs suspendu
   departures(ctx, -72, 6.6, 4.5);
+  // bureau de recrutement des équipages (extrémité est, côté baie)
+  recruitOffice(ctx);
   // grand écran publicitaire mur ouest
   adScreen(ctx);
   // signalétique
@@ -494,4 +496,51 @@ function adScreen(ctx) {
   const m = new THREE.Mesh(new THREE.PlaneGeometry(8, 4), scr.material);
   m.position.set(G.x0 + 0.05, 6.5, 2); m.rotation.y = Math.PI / 2;
   ctx.scene.add(m);
+}
+
+// ------------------------------------------------------------------ bureau de recrutement (Guilde des équipages)
+function recruitOffice(ctx) {
+  const { mats, builder: B, scene } = ctx;
+  const G = GALLERY, wx = G.x1, z = -14;
+  const desk = mats.paint(0x2c3034, { plain: true, rough: 0.5, grime: 0.3 });
+  const top = mats.metal(0xa0a4a8, { rough: 0.3, grime: 0.2 });
+  const olive = mats.paint(0x7a7a3a, { plain: true, rough: 0.5, grime: 0.5 });
+  // comptoir en L
+  B.box(0.7, 1.05, 3.4, desk, [wx - 3.2, 0.525, z], null, { collide: true });
+  B.box(0.8, 0.05, 3.5, top, [wx - 3.2, 1.07, z], null, { cast: false });
+  B.box(1.6, 1.05, 0.6, desk, [wx - 2.2, 0.525, z - 1.95], null, { collide: true });
+  B.box(0.05, 0.12, 3.2, mats.emissive(0xf2a33a, 2.5), [wx - 3.56, 0.95, z], null, { cast: false });
+  B.addObstacle(wx - 3.2, z, 0.45, 1.75, 0);
+  B.addObstacle(wx - 2.2, z - 1.95, 0.8, 0.4, 0);
+  // terminal sur le comptoir
+  B.box(0.05, 0.32, 0.5, mats.emissive(0x3ec7ff, 1.4), [wx - 3.0, 1.3, z + 0.9], [0, 0, 0.25], { cast: false });
+  // cadre olive et panneau d'affichage mural (offres d'emploi)
+  for (const dz of [-2.4, 2.4]) B.box(0.5, 4.6, 0.45, olive, [wx - 0.3, 2.3, z + dz]);
+  B.box(0.5, 0.4, 5.3, olive, [wx - 0.3, 4.6, z]);
+  const board = new Screen(512, 280, (c, w, h, t) => {
+    c.fillStyle = '#0a1016'; c.fillRect(0, 0, w, h);
+    c.fillStyle = '#f2a33a'; c.font = `700 30px ${FONT}`; c.fillText('GUILDE DES ÉQUIPAGES', 20, 42);
+    c.fillStyle = '#7d8a96'; c.font = `500 18px ${FONT}`; c.fillText('Recrutement · contrats à la mission', 20, 68);
+    const lines = ctx.recruitBoard ? ctx.recruitBoard() : [];
+    c.font = `500 21px ${FONT}`;
+    lines.slice(0, 7).forEach((l, i) => { c.fillStyle = i % 2 ? '#cfe6f2' : '#9fd8ff'; c.fillText(l, 20, 104 + i * 26); });
+    c.fillStyle = (t | 0) % 2 ? '#5fd49a' : '#1d3a2c'; c.beginPath(); c.arc(w - 26, 30, 7, 0, 7); c.fill();
+  }, { period: 1, intensity: 1.5 });
+  ctx.screens.push(board);
+  const bm = new THREE.Mesh(new THREE.PlaneGeometry(4.0, 2.2), board.material);
+  bm.position.set(wx - 0.62, 2.55, z); bm.rotation.y = -Math.PI / 2; scene.add(bm);
+  const nt = neonTexture('RECRUTEMENT', '#f2a33a', { size: 100 });
+  const neon = new THREE.Mesh(new THREE.PlaneGeometry(3.6, 3.6 / nt.aspect), neonMaterial(nt.tex, 2.4));
+  neon.position.set(wx - 0.6, 4.15, z); neon.rotation.y = -Math.PI / 2; scene.add(neon);
+  // banquette des candidats
+  bench(ctx, wx - 8.5, -20.4, Math.PI, 2.6);
+  ctx.recruit = {
+    clerk: { x: wx - 2.3, z: z + 0.4 }, clerkFace: { x: wx - 4.5, z: z },
+    customer: new THREE.Vector3(wx - 4.2, 0, z),
+    waiting: [
+      { x: wx - 6.2, z: -17.6, yaw: Math.PI * 0.75 }, { x: wx - 7.4, z: -16.6, yaw: -Math.PI * 0.6 },
+      { x: wx - 9.2, z: -17.2, yaw: Math.PI * 0.5 }, { x: wx - 6.8, z: -11.0, yaw: Math.PI * 0.9 },
+      { x: wx - 10.0, z: -18.6, yaw: -Math.PI * 0.4 }, { x: wx - 5.2, z: -19.0, yaw: Math.PI * 0.8 },
+    ],
+  };
 }

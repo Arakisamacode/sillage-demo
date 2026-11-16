@@ -105,3 +105,5 @@ body.is-touch .help.desktop, body:not(.is-touch) .help.touch { display: none; }
 #nav.edge i { border-color: #ff8a3a; border-radius: 50% 0 50% 50%; }
 #jobs { position: absolute; left: 12px; top: 30px; font-size: 12.5px; line-height: 1.5; color: var(--fg); max-width: 46vw; text-shadow: 0 0 3px #000; }
 #jobs b { color: var(--accent); font-weight: 600; letter-spacing: .06em; }
+.sh-btns { display: flex; gap: 8px; margin-top: 8px; }
+.sh-btns button { background: #1c2630; color: var(--fg); border: 1px solid #34404b; padding: 7px 12px; font: inherit; font-size: 12px; letter-spacing: .1em; text-transform: uppercase; cursor: pointer; }

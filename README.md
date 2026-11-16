@@ -60,6 +60,19 @@ Trois avant-postes en orbite : **Relais Corvin** (dépôt), **Plateforme Ardent-
 (ou ⏻) quand on est à moins de 22 m au-dessus de l'aire. Paiement à la livraison ; abandon : pénalité de 10 %.
 Code : `src/game/cargo.js`, `src/game/missions.js`, `src/world/outposts.js`.
 
+## Équipage
+
+Au **bureau de recrutement** de la galerie (Guilde des équipages, extrémité est, côté baie), on engage
+jusqu'à 6 personnes parmi les candidats qui attendent sur place (frais d'embauche + salaire versé à chaque contrat) :
+- **Manutentionnaire** : en ordre « Manutention du fret », il porte lui-même les caisses du quai jusqu'à la soute
+  (livraisons) et de la soute jusqu'au quai (collectes) ;
+- **Artilleur** : prend la tourelle dorsale en vol (la tourelle s'achète à l'Équipement naval) ;
+- **Garde du corps** : vous suit partout ou garde la rampe.
+
+Ordres : *Me suivre*, *Attendre ici*, *Manutention / Garder la rampe*. L'équipage embarque au décollage (sauf
+« Attendre ici ») et redescend à l'atterrissage au hangar. Chaque membre s'équipe comme le joueur (tenue, armure,
+armes) depuis l'inventaire ou directement en boutique (sélecteur « Pour »). Code : `src/game/crew.js`.
+
 ## Économie et boutiques
 
 On démarre avec 15 000 ¤. Dans la galerie, chaque vendeur ouvre sa boutique (E au comptoir) :
