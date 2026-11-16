@@ -18,7 +18,7 @@ export class Player {
     this.bvh = collisionGeo.boundsTree;
     this.pos = new THREE.Vector3(-26, 0, -6);  // pieds
     this.vel = new THREE.Vector3();
-    this.yaw = -2.2; this.pitch = 0.02;
+    this.yaw = 2.16; this.pitch = 0.02;   // face au sas de la galerie marchande
     this.grounded = false;
     this.thirdPerson = false;
     this.camDist = 0;

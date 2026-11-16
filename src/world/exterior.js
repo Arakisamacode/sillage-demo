@@ -35,7 +35,12 @@ export function buildExterior(ctx) {
   B.box(gw, G.h + 4, 4, shell, [gx, G.h / 2, G.z1 + 9], null, { tex: 8, cast: false });
   B.box(4, G.h + 4, G.z1 - G.z0 + 14, shell, [G.x0 - 5, G.h / 2, (G.z0 + G.z1) / 2 + 4], null, { tex: 8, cast: false });
   B.box(gw, 4, G.z1 - G.z0 + 14, dark, [gx, -2.2, (G.z0 + G.z1) / 2 + 4], null, { tex: 8, cast: false });
-  B.box(12, G.h, 6, shell, [-37, G.h / 2, -2], null, { tex: 6, cast: false }); // coursive du sas
+  // coursive du sas : coque creuse entre le mur extérieur du hangar et la galerie (le passage reste dégagé)
+  {
+    const xa = -HX - 2.0, xb = G.x1, cxs = (xa + xb) / 2, lw = xa - xb;
+    B.box(lw, G.h - 4.7, 6.6, shell, [cxs, (G.h + 4.7) / 2, -2], null, { tex: 6, cast: false });
+    for (const s of [-1, 1]) B.box(lw, 4.7, 0.6, shell, [cxs, 4.7 / 2, -2 + s * 3.0], null, { tex: 6, cast: false });
+  }
   // ---------------------------------------------------------------- corps de la station (cylindre couché derrière le hangar)
   const core = platedHull([
     { z: 34, w: 30, h: 30, y: 10, n: 2.2 }, { z: 46, w: 48, h: 48, y: 10, n: 2.2 },

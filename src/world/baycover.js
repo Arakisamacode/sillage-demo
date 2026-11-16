@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import { neonTexture, neonMaterial } from './signage.js';
+import { AIRLOCK, HX } from './layout.js';
 
 // Caisses de transit devant la baie du hangar 07 : décor permanent qui sert de couverture lors d'une intrusion.
 // Repère « arène » : origine (0, 0, -25), axe x local vers la baie (z monde décroissant), axe z local = x monde.
@@ -26,4 +28,17 @@ export function buildBayCover(ctx) {
     const p = W(x, 0, z);
     builder.addObstacle(p[0], p[2], d / 2 + 0.2, w / 2 + 0.2, 0);
   });
+}
+
+/** Signalétique du sas côté hangar : enseigne lumineuse et balisage vert du cadre. */
+export function buildAirlockSign(ctx) {
+  const x = -HX + 0.32, z = AIRLOCK.z;
+  const nt = neonTexture('GALERIE MARCHANDE', '#7dff9a', { size: 110 });
+  const sign = new THREE.Mesh(new THREE.PlaneGeometry(6.4, 6.4 / nt.aspect), neonMaterial(nt.tex, 2.2));
+  sign.position.set(x, 8.0, z); sign.rotation.y = Math.PI / 2;
+  ctx.scene.add(sign);
+  const strip = ctx.mats.emissive(0x7dff9a, 3);
+  const w = AIRLOCK.w, h = AIRLOCK.h;
+  for (const s of [-1, 1]) ctx.builder.box(0.08, h, 0.12, strip, [x + 0.05, h / 2, z + s * (w / 2 + 0.15)], null, { cast: false });
+  ctx.builder.box(0.08, 0.12, w + 0.4, strip, [x + 0.05, h + 0.1, z], null, { cast: false });
 }

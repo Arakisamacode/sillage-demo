@@ -25,7 +25,7 @@ import { HeronLoadout } from './game/shipgear.js';
 import { ShopUI } from './ui/shop.js';
 import { buildOutposts } from './world/outposts.js';
 import { buildDerelict } from './world/derelict.js';
-import { buildBayCover } from './world/baycover.js';
+import { buildBayCover, buildAirlockSign } from './world/baycover.js';
 import { Cargo, buildQuai } from './game/cargo.js';
 import { Missions } from './game/missions.js';
 import { Crew } from './game/crew.js';
@@ -80,6 +80,7 @@ async function boot() {
   ctx.outposts = buildOutposts(ctx);
   ctx.derelict = buildDerelict(ctx);
   buildBayCover(ctx);
+  buildAirlockSign(ctx);
   ctx.lights = buildLighting(ctx);
   const lib = new CharacterLibrary(manager, quality);
   const libReady = lib.load(undefined, (p) => progress(0.6 + 0.3 * p, 'Chargement des personnages'));
@@ -331,6 +332,7 @@ async function boot() {
     running = true;
     if (!touch) $('view').requestPointerLock?.();
     audio.start($('sound').checked);
+    if ($('go').textContent !== 'Reprendre') toast('Boutiques, armurerie, recrutement : galerie marchande, par le sas droit devant vous');
     $('go').textContent = 'Reprendre';
   };
   $('go').addEventListener('click', start);
@@ -417,7 +419,10 @@ async function boot() {
       }
       jobsEl.innerHTML = lines.join('<br>');
     }
-    const T = missions.navTarget() || (flight.active ? mining.navTarget(ardent) : null);
+    // repère d'orientation : la galerie marchande tant qu'elle n'a pas été visitée
+    if (!game.d.galleryVisited && player.pos.x < -44 && !flight.active) { game.d.galleryVisited = true; game.save(); }
+    const way = !game.d.galleryVisited && !flight.active && !ground.armed && player.pos.x > -33 ? { pos: new THREE.Vector3(-37, 1.6, -2), name: 'Galerie marchande · boutiques, recrutement' } : null;
+    const T = missions.navTarget() || (flight.active ? mining.navTarget(ardent) : null) || way;
     if (!T || shop.isOpen) { navEl.classList.add('hidden'); return; }
     const from = flight.active ? flight.pos : player.pos;
     const d = from.distanceTo(T.pos);
@@ -580,6 +585,7 @@ async function boot() {
   }
   frame();
   window.__app = ctx;
+  window.__THREE = THREE;
 }
 
 function tick() { return new Promise((r) => setTimeout(r, 0)); }
