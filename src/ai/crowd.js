@@ -196,7 +196,8 @@ function shopkeeper(shopId) {
       if (r < 0.5) yield act(Math.random() < 0.6 ? 'interact' : 'idle', R(4, 8), { face: sp.clerkFace, abort: busy });
       else if (r < 0.78 && extra.back) {
         yield move(extra.back.x, 0, extra.back.z, { speed: 0.9 });
-        yield act('interact', R(3, 6), { face: extra.backFace, abort: busy });
+        yield act('pickup', 2.4, { face: extra.backFace });
+        yield act('idle', R(2, 4), { face: extra.backFace, abort: busy });
         yield move(post.x, 0, post.z, { speed: 0.9 });
       } else yield act('idle', R(3, 6), { face: sp.entry, abort: busy });
     }

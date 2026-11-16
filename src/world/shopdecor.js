@@ -61,10 +61,14 @@ export function shopDecor(ctx, s, L, depth) {
     // cuisine au fond : plan de travail, marmites fumantes ; lanternes rouges devant
     L.box(3.4, 0.95, 0.6, mats.metal(0x8a8e92, { rough: 0.3 }), [-1.6, 0.47, depth - 0.45], null, { collide: true });
     const steam = [];
+    const pc = document.createElement('canvas'); pc.width = pc.height = 64;
+    const pg = pc.getContext('2d'), grd = pg.createRadialGradient(32, 32, 0, 32, 32, 32);
+    grd.addColorStop(0, 'rgba(255,255,255,0.9)'); grd.addColorStop(1, 'rgba(255,255,255,0)'); pg.fillStyle = grd; pg.fillRect(0, 0, 64, 64);
+    const puffTex = new THREE.CanvasTexture(pc);
     for (const dx of [-2.6, -1.6, -0.6]) {
       L.cyl(0.24, 0.2, 0.32, mats.metal(0x5a5e62, { rough: 0.25 }), [dx, 1.11, depth - 0.45], null, { seg: 14 });
       for (let k = 0; k < 3; k++) {
-        const sp = new THREE.Sprite(new THREE.SpriteMaterial({ color: 0xffffff, transparent: true, opacity: 0.25, depthWrite: false }));
+        const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: puffTex, color: 0xffffff, transparent: true, opacity: 0.25, depthWrite: false }));
         sp.position.copy(L.world(dx, 1.3, depth - 0.45)); sp.scale.setScalar(0.3); sp.userData = { base: sp.position.clone(), k: k / 3 };
         scene.add(sp); steam.push(sp);
       }

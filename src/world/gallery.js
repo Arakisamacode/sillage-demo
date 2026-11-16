@@ -268,6 +268,9 @@ function shop(ctx, s, wall, wallDark, trim) {
   const x = s.x, z0 = G.z1, depth = 6, w = 8, h = 4.4;
   // intérieur
   const L = new Local(B, x, 0, z0, 0, scene);
+  // ambiance propre à chaque boutique (murs intérieurs)
+  const tint = { armes: 0x3c4146, pieces: 0x56606a, pharma: 0xdfece4, combis: 0xb59c82, nouilles: 0x7a4030 }[s.id];
+  if (tint) wall = mats.paint(tint, { grime: 0.35, scratch: 0.3, rust: 0, rough: 0.6 });
   const floorM = s.id === 'pieces' ? mats.metal(0x55595c, { rough: 0.6 }) : mats.tiles(s.id === 'pharma' ? 0xe8efe8 : 0xb8b0a4);
   L.box(w, 0.05, depth + 0.6, floorM, [0, 0.025, depth / 2 - 0.3], null, { cast: false, tex: 2, collide: true });
   L.box(w, h, 0.3, wall, [0, h / 2, depth + 0.15], null, { tex: 3 });
@@ -276,8 +279,8 @@ function shop(ctx, s, wall, wallDark, trim) {
   L.cbox(w, h, 0.3, [0, h / 2, depth + 0.15]);
   for (const sx of [-1, 1]) L.cbox(0.3, h, depth, [sx * (w / 2 + 0.15), h / 2, depth / 2]);
   // éclairage intérieur (bandeaux)
-  L.box(w - 1, 0.05, 0.3, mats.emissive(0xfff1dc, 7), [0, h - 0.05, depth / 2], null, { cast: false });
-  L.box(w - 1, 0.05, 0.3, mats.emissive(0xfff1dc, 7), [0, h - 0.05, depth / 2 + 1.8], null, { cast: false });
+  L.box(w - 1, 0.05, 0.3, mats.emissive(0xfff1dc, 3.2), [0, h - 0.05, depth / 2], null, { cast: false });
+  L.box(w - 1, 0.05, 0.3, mats.emissive(0xfff1dc, 3.2), [0, h - 0.05, depth / 2 + 1.8], null, { cast: false });
   // vitrine : vitrage + porte ouverte (au centre)
   const glass = mats.glass(0xaac4d4, 0.1);
   for (const sx of [-1, 1]) {
