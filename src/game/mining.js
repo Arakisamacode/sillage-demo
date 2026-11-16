@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { ITEM, ORES, REFINE } from './catalog.js';
+import { ITEM, ORES, REFINE, MARKETS } from './catalog.js';
 
 // Minage : champ d'astéroïdes (Ceinture d'Ardent), balayage de composition, fracturation au laser
 // (garder l'énergie dans la fenêtre optimale sans surcharger), extraction des fragments vers le bac à minerai,
@@ -337,11 +337,13 @@ export class Mining {
 
   // ------------------------------------------------------------------ raffinerie et marché (Ardent-3)
   /** Cours du jour (variation lente autour du prix de base). */
-  price(ore, refined) {
+  price(ore, refined, market = 'ardent') {
     const b = refined ? ORES[ore].ref : ORES[ore].raw;
-    const k = 1 + 0.12 * Math.sin(Date.now() / 3.6e6 + ore.length * 1.7);
-    return Math.round(b * k);
+    const k = 1 + 0.12 * Math.sin(Date.now() / 3.6e6 + ore.length * 1.7 + market.length * 0.9);
+    return Math.round(b * k * (refined ? (MARKETS[market]?.k[ore] ?? 1) : 1));
   }
+  /** Meilleur marché connu pour un matériau raffiné. */
+  bestMarket(ore) { return Object.keys(MARKETS).reduce((a, m) => (this.price(ore, true, m) > this.price(ore, true, a) ? m : a), 'ardent'); }
   rawValue() { return Object.entries(this.game.d.ore).reduce((s, [o, q]) => s + q * this.price(o, false), 0); }
   sellRaw() {
     const v = Math.round(this.rawValue());
@@ -367,12 +369,12 @@ export class Mining {
     for (const [o, q] of Object.entries(job.out)) this.game.d.materials[o] = Math.round(((this.game.d.materials[o] || 0) + q) * 10) / 10;
     this.game.d.refJobs = this.game.d.refJobs.filter((j) => j !== job);
     this.game.save();
-    return 'Matériaux raffinés récupérés en entrepôt.';
+    return 'Matériaux raffinés chargés dans la soute du Héron · revendables ici ou plus cher ailleurs (Corvin, Lys).';
   }
-  sellMaterial(ore) {
+  sellMaterial(ore, market = 'ardent') {
     const q = this.game.d.materials[ore] || 0;
     if (q <= 0) return 'Rien à vendre.';
-    const v = Math.round(q * this.price(ore, true));
+    const v = Math.round(q * this.price(ore, true, market));
     delete this.game.d.materials[ore];
     this.game.earn(v);
     return `${ORES[ore].name} raffiné vendu : +${fmt(v)} ¤`;
@@ -380,6 +382,13 @@ export class Mining {
 
   /** Repère de navigation : raffinerie si le bac est bien rempli, sinon le champ d'astéroïdes. */
   navTarget(ardent) {
+    const mats = Object.entries(this.game.d.materials).filter(([, q]) => q > 0);
+    if (mats.length && this.binUsed() < BIN_CAP * 0.6) {
+      const val = (m) => mats.reduce((s, [o, q]) => s + q * this.price(o, true, m), 0);
+      const best = Object.keys(MARKETS).reduce((a, m) => (val(m) > val(a) ? m : a), 'ardent');
+      const o = this.ctx.outposts.find((x) => x.id === best);
+      if (o && this.flight.dockedAt !== o.pad) return { pos: o.center, name: `Marché · ${MARKETS[best].name} · ${fmt(val(best))} ¤` };
+    }
     if (!this.laser) return null;
     if (this.binUsed() > BIN_CAP * 0.6) return { pos: ardent.center, name: 'Raffinerie · Plateforme Ardent-3' };
     if (!this.inField(this.flight.pos)) return { pos: FIELD.center, name: `Champ d'astéroïdes · ${FIELD.name}` };

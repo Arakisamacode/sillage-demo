@@ -161,7 +161,7 @@ export class Player {
     if (this.avatar) {
       this.avatar.root.visible = this.camDist > 0.6;
       this.avatar.root.position.copy(this.pos);
-      if (this.aiming) {
+      if (this.aiming || this.faceCam) {
         let d = this.yaw + Math.PI - this.avatar.root.rotation.y;
         d = Math.atan2(Math.sin(d), Math.cos(d));
         this.avatar.root.rotation.y += d * (1 - Math.exp(-dt * 16));

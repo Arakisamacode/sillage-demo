@@ -1,6 +1,6 @@
 import { ITEMS, ITEM, CATEGORIES, STORES, HERON_SLOTS } from '../game/catalog.js';
 import { ROLES } from '../game/crew.js';
-import { ORES, REFINE } from '../game/catalog.js';
+import { ORES, REFINE, MARKETS } from '../game/catalog.js';
 
 // Interfaces de commerce et d'inventaire (HTML par-dessus la vue 3D).
 const fmt = (n) => n.toLocaleString('fr-FR').replace(/ /g, ' ') + ' ¤';
@@ -55,7 +55,7 @@ export class ShopUI {
     const tabs = this.mode === 'store'
       ? [['buy', 'Acheter'], ['sell', 'Vendre']]
       : this.mode === 'board' ? [['offers', 'Offres'], ['active', `En cours (${this.missions.active.length})`]]
-        : this.mode === 'dock' ? [['ops', 'Opérations'], ...(this.pad.id === 'ardent' ? [['refine', 'Raffinerie'], ['market', 'Marché']] : [])]
+        : this.mode === 'dock' ? [['ops', 'Opérations'], ...(this.pad.id === 'ardent' ? [['refine', 'Raffinerie']] : []), ...(MARKETS[this.pad.id] ? [['market', 'Marché des matériaux']] : [])]
         : this.mode === 'recruit' ? [['cands', 'Candidats'], ['crew', `Mon équipage (${this.crew.members.length})`]]
         : [['perso', 'Personnage'], ['ship', 'Héron Mk II'], ['bag', 'Sac']];
     let body = '';
@@ -173,6 +173,7 @@ export class ShopUI {
     let h = acts.length ? acts.map((a, i) => `<div class="sh-item"><div class="sh-main"><b>${a.label}</b></div><div class="sh-side"><button data-a="dockact" data-v="${i}">Valider</button></div></div>`).join('')
       : '<div class="sh-empty">Aucune opération de contrat ici pour l\'instant.</div>';
     if (this.pad.id === 'ardent') h += '<div class="sh-note">Raffinerie et marché des matériaux : onglets ci-dessus.</div>';
+    else if (MARKETS[this.pad.id]) h += `<div class="sh-note">Marché des matériaux raffinés (${MARKETS[this.pad.id].tag}) : onglet ci-dessus.</div>`;
     return h;
   }
 
@@ -198,11 +199,17 @@ export class ShopUI {
   }
 
   _market() {
-    const M = this.mining, mats = Object.entries(this.state.d.materials).filter(([, q]) => q > 0);
-    let h = '<div class="sh-cat">Cours des matériaux raffinés</div>' + Object.keys(ORES).map((o) => `<div class="sh-item"><div class="sh-main"><b>${ORES[o].name}</b><p>${fmt(M.price(o, true))} / SCU raffiné · ${fmt(M.price(o, false))} / SCU brut</p></div></div>`).join('');
-    h += '<div class="sh-cat">Votre entrepôt</div>';
-    h += mats.length ? mats.map(([o, q]) => `<div class="sh-item"><div class="sh-main"><b>${ORES[o].name} raffiné</b><p>${q.toFixed(1).replace('.', ',')} SCU</p></div><div class="sh-side"><div class="sh-price">${fmt(Math.round(q * M.price(o, true)))}</div><button data-a="sellmat" data-v="${o}">Vendre</button></div></div>`).join('')
-      : '<div class="sh-empty">Aucun matériau raffiné en entrepôt.</div>';
+    const M = this.mining, here = this.pad.id, mats = Object.entries(this.state.d.materials).filter(([, q]) => q > 0);
+    const others = Object.keys(MARKETS).filter((m) => m !== here);
+    let h = `<div class="sh-cat">Cours ici · ${MARKETS[here].name} (${MARKETS[here].tag})</div>`;
+    h += Object.keys(ORES).map((o) => {
+      const p = M.price(o, true, here), best = M.bestMarket(o);
+      const cmp = others.map((m) => `${MARKETS[m].name.split(' ').pop()} ${fmt(M.price(o, true, m))}`).join(' · ');
+      return `<div class="sh-item"><div class="sh-main"><b>${ORES[o].name} raffiné · ${fmt(p)} / SCU${best === here ? ' <span class="sh-own">meilleur cours</span>' : ''}</b><p>Ailleurs : ${cmp}</p></div></div>`;
+    }).join('');
+    h += '<div class="sh-cat">Matériaux dans la soute</div>';
+    h += mats.length ? mats.map(([o, q]) => { const best = M.bestMarket(o); return `<div class="sh-item"><div class="sh-main"><b>${ORES[o].name} raffiné</b><p>${q.toFixed(1).replace('.', ',')} SCU${best !== here ? ` · vaudrait ${fmt(Math.round(q * M.price(o, true, best)))} à ${MARKETS[best].name}` : ''}</p></div><div class="sh-side"><div class="sh-price">${fmt(Math.round(q * M.price(o, true, here)))}</div><button data-a="sellmat" data-v="${o}">Vendre ici</button></div></div>`; }).join('')
+      : '<div class="sh-empty">Aucun matériau raffiné à bord. Raffinez du minerai à Ardent-3.</div>';
     return h;
   }
 
@@ -256,7 +263,7 @@ export class ShopUI {
     if (a === 'sellraw') { const r = this.mining.sellRaw(); this.onAction('sell'); return this.flash(r); }
     if (a === 'refine') { const r = this.mining.refine(v); this.onAction('buy'); return this.flash(r, /insuff|vide/.test(r)); }
     if (a === 'collect') { const r = this.mining.collect(this.state.d.refJobs[+v]); return this.flash(r); }
-    if (a === 'sellmat') { const r = this.mining.sellMaterial(v); this.onAction('sell'); return this.flash(r); }
+    if (a === 'sellmat') { const r = this.mining.sellMaterial(v, this.pad.id); this.onAction('sell'); return this.flash(r); }
     if (a === 'hire') { const c = this.crew.candidates.find((x) => x.data.cid === +v); const err = c && this.crew.hire(c); if (err) return this.flash(err, true); this.onAction('hire'); return this.flash(`${c.data.name} rejoint votre équipage.`); }
     if (a === 'fire') { const m = this.crew.members.find((x) => x.data.id === v); this.crew.dismiss(m); return this.flash(`${m.data.name} a quitté l'équipage.`, true); }
     if (a === 'equipcrew') { this.who = v; this.mode = 'inv'; this.tab = 'perso'; this.msg = ''; return this.render(); }

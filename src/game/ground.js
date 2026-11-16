@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { ITEM } from './catalog.js';
 import { COVER, DECK } from '../world/outposts.js';
 import { BOARD_COVER, BAY } from '../world/derelict.js';
+import { STATION_ARENA, STATION_COVER } from '../world/baycover.js';
 import { BODIES, HAIRS } from '../characters/characters.js';
 
 // Combat à pied sur les avant-postes : raids pirates (aléatoires ou contrats de sécurité), débarquement armé
@@ -85,6 +86,8 @@ export class Ground {
   }
 
   get audio() { return this.ctx.audio; }
+  /** Le joueur peut combattre : à pied sur un avant-poste / un cargo, ou dans la station pendant une alerte. */
+  get armed() { return this.onFoot || !!this.raid?.station; }
   get me() { return this.game.person('me'); }
   get prot() { const a = this.me.armor && ITEM[this.me.armor]; return a ? a.prot : 0; }
   weaponId(slot = this.slot) { return slot && this.me[slot]; }
@@ -173,6 +176,59 @@ export class Ground {
       clampOut: (l) => { l.x = THREE.MathUtils.clamp(l.x, BAY.x0, BAY.x1); l.z = THREE.MathUtils.clamp(l.z, -BAY.z, BAY.z); },
     });
   }
+  /** Hangar 07 : bande dégagée devant la baie. */
+  _arenaStation() {
+    const rot = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, STATION_ARENA.yaw, 0));
+    return this._makeArena({ id: 'halden', name: 'Hangar 07' }, STATION_ARENA.origin, rot, STATION_COVER, {
+      kind: 'station', door: { x: 19.2, z: 0 }, enemyMin: 13.5, friendMax: 12.5,
+      walk: (l) => l.x >= 6 && l.x <= 19.4 && Math.abs(l.z) <= 28,
+      clampOut: (l) => { l.x = THREE.MathUtils.clamp(l.x, 6, 19.4); l.z = THREE.MathUtils.clamp(l.z, -28, 28); },
+    });
+  }
+  /** Alerte d'intrusion dans le hangar : pirates par la baie, sécurité de la station, civils à l'abri. */
+  startStationAlert() {
+    if (this.raid || this.flight.state !== 'parked' || this.flight.away) return false;
+    const A = this._arenaStation();
+    this.raid = { A, o: A.o, contract: null, n: 4 + Math.floor(Math.random() * 2), spawned: 0, spawnT: 4, kills: 0, bounty: 0, done: false, station: true };
+    // agents de sécurité de la station
+    for (let i = 0; i < 3; i++) {
+      const ch = this.ctx.lib.create(i === 1 ? 'UF_light' : i ? 'UM_light' : 'UM_dark', { height: i === 1 ? 1.72 : 1.82, hair: i === 1 ? 'Hair_Buns' : 'Hair_Buzzed' });
+      ch.setOutfit({ top: 0x1b222c, bottom: 0x1b222c, boot: 0x101216, accent: 0x6f86a8, gloves: true, hivis: true });
+      ch.setArmor({ tier: 2, plate: 0x2a3138, under: 0x16191c, accent: 0x3e5a7a, light: 0x6fb8ff });
+      const gid = i === 2 ? 'sm3' : 'ac7';
+      const mesh = weaponMesh(ITEM[gid].shape, 0x3e5a7a);
+      ch.hold(mesh, ITEM[gid].cat);
+      this.ctx.scene.add(ch.root);
+      const u = this._unit('friend', ch, A.W(3, -18 + i * 4, 0), 0, gid, mesh);
+      u.name = ['Sgt Morel', 'Agente Brun', 'Agent Kader'][i]; u.prot = 0.4; u.skill = 0.55; u.station = true;
+    }
+    // gardes de l'équipage qui accompagnent le joueur dans la station
+    for (const m of this.crew.members) {
+      if (m.aboard || m.data.role !== 'guard') continue;
+      const p = this.game.person(m.data.id), gid = p.primary || p.sidearm || 'ks9';
+      const ch = this.crew._char(m.data);
+      this.ctx.dressPerson(ch, p);
+      const mesh = weaponMesh(ITEM[gid].shape, ITEM[gid].accent);
+      ch.hold(mesh, ITEM[gid].cat);
+      const u = this._unit('friend', ch, m.agent.pos.clone(), m.agent.yaw, gid, mesh);
+      u.name = m.data.name.split(' ')[0]; u.member = m; u.prot = p.armor ? ITEM[p.armor].prot : 0; u.skill = 0.5 + m.data.skill * 0.05;
+      m.agent.char.root.visible = false; m.inCombat = true;
+    }
+    this._panic(true);
+    this.onEvent('alert', this.raid.n);
+    return true;
+  }
+  /** Les civils du hangar s'accroupissent à l'abri pendant l'alerte. */
+  _panic(on) {
+    for (const a of this.ctx.crowd.agents) {
+      if (a.attached || a.data?.member || a.pos.x < -33 || a.pos.y > 2) continue;
+      if (on) {
+        if (a.task?.type === 'sit') continue;
+        const t = { type: 'act', anim: 'crouch', dur: 999, t: 0, abort: () => !this.raid?.station };
+        a.task = t; a._start(t);
+      }
+    }
+  }
   /** Repousse un point local hors des caisses et dans la zone praticable. */
   _clampLocal(l, A = this.raid?.A || this.A) {
     for (const [x, z, w, d] of A.cover) {
@@ -242,7 +298,9 @@ export class Ground {
   }
   /** Fin du raid : nettoyage (départ du vaisseau, joueur à terre) ou victoire. */
   endRaid(silent) {
-    for (const u of this.units) { this.ctx.scene.remove(u.ch.root); if (u.member) u.member.ashore = false; }
+    for (const u of this.units) { this.ctx.scene.remove(u.ch.root); if (u.member) { u.member.ashore = false; if (u.member.inCombat) { u.member.inCombat = false; u.member.agent.char.root.visible = true; } } }
+    const wasStation = this.raid?.station;
+    if (wasStation && !this.onFoot) { this.raid = null; this.draw(false); }
     if (this.raid?.boarding) for (const l of this.ctx.derelict.lights) l.visible = false;
     this._clearLoot();
     this.units = [];
@@ -254,7 +312,11 @@ export class Ground {
     const R = this.raid;
     R.done = true;
     let msg;
-    if (R.boarding) {
+    if (R.station) {
+      const b = 2000; this.game.earn(b);
+      msg = `prime de la sécurité de Halden · +${fmt(b)} ¤`;
+      setTimeout(() => { if (this.raid === R) this.endRaid(true); this.onEvent('alertEnd'); }, 12000);
+    } else if (R.boarding) {
       // cargaison de contrebande : deux caisses près de la porte des pirates
       for (const z of [-1.4, 1.4]) this._spawnLoot(R.A, R.A.door.x - 2.5, z, Math.round((1400 + Math.random() * 1600) / 50) * 50, true, null, true);
       msg = 'cargaison de contrebande à saisir près de la porte du fond';
@@ -337,7 +399,7 @@ export class Ground {
   // ------------------------------------------------------------------ armes du joueur
   draw(on) {
     const P = this.player, av = P.avatar;
-    if (on && !this.onFoot) { this.onEvent('noguns'); return; }
+    if (on && !this.armed) { this.onEvent('noguns'); return; }
     if (on) {
       if (!this.slot || !this.weaponId()) this.slot = this.me.primary ? 'primary' : this.me.sidearm ? 'sidearm' : null;
       if (!this.slot) { this.onEvent('nogun'); return; }
@@ -375,10 +437,10 @@ export class Ground {
   /** Entrées à pied (appelé par la boucle principale avant la consommation des touches). */
   footInput(dt, input) {
     if (input.consume('draw')) {
-      if (!this.onFoot) this.onEvent('noguns');
+      if (!this.armed) this.onEvent('noguns');
       else this.draw(!this.drawn);
     }
-    if (!this.onFoot) return;
+    if (!this.armed) return;
     if (input.consume('hud')) this.heal();
     if (!this.drawn || this.dead) return;
     if (input.consume('missile')) this.reload();
@@ -440,7 +502,7 @@ export class Ground {
   // ------------------------------------------------------------------ dégâts
   _damage(u, dmg, from) {
     if (u === 'player') {
-      if (this.dead || !this.onFoot) return;
+      if (this.dead || !this.armed) return;
       this.hp -= dmg * (1 - this.prot);
       this.dmgFlash = 1; this._lastHurt = this.t;
       this.audio?.hit?.(false);
@@ -490,7 +552,7 @@ export class Ground {
     if (!this.loot?.length) return;
     for (const L of this.loot) {
       L.glow.visible = (this.t * 2) % 1 < 0.5;
-      if (this.onFoot && !this.dead && this.player.pos.distanceTo(L.pos) < L.r) {
+      if (this.armed && !this.dead && this.player.pos.distanceTo(L.pos) < L.r) {
         L.done = true;
         this.ctx.scene.remove(L.g);
         this.game.earn(L.credits);
@@ -518,6 +580,12 @@ export class Ground {
     this.game.pay(fee);
     this.dead = false; this.hp = HP;
     this.player.avatar?.stop(0.1);
+    if (this.raid?.station) {
+      // infirmerie de la station : le joueur se réveille près du sas, la sécurité termine le travail
+      this.endRaid(true);
+      this.player.pos.set(-26, 0, -6); this.player.vel.set(0, 0, 0);
+      return this.onEvent('evacStation', fee);
+    }
     this.reboard();
     if (this.raid) { this.endRaid(true); }
     this.onEvent('evac', fee);
@@ -527,7 +595,7 @@ export class Ground {
   _hostiles(u) {
     if (u.side === 'friend') return this.units.filter((x) => x.side === 'enemy' && !x.down);
     const list = this.units.filter((x) => x.side === 'friend' && !x.down);
-    if (this.onFoot && !this.dead) list.push({ isPlayer: true, pos: this.player.pos, crouch: false, speed: this.player.speed });
+    if (this.armed && !this.dead && !this.player.seated) list.push({ isPlayer: true, pos: this.player.pos, crouch: false, speed: this.player.speed });
     return list;
   }
   _eye(u) { return _v.copy(u.pos).setY(u.pos.y + (u.crouch ? 1.0 : 1.5)); }
@@ -644,6 +712,13 @@ export class Ground {
   // ------------------------------------------------------------------ boucle
   update(dt) {
     this.t += dt;
+    // alerte d'intrusion : de temps en temps quand le joueur est à pied dans le hangar
+    const P = this.player;
+    if (!this.raid && !P.seated && !this.flight.active && P.pos.x > -32 && P.pos.y < 2 && this.ctx.shop && !this.ctx.shop.isOpen) {
+      this.alertT = (this.alertT || 0) + dt;
+      if (this.nextAlert === undefined) this.nextAlert = 300 + Math.random() * 180;
+      if (this.alertT > this.nextAlert) { this.alertT = 0; this.nextAlert = 900 + Math.random() * 600; this.startStationAlert(); }
+    }
     const R = this.raid;
     if (R && !R.done && R.spawned < R.n) {
       R.spawnT -= dt;
@@ -656,7 +731,7 @@ export class Ground {
     const av = this.player.avatar;
     if (av && this.drawn) av.aimPitch = this.player.pitch * 0.9;
     if (this.dead) { this.deadT += dt; if (this.deadT > 2.6) this._evac(); }
-    else if (this.onFoot && this.hp < HP && this.t - (this._lastHurt || 0) > 6) this.hp = Math.min(HP, this.hp + dt * 2);
+    else if (this.armed && this.hp < HP && this.t - (this._lastHurt || 0) > 6) this.hp = Math.min(HP, this.hp + dt * 2);
     this._updateLoot();
     this._updateFx(dt);
     this._hud();
@@ -667,14 +742,14 @@ export class Ground {
     const E = this.el;
     if (!E.hud) return;
     this.dmgFlash = Math.max(0, (this.dmgFlash || 0) - 0.03);
-    E.dmg.style.opacity = this.dmgFlash * 0.8 + (this.onFoot && this.hp < 35 ? 0.25 + Math.sin(this.t * 5) * 0.1 : 0);
-    const show = this.onFoot && !this.ctx.shop?.isOpen;
+    E.dmg.style.opacity = this.dmgFlash * 0.8 + (this.armed && this.hp < 35 ? 0.25 + Math.sin(this.t * 5) * 0.1 : 0);
+    const show = this.armed && !this.player.seated && !this.ctx.shop?.isOpen;
     E.hud.classList.toggle('hidden', !show);
-    E.raid.classList.toggle('hidden', !this.raid || !this.onFoot && !this.flight.away);
+    E.raid.classList.toggle('hidden', !this.raid || !this.armed && !this.flight.away);
     if (this.raid) {
       const R = this.raid, left = this.enemiesLeft() + (R.n - R.spawned);
-      const fr = this.units.filter((u) => u.side === 'friend').map((u) => `${u.name} ${u.down ? '<i>à terre</i>' : Math.round(u.hp / u.maxHp * 100) + ' %'}`).join(' · ');
-      const h = R.done ? `<b class="ok">${R.boarding ? 'CARGO SAISI' : 'PLATEFORME SÉCURISÉE'}</b> · ${R.kills} pirates neutralisés` : `<b>${R.boarding ? 'ABORDAGE' : 'RAID PIRATE'}</b> · ${R.o.name} · ${left} hostile${left > 1 ? 's' : ''}${fr ? `<br>Gardes : ${fr}` : ''}`;
+      const fr = this.units.filter((u) => u.side === 'friend' && !u.station).map((u) => `${u.name} ${u.down ? '<i>à terre</i>' : Math.round(u.hp / u.maxHp * 100) + ' %'}`).join(' · ');
+      const h = R.done ? `<b class="ok">${R.station ? 'HANGAR SÉCURISÉ' : R.boarding ? 'CARGO SAISI' : 'PLATEFORME SÉCURISÉE'}</b> · ${R.kills} pirates neutralisés` : `<b>${R.station ? 'ALERTE INTRUSION' : R.boarding ? 'ABORDAGE' : 'RAID PIRATE'}</b> · ${R.o.name} · ${left} hostile${left > 1 ? 's' : ''}${fr ? `<br>Gardes : ${fr}` : ''}`;
       if (h !== this._lastR) { E.raid.innerHTML = h; this._lastR = h; }
     }
     if (show) {
@@ -686,7 +761,7 @@ export class Ground {
     }
     // repères au-dessus des pirates visibles
     let i = 0;
-    if (this.raid && this.onFoot) {
+    if (this.raid && this.armed) {
       for (const u of this.units) {
         if (u.side !== 'enemy' || u.down || !u.visToPlayer) continue;
         _v.copy(u.pos).setY(u.pos.y + 2.05).project(this.ctx.camera);

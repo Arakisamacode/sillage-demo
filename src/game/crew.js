@@ -345,8 +345,10 @@ export class Crew {
     for (const m of this.members) {
       const a = m.agent, carrying = this.cargo.crates.some((c) => c.carrier === a);
       const moving = carrying && a.task && (a.task.type === 'goto' || a.task.type === 'move');
-      if (moving && a.char.override !== 'push') a.char.play('push', { fade: 0.3 });
-      if (!moving && a.char.override === 'push') a.char.stop(0.3);
+      const crate = carrying && this.cargo.crates.find((c) => c.carrier === a);
+      a.char.carry = crate ? crate.mesh : null;
+      if (a.char.override === 'push') a.char.stop(0.3);
+      void moving;
     }
     // tourelle : balayage quand un artilleur est à son poste en vol
     const tur = this.loadout.meshes.dorsal;

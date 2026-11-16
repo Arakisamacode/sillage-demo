@@ -85,6 +85,13 @@ export const ORES = {
   corindon: { name: 'Corindon', raw: 320, ref: 700, tint: 0xc83a4a, instab: 0.5, resist: 0.72, w: 15 },
   aurelite: { name: 'Aurélite', raw: 900, ref: 2000, tint: 0xf2d04a, instab: 0.85, resist: 0.5, w: 8 },
 };
+// Marchés des matériaux raffinés : coefficient par minerai (la raffinerie d'Ardent rachète au rabais)
+export const MARKETS = {
+  ardent: { name: 'Plateforme Ardent-3', tag: 'raffinerie, rachat au rabais', k: { fer: 0.85, cuivre: 0.85, titane: 0.85, corindon: 0.85, aurelite: 0.85 } },
+  corvin: { name: 'Relais Corvin', tag: 'négoce : métaux de construction', k: { fer: 1.3, cuivre: 1.35, titane: 1.1, corindon: 0.95, aurelite: 1.0 } },
+  lys: { name: 'Station agricole Lys', tag: 'coopérative : alliages et électronique', k: { fer: 1.0, cuivre: 1.1, titane: 1.3, corindon: 1.35, aurelite: 1.4 } },
+};
+
 export const REFINE = [
   { id: 'fast', name: 'Rapide', time: 60, yield: 0.7, fee: 0.05, desc: '1 min · rendement 70 %' },
   { id: 'std', name: 'Standard', time: 180, yield: 0.85, fee: 0.08, desc: '3 min · rendement 85 %' },

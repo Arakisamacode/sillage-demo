@@ -43,6 +43,9 @@ export function buildQuai(ctx) {
   return { terminal: new THREE.Vector3(tx + 0.9, 0, tz) };
 }
 
+// une caisse portée à bras le corps est tenue compacte (sangles serrées), à hauteur de poitrine
+const CARRY_K = 0.7;
+
 export class Cargo {
   constructor(ctx, ship, flight) {
     this.ctx = ctx; this.ship = ship; this.flight = flight;
@@ -96,10 +99,10 @@ export class Cargo {
   inQuai(contract) { return this.crates.filter((c) => c.contract === contract && c.where === 'ground' && this.inQuaiZone(c.mesh.position)).length; }
   inQuaiZone(p) { return Math.abs(p.x - QUAI.x) < QUAI.w / 2 + 0.3 && Math.abs(p.z - QUAI.z) < QUAI.d / 2 + 0.3 && p.y < 0.5; }
 
-  _detach(c) { if (c.slot >= 0) this.slots[c.slot] = null; c.slot = -1; c.spot = -1; c.carrier = null; c.mesh.parent?.remove(c.mesh); }
+  _detach(c) { c.mesh.scale.setScalar(1); if (c.slot >= 0) this.slots[c.slot] = null; c.slot = -1; c.spot = -1; c.carrier = null; c.mesh.parent?.remove(c.mesh); }
   freeSpot() { const i = SPOTS.findIndex((s, k) => !this.crates.some((o) => o.where === 'ground' && o.spot === k)); return i < 0 ? null : SPOTS[i]; }
   /** Caisse portée par un membre d'équipage. */
-  carryBy(c, agent) { this._detach(c); c.where = 'npc'; c.carrier = agent; this.ctx.scene.add(c.mesh); }
+  carryBy(c, agent) { this._detach(c); c.where = 'npc'; c.carrier = agent; c.mesh.scale.setScalar(CARRY_K); this.ctx.scene.add(c.mesh); }
 
   toQuai(c) {
     const i = SPOTS.findIndex((s, k) => !this.crates.some((o) => o !== c && o.where === 'ground' && o.spot === k));
@@ -197,6 +200,7 @@ export class Cargo {
   pick(c) {
     this._detach(c);
     c.where = 'carried';
+    c.mesh.scale.setScalar(CARRY_K);
     this.carried = c;
     this.ctx.scene.add(c.mesh);
   }
@@ -206,13 +210,14 @@ export class Cargo {
     for (const k of this.crates) {
       if (k.where !== 'npc' || !k.carrier) continue;
       const a = k.carrier;
-      k.mesh.position.set(a.pos.x + Math.sin(a.yaw) * 0.62, a.pos.y + 0.38, a.pos.z + Math.cos(a.yaw) * 0.62);
+      k.mesh.position.set(a.pos.x + Math.sin(a.yaw) * 0.6, a.pos.y + 0.72, a.pos.z + Math.cos(a.yaw) * 0.6);
       k.mesh.rotation.set(0, a.yaw, 0);
     }
     const c = this.carried;
+    if (player.avatar) { player.avatar.carry = c ? c.mesh : null; player.faceCam = !!c; }
     if (!c) return;
-    c.mesh.position.set(player.pos.x - Math.sin(player.yaw) * 0.75, player.pos.y + 0.35, player.pos.z - Math.cos(player.yaw) * 0.75);
-    c.mesh.rotation.set(0, player.yaw, 0);
+    c.mesh.position.set(player.pos.x - Math.sin(player.yaw) * 0.6, player.pos.y + 0.72, player.pos.z - Math.cos(player.yaw) * 0.6);
+    c.mesh.rotation.set(0, player.yaw + Math.PI, 0);
   }
 
   /** Obstacles pour le joueur : caisses au sol et en soute (vaisseau posé à l'aire 02). */

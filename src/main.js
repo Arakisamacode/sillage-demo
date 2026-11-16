@@ -25,6 +25,7 @@ import { HeronLoadout } from './game/shipgear.js';
 import { ShopUI } from './ui/shop.js';
 import { buildOutposts } from './world/outposts.js';
 import { buildDerelict } from './world/derelict.js';
+import { buildBayCover } from './world/baycover.js';
 import { Cargo, buildQuai } from './game/cargo.js';
 import { Missions } from './game/missions.js';
 import { Crew } from './game/crew.js';
@@ -78,6 +79,7 @@ async function boot() {
   buildExterior(ctx);
   ctx.outposts = buildOutposts(ctx);
   ctx.derelict = buildDerelict(ctx);
+  buildBayCover(ctx);
   ctx.lights = buildLighting(ctx);
   const lib = new CharacterLibrary(manager, quality);
   const libReady = lib.load(undefined, (p) => progress(0.6 + 0.3 * p, 'Chargement des personnages'));
@@ -203,11 +205,21 @@ async function boot() {
       audio.say(`Ici ${a.name}. Nous sommes attaqués ! Des pirates sortent de la tour. Demandons assistance immédiate.`);
       toast(`Raid pirate sur ${a.name} · ${plural(b, 'assaillant', 'assaillants')} · ${touch ? 'ARME' : 'G'} : descendre armé`);
     }
+    if (e === 'alert') {
+      audio.say('Alerte. Intrusion armée, baie du hangar zéro sept. Civils, mettez-vous à l\'abri. Port d\'arme autorisé.');
+      toast(`Alerte intrusion · ${plural(a, 'pirate franchit', 'pirates franchissent')} le champ de la baie · ${touch ? 'ARME' : 'G'} : dégainer`);
+    }
+    if (e === 'alertEnd') { audio.say('Fin d\'alerte. Reprise normale des opérations.'); toast('Fin d\'alerte · armes rangées'); }
+    if (e === 'evacStation') toast(`Soigné à l'infirmerie de la station · −${money(a)} ¤ · la sécurité a repoussé l'intrusion`);
     if (e === 'boarding') audio.say('Sas ouvert. Contacts dans la soute.');
     if (e === 'boarded') toast(`À bord du cargo pirate · ${plural(ground.raid?.n || 4, 'pirate', 'pirates')} dans la soute${a ? ` · ${plural(a, 'garde', 'gardes')} avec vous` : ''}`);
     if (e === 'disembark') toast(a ? `Sur le pont · ${plural(a, 'garde vous accompagne', 'gardes vous accompagnent')}` : `Sur le pont de ${flight.dockedAt.name}`);
     if (e === 'kill') toast(`${a.name} neutralisé · prime +${money(b)} ¤${d ? ` · ${plural(d, 'pirate restant', 'pirates restants')}` : ''}${c === 'friend' ? ' (garde)' : ''}`);
-    if (e === 'cleared') { audio.say('Plateforme sécurisée. Merci, pilote. Paiement transféré.'); toast(`Plateforme sécurisée · ${c}`); }
+    if (e === 'cleared') {
+      const what = a.id === 'halden' ? 'Hangar sécurisé' : a.id === 'derelict' ? 'Cargo saisi' : 'Plateforme sécurisée';
+      audio.say(a.id === 'halden' ? 'Intrus neutralisés. Merci pour votre aide, pilote.' : a.id === 'derelict' ? 'Soute sécurisée.' : 'Plateforme sécurisée. Merci, pilote. Paiement transféré.');
+      toast(`${what} · ${c}`);
+    }
     if (e === 'loot') toast(`Butin ramassé · ${a}`);
     if (e === 'guardDown') toast(`${a.name} est à terre !`);
     if (e === 'down') { audio.say('Blessé grave. Évacuation vers le vaisseau.'); toast('Vous êtes à terre !'); }
@@ -472,7 +484,7 @@ async function boot() {
         if (cargo.carried) input.run = false;
         ground.footInput(dt, input);
         if (ground.dead) input.move.x = input.move.y = 0;
-        player.update(dt, input, ground.onFoot ? ground.units.filter((u) => !u.down) : crowd.agents.filter((a) => !a.attached), ground.onFoot ? [] : [...ctx.doors, ...cargo.blockers()]);
+        player.update(dt, input, ground.onFoot ? ground.units.filter((u) => !u.down) : [...crowd.agents.filter((a) => !a.attached), ...ground.units.filter((u) => !u.down)], ground.onFoot ? [] : [...ctx.doors, ...cargo.blockers()]);
         let near = null;
         if (ground.onFoot) near = ground.nearBoard() && !ground.dead ? { label: `E — Remonter à bord du Héron${ground.raid && !ground.raid.done ? ' (le raid continue)' : ''}`, fn: () => ground.reboard() } : null;
         else if (player.seated) near = { label: touch ? '⏻ — Décoller · E — Se lever' : 'ESPACE — Décoller · E — Se lever', fn: () => player.stand() };
