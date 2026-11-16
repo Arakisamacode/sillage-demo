@@ -122,9 +122,9 @@ qui servent de couverture. Le Héron s'y pose rampe face au pont.
 ## Module habitat
 
 Au fond de la galerie marchande, la porte « MODULE HABITAT » mène par un couloir au hall des ascenseurs.
-Les deux cabines montent au **pont habitat** (E dans la cabine) : promenade avec baie vitrée sur la planète,
+Les deux cabines circulent réellement dans leur gaine : appelez-les au palier (E), entrez, puis E pour monter au **pont habitat** (environ 8 s de trajet, repères lumineux qui défilent ; les portes palières ne s'ouvrent que si la cabine est à l'étage) : promenade avec baie vitrée sur la planète,
 **bar La Comète** (boissons à 8 ¤ et rumeurs utiles), **infirmerie** (soins complets à 250 ¤, un stylo
-médical offert) et **cabine 12** du joueur (repos : santé au maximum et sauvegarde).
+médical offert) et **cabine 12** du joueur (repos : santé au maximum et sauvegarde). Le long du mur nord, les autres cabines numérotées affichent libre / occupée. Sur le pont, un serveur fait sa tournée, un couple se promène le long de la baie, un résident rentre chez lui.
 
 ## Alerte d'intrusion (hangar 07)
 

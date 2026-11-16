@@ -82,41 +82,70 @@ export function buildHabitat(ctx) {
   room(-108, -100, 2, 10, Y, 3.4, [{ side: 's', a: -105.6, b: -102.4, h: 2.8 }], mats.paint(0xe6ecef, { grime: 0.15, rough: 0.5 }));
   room(-94, -86, 2, 8, Y, 3.0, [{ side: 's', a: -91.6, b: -88.4, h: 2.8 }], mats.paint(0x8a7a66, { grime: 0.2, rough: 0.6 }));
 
-  // ------------------------------------------------------------------ cabines d'ascenseur (les deux niveaux)
-  const cabins = [];
-  for (const y of [0, Y]) {
-    for (const c of CAB) {
-      const x0 = LOBBY.x0 - 2.4, x1 = LOBBY.x0;
-      box(2.4, 0.3, 2.2, dark, [x0 + 1.2, y - 0.15, c], true);
-      box(2.4, 0.2, 2.2, wallD, [x0 + 1.2, y + 2.7, c]);
-      box(0.2, 2.8, 2.2, mats.metal(0x6a6e72, { rough: 0.3 }), [x0 - 0.1, y + 1.4, c], true);
-      for (const s of [-1, 1]) box(2.4, 2.8, 0.15, mats.metal(0x6a6e72, { rough: 0.3 }), [x0 + 1.2, y + 1.4, c + s * 1.08], true);
-      box(1.8, 0.04, 0.3, cold, [x0 + 1.2, y + 2.58, c]);
-      box(0.05, 0.4, 0.25, green, [x0 + 0.05, y + 1.3, c + 0.6]);
-      // cadre et vantaux
+  // ------------------------------------------------------------------ ascenseurs : gaines sur toute la hauteur, cabines mobiles
+  const shafts = [];
+  const metalCab = mats.metal(0x6a6e72, { rough: 0.3 }), shaftM = mats.paint(0x2a2d30, { grime: 0.8, rust: 0.2 });
+  const amber = mats.emissive(0xffa040, 2.4);
+  for (const c of CAB) {
+    const x0 = LOBBY.x0 - 2.6, x1 = LOBBY.x0, H0 = -0.4, H1 = Y + 4.6, hh = H1 - H0;
+    // gaine : fond, flancs, façade entre les paliers (béton sombre, repères lumineux tous les 3 m)
+    box(0.3, hh, 2.8, shaftM, [x0 - 0.15, (H0 + H1) / 2, c], true);
+    for (const s2 of [-1, 1]) box(2.9, hh, 0.3, shaftM, [x0 + 1.3, (H0 + H1) / 2, c + s2 * 1.4], true);
+    box(0.3, Y - 4.2, 2.4, shaftM, [x1 - 0.05, (4.2 + Y) / 2, c]);
+    for (let y = 3; y < Y; y += 3) {
+      box(0.05, 0.08, 1.8, amber, [x0 + 0.02, y, c]);
+      for (const s2 of [-1, 1]) box(2.2, 0.08, 0.05, amber, [x0 + 1.3, y, c + s2 * 1.23]);
+    }
+    // planchers des paliers (collision seulement : le sol visible est celui de la cabine)
+    for (const y of [0, Y]) B.colliderBox(2.6, 0.3, 2.4, [x0 + 1.3, y - 0.15, c]);
+    // cabine mobile
+    const cab = new THREE.Group();
+    const add = (geo, m, x, y, z) => { const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); o.receiveShadow = true; cab.add(o); return o; };
+    add(new THREE.BoxGeometry(2.5, 0.2, 2.4), dark, 1.25, -0.1, 0);
+    add(new THREE.BoxGeometry(2.5, 0.02, 2.3), mats.metal(0x3a3c3e, { rough: 0.6 }), 1.25, 0.01, 0);
+    add(new THREE.BoxGeometry(2.5, 0.15, 2.4), wallD, 1.25, 2.78, 0);
+    add(new THREE.BoxGeometry(1.8, 0.04, 0.3), new THREE.MeshBasicMaterial({ color: new THREE.Color(2.2, 2.6, 3) }), 1.25, 2.69, 0);
+    add(new THREE.BoxGeometry(0.1, 2.7, 2.3), metalCab, 0.05, 1.35, 0);
+    for (const s2 of [-1, 1]) add(new THREE.BoxGeometry(2.4, 2.7, 0.08), metalCab, 1.25, 1.35, s2 * 1.12);
+    add(new THREE.BoxGeometry(0.06, 0.06, 2.2), new THREE.MeshBasicMaterial({ color: new THREE.Color(3, 2, 1) }), 0.12, 1.0, 0);
+    const panel = add(new THREE.BoxGeometry(0.05, 0.5, 0.3), new THREE.MeshBasicMaterial({ color: new THREE.Color(0.4, 3, 1) }), 2.3, 1.3, 1.05);
+    cab.position.set(x0 + 0.05, 0, c);
+    scene.add(cab);
+    // portes palières
+    const doors = {};
+    for (const y of [0, Y]) {
       box(0.3, 0.4, 2.4, trim, [x1, y + 2.8, c]);
       const leaves = [];
-      for (const s of [-1, 1]) {
+      for (const s2 of [-1, 1]) {
         const m = new THREE.Mesh(new THREE.BoxGeometry(0.08, 2.6, 0.9), mats.metal(0x9aa0a4, { rough: 0.25 }));
-        m.position.set(x1 - 0.05, y + 1.3, c + s * 0.45); scene.add(m); leaves.push({ m, s, base: c + s * 0.45 });
+        m.position.set(x1 - 0.05, y + 1.3, c + s2 * 0.45); scene.add(m); leaves.push({ m, s: s2, base: c + s2 * 0.45 });
       }
+      const lamp = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.12, 0.5), new THREE.MeshBasicMaterial({ color: new THREE.Color(4, 1.5, 0.3) }));
+      lamp.position.set(x1 + 0.2, y + 3.15, c); scene.add(lamp);
       const door = {
-        x: x1, z: c, y, w: 1.8, h: 2.6, open: 0, target: 0, leaves, forced: 0,
+        x: x1, z: c, y, w: 1.8, h: 2.6, open: 0, target: 0, leaves, lamp, shaft: null,
         box: new THREE.Box3(new THREE.Vector3(x1 - 0.15, y, c - 0.9), new THREE.Vector3(x1 + 0.15, y + 2.6, c + 0.9)),
         update(dt, actors) {
-          let near = this.forced > 0;
-          this.forced -= dt;
-          for (const p of actors) if (Math.abs(p.x - this.x) < 2.6 && Math.abs(p.z - this.z) < 1.6 && Math.abs((p.y ?? 0) - this.y) < 2) { near = true; break; }
-          this.target = near ? 1 : 0;
+          // ne s'ouvre que si la cabine est arrêtée à ce palier
+          const S = this.shaft, here = S && !S.moving && Math.abs(S.y - this.y) < 0.05;
+          let near = false;
+          if (here) for (const p of actors) if (Math.abs(p.x - this.x) < 2.6 && Math.abs(p.z - this.z) < 1.6 && Math.abs((p.y ?? 0) - this.y) < 2) { near = true; break; }
+          this.target = here && (near || S.hold > 0) ? 1 : 0;
           this.open += Math.sign(this.target - this.open) * Math.min(Math.abs(this.target - this.open), dt * 1.8);
           const e = this.open * this.open * (3 - 2 * this.open);
           for (const l of leaves) l.m.position.z = l.base + l.s * e * 0.85;
+          lamp.material.color.setRGB(here ? 0.4 : 4, here ? 4 : 1.5, 0.3);
         },
       };
       ctx.doors.push(door);
-      cabins.push({ y, c, door, inside: new THREE.Vector3(x0 + 1.1, y, c) });
+      doors[y] = door;
     }
+    const S = { c, x0, x1, cab, panel, doors, y: c === CAB[0] ? 0 : Y, moving: false, hold: 0, inside: (y) => new THREE.Vector3(x0 + 1.15, y, c) };
+    cab.position.y = S.y;
+    doors[0].shaft = doors[Y].shaft = S;
+    shafts.push(S);
   }
+
   // enseignes
   const sign = (text, color, size, w, p, ry) => {
     const nt = neonTexture(text, color, { size });
@@ -184,16 +213,68 @@ export function buildHabitat(ctx) {
   box(0.8, 0.5, 0.04, cold, [-87, Y + 1.3, 7.9]);
   box(2.4, 0.05, 0.3, warm, [-90, Y + 2.95, 5]);
 
+  // portes de cabines numérotées le long du mur nord (fermées, voyant libre / occupée)
+  const cabinDoors = [];
+  [[-110, '08', true], [-98.5, '10', true], [-95.5, '11', false], [-84.8, '14', true], [-82, '15', false]].forEach(([x, num, busy]) => {
+    box(1.6, 2.8, 0.12, trim, [x, Y + 1.4, HALL.z1 - 0.2]);
+    box(1.3, 2.6, 0.1, mats.metal(0x5a6066, { rough: 0.35 }), [x, Y + 1.3, HALL.z1 - 0.26]);
+    box(0.25, 0.08, 0.04, busy ? mats.emissive(0xff4a3a, 3) : mats.emissive(0x7dff9a, 3), [x + 0.45, Y + 1.55, HALL.z1 - 0.32]);
+    const nt = neonTexture(num, '#ffd27a', { size: 70 });
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(0.55, 0.55 / nt.aspect), neonMaterial(nt.tex, 1.8));
+    m.position.set(x, Y + 3.05, HALL.z1 - 0.32); m.rotation.y = Math.PI; scene.add(m);
+    cabinDoors.push({ pos: new THREE.Vector3(x, Y, HALL.z1 - 1.0), num, busy });
+  });
   // lumières (allumées seulement quand le joueur est sur le pont)
   const lights = [[-104, -12, 0xffd0a0], [-88, -12, 0xffb070], [-104, 6, 0xd8f0ff]].map(([x, z, c]) => {
     const l = new THREE.PointLight(c, 0, 26, 1.6); l.position.set(x, Y + 4, z); l.visible = false; scene.add(l); return l;
   });
 
   return {
-    cabins, lights, stools, chairs, benches,
+    shafts, lights, stools, chairs, benches, cabinDoors,
     bar: new THREE.Vector3(bx - 1.2, Y, -12), bartender: new THREE.Vector3(bx + 0.9, Y, -12),
     clinic: new THREE.Vector3(-102, Y, 8.2), doctor: new THREE.Vector3(-102.4, Y, 8.9),
     bunk: new THREE.Vector3(-92.6, Y, 6.3),
     onDeck: (p) => p.y > Y - 5,
   };
+}
+
+/** Commande des ascenseurs : appel au palier, trajet de la cabine (joueur à bord), arrivée portes ouvertes. */
+export class Elevators {
+  constructor(shafts, player) {
+    this.shafts = shafts; this.player = player;
+    this.onEvent = () => {};
+    this.t = 0;
+  }
+  get riding() { return this.shafts.find((s) => s.carry) || null; }
+  isAt(S, y) { return !S.moving && Math.abs(S.y - y) < 0.05; }
+  _start(S, to, carry) {
+    S.from = S.y; S.to = to; S.k = 0; S.moving = true; S.carry = carry; S.closeT = 1.3; S.hold = 0;
+    this.onEvent('start', S);
+  }
+  call(S, y) { if (S.moving) return; if (this.isAt(S, y)) { S.hold = 3; return; } this._start(S, y, false); this.onEvent('called', S); }
+  ride(S) { if (S.moving) return; this._start(S, S.y < 1 ? DECK_Y : 0, true); }
+  /** À appeler avant la mise à jour du joueur : déplace les cabines et le joueur embarqué. */
+  update(dt) {
+    this.t += dt;
+    for (const S of this.shafts) {
+      S.hold -= dt;
+      if (!S.moving) continue;
+      if (S.closeT > 0) S.closeT -= dt;
+      else {
+        S.k = Math.min(1, S.k + dt / 7);
+        const e = S.k * S.k * (3 - 2 * S.k);
+        S.y = S.from + (S.to - S.from) * e;
+        if (S.k >= 1) { S.y = S.to; S.moving = false; S.hold = 4; const was = S.carry; S.carry = false; this.onEvent('arrived', S, was); }
+      }
+      S.cab.position.y = S.y;
+      S.panel.material.color.setRGB(this.t % 0.6 < 0.3 ? 3 : 0.6, this.t % 0.6 < 0.3 ? 2 : 0.4, 0.3);
+      if (S.carry || (S.moving && this._inside(S))) {
+        const P = this.player;
+        P.pos.y = S.y + 0.02; P.vel.set(0, 0, 0);
+        P.pos.x = THREE.MathUtils.clamp(P.pos.x, S.x0 + 0.4, S.x0 + 2.2);
+        P.pos.z = THREE.MathUtils.clamp(P.pos.z, S.c - 0.8, S.c + 0.8);
+      }
+    }
+  }
+  _inside(S) { const P = this.player; return P.pos.x > S.x0 - 0.2 && P.pos.x < S.x1 - 0.1 && Math.abs(P.pos.z - S.c) < 1.1 && Math.abs(P.pos.y - S.y) < 3; }
 }

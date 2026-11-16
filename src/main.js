@@ -26,7 +26,7 @@ import { ShopUI } from './ui/shop.js';
 import { buildOutposts } from './world/outposts.js';
 import { buildDerelict } from './world/derelict.js';
 import { buildBayCover, buildAirlockSign } from './world/baycover.js';
-import { buildHabitat, DECK_Y } from './world/habitat.js';
+import { buildHabitat, DECK_Y, Elevators } from './world/habitat.js';
 import { Cargo, buildQuai } from './game/cargo.js';
 import { Missions } from './game/missions.js';
 import { Crew } from './game/crew.js';
@@ -187,8 +187,39 @@ async function boot() {
     const tops = [0x6a4a32, 0x1a2436, 0x5d6168, 0xa89470, 0x2b3036, 0x7a2a24];
     seats.forEach((st, i) => put(looks[i][0], { height: looks[i][0].startsWith('UF') ? 1.68 : 1.8, hair: looks[i][1] }, st.p, st.yaw, i % 2 ? 'sitTalk' : 'sit', { top: tops[i], accent: 0xc8b48a, belt: true }));
     put('UM_light', { height: 1.78, hair: 'Hair_Buzzed' }, HB.stools[2].clone().add(new THREE.Vector3(-0.3, 0, 0)), Math.PI / 2, 'talk', { top: 0x3a4a2a, accent: 0xd0a040 });
+    // habitants qui circulent : serveur, couple en promenade le long de la baie, résident qui rentre en cabine
+    const Y40 = DECK_Y, V = (x, z) => new THREE.Vector3(x, Y40, z);
+    const walkers = [];
+    const walker = (c, route) => { walkers.push({ c, route, i: 0, pause: Math.random() * 2, pos: route[0].p.clone() }); c.root.position.copy(route[0].p); };
+    walker(put('UF_dark', { height: 1.7, hair: 'Hair_Buns' }, V(-87, -17), 0, null, { top: 0x2a2224, bottom: 0x1c1c1e, accent: 0xffb84a, zip: true }), [
+      { p: V(-87, -17), wait: 4, anim: 'idle', face: Math.PI / 2 }, { p: V(-97, -15), wait: 3, anim: 'talk', face: Math.PI / 2 },
+      { p: V(-97, -3), wait: 0 }, { p: V(-103, -3), wait: 3, anim: 'talk', face: Math.PI }, { p: V(-89, -2), wait: 0 }]);
+    const stroll = (dx) => [{ p: V(-109 + dx, -20), wait: 6, anim: 'talk', face: Math.PI }, { p: V(-96 + dx, -20), wait: 5, anim: 'idle', face: Math.PI }, { p: V(-84 + dx, -20), wait: 6, anim: 'talk', face: Math.PI }, { p: V(-96 + dx, -19.4), wait: 0 }];
+    walker(put('UM_light', { height: 1.8, hair: 'Hair_SimpleParted' }, V(-109, -20), 0, null, { top: 0x6a4a32, accent: 0xc8b48a, belt: true }), stroll(0));
+    walker(put('UF_light', { height: 1.66, hair: 'Hair_Long' }, V(-108.3, -20), 0, null, { top: 0x1a2436, accent: 0x3e8ad8 }), stroll(0.75));
+    walker(put('UM_dark', { height: 1.82, hair: 'Hair_Buzzed' }, V(-114, -11), 0, null, { top: 0x5d6168, bottom: 0x3a3d42, accent: 0xe8762a, hivis: true }), [
+      { p: V(-114, -11), wait: 6, anim: 'idle', face: -Math.PI / 2 }, { p: V(-109, -4), wait: 0 }, { p: V(-98.5, 0.6), wait: 4, anim: 'idle', face: 0 }, { p: V(-104, -2), wait: 0 }]);
+    const stepWalkers = (dt) => {
+      for (const w of walkers) {
+        const T = w.route[w.i];
+        if (w.pause > 0) {
+          w.pause -= dt; w.c.setSpeed(0);
+          if (T.face !== undefined) { let d = T.face - w.c.root.rotation.y; d = Math.atan2(Math.sin(d), Math.cos(d)); w.c.root.rotation.y += d * (1 - Math.exp(-dt * 4)); }
+          if (w.pause <= 0) { if (w.c.override) w.c.stop(0.3); w.i = (w.i + 1) % w.route.length; }
+          continue;
+        }
+        const d = new THREE.Vector3().subVectors(T.p, w.pos).setY(0), L = d.length();
+        if (L < 0.15) { w.pause = T.wait || 0.01; if (T.anim && T.anim !== 'idle') w.c.play(T.anim, { fade: 0.4 }); continue; }
+        w.pos.addScaledVector(d.normalize(), Math.min(L, 1.3 * dt));
+        w.c.root.position.copy(w.pos);
+        let dy = Math.atan2(d.x, d.z) - w.c.root.rotation.y; dy = Math.atan2(Math.sin(dy), Math.cos(dy));
+        w.c.root.rotation.y += dy * (1 - Math.exp(-dt * 8));
+        w.c.setSpeed(1.3);
+      }
+    };
     ctx.updaters.push((dt) => {
       const on = HB.onDeck(player.pos);
+      if (on) stepWalkers(dt);
       for (const l of HB.lights) l.visible = on;
       for (const c of people) { c.root.visible = on; if (on) c.update(dt, null); }
     });
@@ -311,19 +342,25 @@ async function boot() {
   const HB = ctx.habitat;
   const fadeEl = $('fade');
   const fadeDo = (fn, hold = 450) => { fadeEl.classList.add('on'); setTimeout(() => { fn(); setTimeout(() => fadeEl.classList.remove('on'), hold); }, 480); };
-  for (const cab of HB.cabins) {
-    const up = cab.y === 0;
-    interactables.push({ pos: cab.inside.clone(), r: 1.3, label: up ? 'E — Ascenseur : monter au pont habitat' : 'E — Ascenseur : descendre à la galerie', fn: () => {
-      const dest = HB.cabins.find((k) => k.c === cab.c && k.y !== cab.y);
-      audio.blip();
-      fadeDo(() => {
-        player.pos.set(dest.inside.x + 0.3, dest.y + 0.02, dest.inside.z); player.vel.set(0, 0, 0);
-        player.yaw = -Math.PI / 2; player.pitch = 0;
-        dest.door.forced = 2.5;
-        toast(up ? 'Pont habitat · bar La Comète, infirmerie, cabine 12' : 'Rez-de-chaussée · galerie marchande');
-      }, 700);
-    } });
+  const elevators = new Elevators(HB.shafts, player);
+  ctx.elevators = elevators;
+  elevators.onEvent = (e, S, carried) => {
+    if (e === 'start' || e === 'arrived') audio.blip();
+    if (e === 'called') toast('Ascenseur appelé · cabine en approche');
+    if (e === 'arrived' && carried) toast(S.y > 1 ? 'Pont habitat · bar La Comète, infirmerie, cabines' : 'Rez-de-chaussée · galerie marchande');
+  };
+  for (const S of HB.shafts) {
+    for (const y of [0, DECK_Y]) {
+      interactables.push({ pos: S.inside(y), r: 1.2, when: () => elevators.isAt(S, y), label: y === 0 ? 'E — Ascenseur : monter au pont habitat' : 'E — Ascenseur : descendre à la galerie', fn: () => elevators.ride(S) });
+      interactables.push({ pos: new THREE.Vector3(S.x1 + 1.3, y, S.c), r: 1.3, when: () => !elevators.isAt(S, y) && !S.moving, label: 'E — Appeler l\'ascenseur', fn: () => elevators.call(S, y) });
+      interactables.push({ pos: new THREE.Vector3(S.x1 + 1.3, y, S.c), r: 1.3, when: () => S.moving, label: 'Ascenseur en mouvement…', fn: () => null });
+    }
   }
+  const OCCUPANTS = { '08': 'un mécanicien de nuit', '10': 'une pilote de convoi', '14': 'un négociant de Corvin' };
+  for (const d of HB.cabinDoors) interactables.push({ pos: d.pos, r: 1.3, label: `E — Cabine ${d.num}`, fn: () => {
+    audio.blip();
+    toast(d.busy ? `Cabine ${d.num} · occupée par ${OCCUPANTS[d.num] || 'un résident'} · « Ne pas déranger »` : `Cabine ${d.num} · libre · location à la nuit 120 ¤ (votre cabine 12 vous attend, porte suivante)`);
+  } });
   const DRINKS = ['Thé fumé de Lys', 'Bière de soute', 'Café serré', 'Eau pétillante recyclée', 'Liqueur d\'aurélite (sans aurélite)'];
   const GOSSIP = ['« Les cargos pirates passent souvent près de la ceinture d\'Ardent. »', '« Corvin paie bien le cuivre, ces temps-ci. »', '« Lys rachète le titane au prix fort. »', '« Une alerte au hangar 07 ? Ça arrive plus qu\'on ne croit. »', '« Embauchez un artilleur, la tourelle ne se sert pas toute seule. »'];
   interactables.push({ pos: HB.bar, r: 1.6, label: 'E — Commander au bar (8 ¤)', fn: () => {
@@ -606,13 +643,15 @@ async function boot() {
         if (input.consume('view')) player.toggleView();
         if (cargo.carried) input.run = false;
         ground.footInput(dt, input);
+        elevators.update(dt);
+        if (elevators.riding) input.move.x = input.move.y = 0;
         if (ground.dead) input.move.x = input.move.y = 0;
         player.update(dt, input, ground.onFoot ? ground.units.filter((u) => !u.down) : [...crowd.agents.filter((a) => !a.attached), ...ground.units.filter((u) => !u.down)], ground.onFoot ? [] : [...ctx.doors, ...cargo.blockers()]);
         let near = null;
         if (ground.onFoot) near = ground.nearBoard() && !ground.dead ? { label: `E — Remonter à bord du Héron${ground.raid && !ground.raid.done ? ' (le raid continue)' : ''}`, fn: () => ground.reboard() } : null;
         else if (player.seated) near = { label: touch ? 'DÉCOL. — Décoller · LEVER — Se lever' : 'ESPACE — Décoller · E — Se lever', fn: () => player.stand() };
         else near = cargo.prompt(player);
-        if (!near && !player.seated && !ground.onFoot) for (const it of interactables) if (it.pos.distanceTo(player.pos) < it.r) { near = it; break; }
+        if (!near && !player.seated && !ground.onFoot) for (const it of interactables) if (it.pos.distanceTo(player.pos) < it.r && (!it.when || it.when())) { near = it; break; }
         promptEl.classList.toggle('hidden', !near);
         if (near) promptEl.textContent = near.label;
         if (player.seated && (input.consume('fly') || input.consume('flyKey'))) { flight.takeOff(); if (player.avatar) player.avatar.root.visible = false; }
