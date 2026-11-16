@@ -241,7 +241,7 @@ async function boot() {
     if (e === 'nolock') toast('Pas de verrouillage · gardez la cible dans l\'axe pendant 3 s');
     if (e === 'launch') toast(`Missile lancé · ${plural(a, 'restant', 'restants')}`);
     if (e === 'destroyed') { audio.say('Alerte. Perte d\'intégrité de la coque. Éjection.'); toast('Héron détruit !'); }
-    if (e === 'disabled') { audio.say('Cargo pirate désemparé. Arrimage possible.'); toast(`${a.K.name} désemparé · approchez à moins de 120 m, ralentissez · ${touch ? 'E' : 'E / B'} : arrimer et aborder`); }
+    if (e === 'disabled') { audio.say('Cargo pirate désemparé. Arrimage possible.'); toast(`${a.K.name} désemparé · approchez à moins de 150 m, ralentissez · ${touch ? 'E' : 'E / B'} : arrimer et aborder`); }
     if (e === 'docked') { flight.lastDock = flight.dockedAt; toast('Arrimage · passage du sas'); }
     if (e === 'escorts') toast('Impossible d\'arrimer : éliminez d\'abord les escortes');
     if (e === 'escaped') toast(`${a.K.name} s'est échappé`);

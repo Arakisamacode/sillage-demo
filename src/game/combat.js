@@ -106,6 +106,7 @@ function freighterMesh() {
   const base = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.9, 1.2, 16), K.plate); tur.add(base);
   for (const x of [-0.6, 0.6]) { const b = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 3.6, 8), K.plate); b.rotation.x = Math.PI / 2; b.position.set(x, 0.6, -1.8); tur.add(b); }
   g.userData.turret = tur;
+  g.scale.setScalar(1.6);
   for (const [x, y, z] of [[5.6, 3.8, -16], [-5.6, 3.8, -16], [0, 4.6, 16]]) add(new THREE.SphereGeometry(0.25, 8, 6), K.glow, x, y, z);
   return g;
 }
@@ -261,7 +262,7 @@ export class Combat {
       const plumes = []; mesh.traverse((o) => { if (o.userData.plume) plumes.push(o); });
       this.pirates.push({
         kind, K, mesh, bubble, plumes, pos, q: mesh.quaternion.clone(), vel: new THREE.Vector3().copy(base).multiplyScalar(-K.speed),
-        shield: K.shield, hull: K.hull, state: K.freighter ? 'run' : 'attack', t: 0, fireCd: Math.random(), side: 1, bubbleAmp: 0, r: K.freighter ? 17 : 7.5 * K.scale,
+        shield: K.shield, hull: K.hull, state: K.freighter ? 'run' : 'attack', t: 0, fireCd: Math.random(), side: 1, bubbleAmp: 0, r: K.freighter ? 27 : 7.5 * K.scale,
         orbit: Math.random() < 0.5 ? -1 : 1, jink: Math.random() * 10,
       });
     }
@@ -303,7 +304,7 @@ export class Combat {
       p.fireCd -= dt;
       if (p.fireCd <= 0) {
         p.fireCd = 1 / K.rate; p.side = -p.side;
-        const muzzle = tur.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0, 1.5, 0));
+        const muzzle = tur.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0, 2.5, 0));
         const tof = dist / GUNS.pirate.speed;
         const aim = F.pos.clone().add(new THREE.Vector3(0, 4, 0)).addScaledVector(F.vel, tof);
         const dir = aim.sub(muzzle).normalize().add(new THREE.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).multiplyScalar(0.03)).normalize();
@@ -316,7 +317,7 @@ export class Combat {
   boardable() {
     const F = this.flight;
     if (F.state !== 'flying' || F.vel.length() > 30) return null;
-    return this.pirates.find((p) => p.state === 'disabled' && p.scuttleT === undefined && p.pos.distanceTo(F.pos) < 120) || null;
+    return this.pirates.find((p) => p.state === 'disabled' && p.scuttleT === undefined && p.pos.distanceTo(F.pos) < 150) || null;
   }
   /** Arrimage le long du cargo : le Héron se range à son flanc, posé « à quai ». */
   dock(fr) {
@@ -324,7 +325,7 @@ export class Combat {
     if (this.pirates.some((p) => p !== fr && !p.dead && p.state !== 'flee')) { this.onEvent('escorts'); return false; }
     fr.vel.set(0, 0, 0);
     const q = fr.q.clone();
-    const pos = fr.pos.clone().add(new THREE.Vector3(24, -2, 0).applyQuaternion(q));
+    const pos = fr.pos.clone().add(new THREE.Vector3(32, -3, 0).applyQuaternion(q));
     const pad = { id: 'derelict', name: 'Rançonneur (désemparé)', boarding: true, pos, q, freighter: fr };
     F.pos.copy(pos); F.q.copy(q); F.vel.set(0, 0, 0); F.rate.set(0, 0, 0);
     F.state = 'parked'; F.dockedAt = pad; F.throttle = 0;
@@ -403,7 +404,7 @@ export class Combat {
     if (p.hull <= 0) this._kill(p);
   }
   _kill(p, scuttled) {
-    this._boom(p.pos, p.K.freighter ? 26 : 8 * p.K.scale, p.vel.clone().multiplyScalar(0.3));
+    this._boom(p.pos, p.K.freighter ? 40 : 8 * p.K.scale, p.vel.clone().multiplyScalar(0.3));
     this.ctx.scene.remove(p.mesh);
     p.dead = true;
     if (scuttled) { this.onEvent('scuttled', p); return; }

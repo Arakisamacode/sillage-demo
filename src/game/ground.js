@@ -674,7 +674,7 @@ export class Ground {
     if (this.raid) {
       const R = this.raid, left = this.enemiesLeft() + (R.n - R.spawned);
       const fr = this.units.filter((u) => u.side === 'friend').map((u) => `${u.name} ${u.down ? '<i>à terre</i>' : Math.round(u.hp / u.maxHp * 100) + ' %'}`).join(' · ');
-      const h = R.done ? `<b class="ok">PLATEFORME SÉCURISÉE</b> · ${R.kills} pirates neutralisés` : `<b>RAID PIRATE</b> · ${R.o.name} · ${left} hostile${left > 1 ? 's' : ''}${fr ? `<br>Gardes : ${fr}` : ''}`;
+      const h = R.done ? `<b class="ok">${R.boarding ? 'CARGO SAISI' : 'PLATEFORME SÉCURISÉE'}</b> · ${R.kills} pirates neutralisés` : `<b>${R.boarding ? 'ABORDAGE' : 'RAID PIRATE'}</b> · ${R.o.name} · ${left} hostile${left > 1 ? 's' : ''}${fr ? `<br>Gardes : ${fr}` : ''}`;
       if (h !== this._lastR) { E.raid.innerHTML = h; this._lastR = h; }
     }
     if (show) {

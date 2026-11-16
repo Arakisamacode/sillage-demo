@@ -119,6 +119,21 @@ qui servent de couverture. Le Héron s'y pose rampe face au pont.
 - **Récompenses** : 420 à 720 ¤ par pirate, puis le contrat de sécurité ou une prime de 1 500 ¤.
 - **À terre** : évacuation à bord, soins d'urgence (1 200 ¤), le raid échoue (le contrat reste ouvert).
 
+## Abordage
+
+Certaines vagues pirates escortent un **cargo Rançonneur** qui tente de fuir (il s'échappe au-delà de
+3,6 km). Abattez ses boucliers puis sa coque sous 30 % : il est **désemparé** (moteurs coupés, étincelles).
+Après avoir éliminé les escortes, approchez à moins de 150 m en ralentissant puis **E / B** : le Héron
+s'arrime à son flanc et vous passez le sas, avec vos gardes. La soute est défendue par 4 à 5 pirates ;
+une fois saisie, deux caisses de contrebande attendent près de la porte du fond (1 400 à 3 000 ¤ chacune).
+Remontez par le sas (**E**), puis **Espace** pour vous désarrimer : le cargo se saborde derrière vous.
+
+## Équipage à bord
+
+L'équipage embarqué est visible à son poste dans le Héron et suit le vaisseau en vol : l'artilleur au
+siège du copilote (tourelle télé-opérée), le garde en haut de la rampe, les autres dans la soute et sur
+le pont supérieur. Les gardes qui descendent combattre quittent leur poste et le reprennent au retour.
+
 ## Équipage
 
 Au **bureau de recrutement** de la galerie (Guilde des équipages, extrémité est, côté baie), on engage
