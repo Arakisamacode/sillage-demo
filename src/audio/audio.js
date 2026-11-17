@@ -116,6 +116,16 @@ export class Audio {
   // --------------------------------------------------------------------------- annonces
   /** annonce libre (carillon + voix) */
   say(text) { this._sayText = text; this.announce('custom'); }
+  /** Réplique d'un personnage (voix de synthèse sans carillon) ; v : { pitch, rate }. */
+  speakAs(text, v = {}) {
+    if (!this.enabled || !window.speechSynthesis || !window.SpeechSynthesisUtterance) return;
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text.replace(/[«»]/g, ''));
+    u.lang = 'fr-FR'; u.rate = v.rate ?? 1.0; u.pitch = v.pitch ?? 1.0; u.volume = 0.8;
+    const vs = speechSynthesis.getVoices().filter((x) => x.lang && x.lang.startsWith('fr'));
+    if (vs.length) u.voice = vs[(v.idx ?? 0) % vs.length];
+    speechSynthesis.speak(u);
+  }
 
   announce(kind) {
     if (!this.ac || !this.enabled) return;

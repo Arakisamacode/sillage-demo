@@ -148,6 +148,21 @@ sortie), font la queue au restaurant choisi, commandent, reçoivent leur plateau
 cuillère ou à la main, mastication, pauses conversation ; le plat diminue), puis rapportent le plateau au point de tri
 et redescendent à la galerie. Le cuisinier vient servir quand un client attend.
 
+## Récit, conversations et mode analyse
+
+- **Conversations cinématiques** : plan rapproché sur l'interlocuteur, bandes noires, sous-titres et voix de synthèse,
+  roue de réponses (touches 1-6, clic ou toucher). Le ton des réponses est coloré : bleu (calme → Sérénité),
+  rouge (ferme → Audace), gris (questions). Réputation affichée : Sérénité, Audace, réputation de Halden.
+  Personnages : Joss Varrin (barman de La Comète : boissons, rumeurs, histoire de la station, tournée générale),
+  Dr Salek (infirmerie), Mira Castel (conciergerie de La Couronne), Iréna Solvay (prévisionniste).
+- **Récit principal « L'Équation de Halden »** : Iréna Solvay, devant sa sphère des tendances à La Couronne, a calculé
+  que la station s'effondrera dans quarante ans. Porter son noyau de calcul à la station agricole Lys (se poser),
+  protéger la diffusion contre trois intercepteurs (combat spatial, transmissions radio avec portrait), revenir
+  et choisir : rendre la projection publique ou la confier au Conseil (30 000 ¤). Objectif affiché en haut à gauche.
+- **Mode analyse** (C, bouton SCAN) : filtre holographique et balayage, nom et fonction des personnes, points
+  d'interaction, éléments remarquables à analyser (vaisseaux, yacht, sculpture, sphère, coupole, Cour des Saveurs)
+  qui enrichissent le **codex** (K) : lieux, vaisseaux, culture, factions.
+
 ## La Couronne (étage de prestige)
 
 Depuis le hall du pont habitat (coin nord-ouest), un **ascenseur panoramique en verre** monte 30 m plus haut jusqu'à

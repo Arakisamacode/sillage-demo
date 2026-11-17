@@ -329,6 +329,34 @@ export function buildLuxury(ctx) {
     add(new THREE.TorusGeometry(0.75, 0.025, 6, 64), gold, M4(p.clone().setY(Y + 0.8), 0, [1, 1, 1], Math.PI / 2));
     if (MD?.has('potted_plant_02')) MD.place(B, low ? 'potted_plant_04' : 'potted_plant_02', p.x, Y + 0.78 - (low ? 0.55 : 0.6), p.z, { fit: ['y', 1.8], ry: th });
   }
+  // sphère des tendances d'Iréna Solvay (galerie d'observation, au sud) : anneaux de calculs, nuage de trajectoires
+  {
+    const th = Math.PI - 0.2, base = P(th, 14.4);
+    add(new THREE.CylinderGeometry(0.55, 0.75, 0.9, 48), graphite, M4(base.clone().setY(Y + 0.45)), { collide: true });
+    add(new THREE.TorusGeometry(0.6, 0.02, 6, 64), glowCyan, M4(base.clone().setY(Y + 0.88), 0, [1, 1, 1], Math.PI / 2));
+    const sph = new THREE.Group(); sph.position.copy(base).setY(Y + 2.1); scene.add(sph);
+    const glyphTex = (seed) => {
+      const c = document.createElement('canvas'); c.width = 1024; c.height = 64; const g = c.getContext('2d');
+      let q = seed; const r = () => { q = (q * 16807) % 2147483647; return q / 2147483647; };
+      const sy = ['Σ', '∫', '∂', 'λ', 'Ψ', 'Δ', 'ψ', '∞', '≈', 'μ', 'σ', '√', 'π', 'Ω', '∇', '→', '·', '='];
+      g.font = '600 34px monospace'; g.fillStyle = '#ffffff';
+      let x = 0; while (x < 1024) { const t = r() < 0.55 ? sy[Math.floor(r() * sy.length)] : String(Math.floor(r() * 1000) / 100); g.globalAlpha = 0.45 + r() * 0.55; g.fillText(t, x, 44); x += g.measureText(t).width + 8 + r() * 10; }
+      const t = new THREE.CanvasTexture(c); t.wrapS = THREE.RepeatWrapping; return t;
+    };
+    const bands = [];
+    for (const [r, tilt, col, sd] of [[0.9, 0.2, [0.5, 1.8, 2.6], 3], [1.05, -0.5, [2.4, 1.8, 0.7], 7], [1.2, 1.05, [0.6, 2.0, 2.4], 11]]) {
+      const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, 0.16, 96, 1, true), new THREE.MeshBasicMaterial({ map: glyphTex(sd), color: new THREE.Color(...col), transparent: true, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false }));
+      m.rotation.x = tilt; sph.add(m); bands.push(m);
+    }
+    const N = 1400, pos = new Float32Array(N * 3);
+    for (let i = 0; i < N; i++) { const u = Math.random() * 2 - 1, a = Math.random() * Math.PI * 2, rr = 0.75 * Math.cbrt(Math.random()); pos.set([Math.sqrt(1 - u * u) * Math.cos(a) * rr, u * rr, Math.sqrt(1 - u * u) * Math.sin(a) * rr], i * 3); }
+    const pg = new THREE.BufferGeometry(); pg.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    const cloud = new THREE.Points(pg, new THREE.PointsMaterial({ color: new THREE.Color(1.6, 2.2, 2.6), size: 0.025, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false })); sph.add(cloud);
+    const curve = new THREE.Mesh(new THREE.TorusGeometry(0.75, 0.008, 4, 96, Math.PI * 1.3), new THREE.MeshBasicMaterial({ color: new THREE.Color(3, 1.2, 0.6) })); curve.rotation.set(0.6, 0, 0.3); sph.add(curve);
+    ctx.updaters.push((dt, t) => { if (!sph.visible) return; sph.rotation.y = t * 0.12; bands.forEach((b, i) => { b.rotation.y = t * (0.2 + i * 0.07) * (i % 2 ? -1 : 1); b.material.map.offset.x = (t * 0.02 * (i + 1)) % 1; }); cloud.rotation.y = -t * 0.3; curve.rotation.z = 0.3 + Math.sin(t * 0.4) * 0.4; });
+    out.sphere = sph;
+    out.irenaSpot = { p: P(th + 0.07, 13.2), face: Math.atan2(base.x - P(th + 0.07, 13.2).x, base.z - P(th + 0.07, 13.2).z), talk: P(th + 0.1, 12.0) };
+  }
   // parcours de promenade (anneau de 8,5 m) et arrêts devant les vitrines
   for (let k = 0; k < 16; k++) out.loop.push(P((k / 16) * Math.PI * 2, 8.6));
 
@@ -396,7 +424,7 @@ export function buildLuxury(ctx) {
   // ---------------------------------------------------------------- éclairage (actif quand le joueur est à l'étage)
   const lp = low ? [[0, 0, 7]] : [[0, 0, 7], [-Math.PI * 0.27, 15, 3.5], [-Math.PI * 0.73, 15, 3.5], [Math.PI * 0.5, 13, 6], [Math.PI * 0.12, 15, 3.4]];
   for (const [th, r, y] of lp) { const l = new THREE.PointLight(0xffe6c8, r === 0 ? 60 : 30, r === 0 ? 30 : 14, 2); l.position.copy(P(th, r, y)); l.visible = false; scene.add(l); out.lights.push(l); }
-  out.dynamic = [dome, orrery, out.turntable, out.holo];
+  out.dynamic = [dome, orrery, out.turntable, out.holo, out.sphere];
   out.onLevel = (p) => p.y > Y - 5;
   out.P = P; out.faceIn = faceIn;
   return out;
@@ -437,6 +465,7 @@ export function populateLuxury(ctx, lib, player, L) {
   // ---------------------------------------------------------------- moteur de routines (déplacements, actions, attentes)
   const turnTo0 = (c, yaw, dt, k = 6) => { let d = yaw - c.root.rotation.y; d = Math.atan2(Math.sin(d), Math.cos(d)); c.root.rotation.y += d * (1 - Math.exp(-dt * k)); };
   const step = (n, dt) => {
+    if (n.c.inDialog) { n.c.setSpeed(0); return; }
     if (!n.q.length) n.q = n.plan(n);
     const s = n.q[0], c = n.c;
     if (!s) return;
@@ -467,7 +496,8 @@ export function populateLuxury(ctx, lib, player, L) {
   const staff = { top: 0x121417, bottom: 0x121417, boot: 0x0a0a0a, accent: 0xd4af37, zip: true };
   const S = L.spots, T0 = -Math.PI * 0.27, T1 = -Math.PI * 0.73, TA = Math.PI * 0.5, TB = Math.PI * 0.12, TC = -Math.PI / 2 + 0.22;
   // conciergerie : accueil, saisie au terminal, accueil des arrivants
-  actor(mk(0, staff, S.concierge.clerk, S.concierge.faceClerk, null), () => [act('talk', R2(4, 7), FI(TC)), act('idle', R2(2, 4), FI(TC)), w(TC + 0.08, 15.2), act('interact', R2(3, 5), FI(TC + 0.08)), w(TC, 15.2), act('idle', R2(2, 3), FI(TC))]);
+  const conciergeC = mk(0, staff, S.concierge.clerk, S.concierge.faceClerk, null);
+  actor(conciergeC, () => [act('talk', R2(4, 7), FI(TC)), act('idle', R2(2, 4), FI(TC)), w(TC + 0.08, 15.2), act('interact', R2(3, 5), FI(TC + 0.08)), w(TC, 15.2), act('idle', R2(2, 3), FI(TC))]);
   // Maison Élysée : comptoir, retouches aux portants, coup d'œil aux mannequins, pliage sur la table
   actor(mk(4, { ...staff, accent: 0xf4f0e8 }, S.couture.clerk, S.couture.faceClerk, null), () => [
     act(Math.random() < 0.5 ? 'talk' : 'idle', R2(4, 7), FI(T0 - 0.24)),
@@ -502,6 +532,9 @@ export function populateLuxury(ctx, lib, player, L) {
     act('idle', R2(6, 10), FI(-Math.PI / 2 - 0.16)), w(-Math.PI / 2 + 0.45, 16.6, 0.8), act('idle', R2(4, 6), FI(-Math.PI / 2 + 0.45)),
     w(-Math.PI / 2 - 0.5, 16.6, 0.8), act('idle', R2(4, 6), FI(-Math.PI / 2 - 0.5)), w(-Math.PI / 2 - 0.16, 16.4, 0.8),
   ]);
+  // Iréna Solvay, prévisionniste, devant sa sphère
+  const irenaC = mk(2, { top: 0x14303a, bottom: 0x1a1c22, boot: 0x0e0e10, accent: 0xd4af37, zip: true, belt: true }, L.irenaSpot.p, L.irenaSpot.face, null);
+  L.npcs = { concierge: conciergeC, irena: irenaC };
   // clientèle assise (salon)
   L.seats.slice(0, 5).forEach((st, i) => { st.taken = true; mk(i + 2, RICH[(i + 2) % RICH.length], st.p, st.yaw, i % 2 ? 'sitTalk' : 'sit'); });
 

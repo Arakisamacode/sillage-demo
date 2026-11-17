@@ -31,6 +31,9 @@ import { buildFurnish } from './world/furnish.js';
 import { buildFoodCourt } from './world/foodcourt.js';
 import { trayFactory, utensilMesh, DISH_OF } from './world/foodprops.js';
 import { Models } from './world/models.js';
+import { Dialogue } from './ui/dialogue.js';
+import { Story } from './game/story.js';
+import { Scanner, nameFor } from './ui/scanner.js';
 import { buildLuxury, populateLuxury, LUX_Y } from './world/luxury.js';
 import { RESTAURANTS } from './game/food.js';
 import { Cargo, buildQuai } from './game/cargo.js';
@@ -668,8 +671,6 @@ async function boot() {
     interactables.push({ pos: LS.couture.customer, r: 1.6, label: 'E — Maison Élysée : haute couture', fn: () => openUI(() => shop.openStore('lx_mode')) });
     interactables.push({ pos: LS.nova.customer, r: 1.6, label: 'E — Nova Atelier : combinaisons de haute technologie', fn: () => openUI(() => shop.openStore('lx_suits')) });
     interactables.push({ pos: LS.aero.pos, r: 1.8, label: 'E — Aérodyne : yacht stellaire Série 9', fn: () => toast('Aérodyne Série 9 · 48 500 000 ¤ · livraison sur commande, 14 mois · « Un essai en orbite peut être organisé pour nos clients privilégiés. »') });
-    const CONC = ['« Bienvenue à La Couronne. Un rendez-vous privé chez Nova Atelier ? Je m\'en charge. »', '« Le salon Le Zénith sert un millésime de Lys exceptionnel ce soir. »', '« La coupole a été polie la nuit dernière : la vue sur la géante est parfaite. »', '« Aérodyne présente sa Série 9 cette semaine seulement. »'];
-    interactables.push({ pos: LS.concierge.customer, r: 1.6, label: 'E — Conciergerie', fn: () => toast(CONC[Math.floor(Math.random() * CONC.length)]) });
     const LUXD = ['Coupe de champagne de Lys', 'Cocktail « Nébuleuse »', 'Thé blanc des serres orbitales', 'Single malt vieilli en apesanteur'];
     interactables.push({ pos: LS.bar.pos, r: 1.7, label: 'E — Le Zénith : commander (120 ¤)', fn: () => { if (!game.pay(120)) return 'Crédits insuffisants'; audio.coffee(); toast(`${LUXD[Math.floor(Math.random() * LUXD.length)]} · servi sur glace taillée`); } });
   }
@@ -733,15 +734,7 @@ async function boot() {
   } });
   const DRINKS = ['Thé fumé de Lys', 'Bière de soute', 'Café serré', 'Eau pétillante recyclée', 'Liqueur d\'aurélite (sans aurélite)'];
   const GOSSIP = ['« Les cargos pirates passent souvent près de la ceinture d\'Ardent. »', '« Corvin paie bien le cuivre, ces temps-ci. »', '« Lys rachète le titane au prix fort. »', '« Une alerte au hangar 07 ? Ça arrive plus qu\'on ne croit. »', '« Embauchez un artilleur, la tourelle ne se sert pas toute seule. »'];
-  interactables.push({ pos: HB.bar, r: 1.6, label: 'E — Commander au bar (8 ¤)', fn: () => {
-    if (!game.pay(8)) return 'Crédits insuffisants';
-    audio.coffee(); toast(`${DRINKS[Math.floor(Math.random() * DRINKS.length)]} · ${GOSSIP[Math.floor(Math.random() * GOSSIP.length)]}`);
-  } });
-  interactables.push({ pos: HB.clinic, r: 1.6, label: 'E — Consultation à l\'infirmerie (250 ¤)', fn: () => {
-    if (!game.pay(250)) return 'Crédits insuffisants';
-    ctx.ground.hp = 100; game.d.owned.medpen = (game.d.owned.medpen || 0) + 1; game.save();
-    audio.blip(); toast('Soins complets · un stylo médical offert pour la route');
-  } });
+  // bar La Comète et infirmerie : conversations (voir plus bas, après la création du récit)
   interactables.push({ pos: HB.bunk, r: 2.4, label: 'E — Se reposer dans la cabine 12', fn: () => {
     fadeDo(() => {
       ctx.ground.hp = 100; missions.persist(); game.save();
@@ -886,6 +879,48 @@ async function boot() {
     for (const c of ctx.luxPeople || []) if (c.root.visible) _blk.push({ pos: c.root.position });
     return _blk;
   }
+  // ------------------------------------------------------------------ conversations cinématiques et récit principal
+  const dialog = new Dialogue(ctx, { audio, game, onClose: () => { input.enabled = true; if (touch) $('touch').classList.remove('hidden'); else $('view').requestPointerLock?.(); } });
+  ctx.dialog = dialog; ctx.toast = toast;
+  const story = new Story({ game, audio, dialog, toast, combat, flight, ground });
+  ctx.story = story;
+  { const fo = flight.onEvent; flight.onEvent = (e, pad) => { fo(e, pad); story.onFlight(e, pad); }; }
+  { const co = combat.onEvent; combat.onEvent = (e, ...a) => { co(e, ...a); story.onCombat(e, ...a); }; }
+  const talk = (npc, tree) => { if (!npc.c) return; openUI(() => dialog.open(npc, tree)); };
+  const NPC = {
+    joss: { c: ctx.habitatPeople[0], name: 'Joss Varrin', role: 'Barman · La Comète', voice: { pitch: 0.7, rate: 0.95, idx: 1 } },
+    salek: { c: ctx.habitatPeople[1], name: 'Dr Salek', role: 'Médecin · infirmerie du pont habitat', voice: { pitch: 0.95, rate: 1.0, idx: 2 } },
+    mira: { c: ctx.lux.npcs.concierge, name: 'Mira Castel', role: 'Conciergerie · La Couronne', voice: { pitch: 1.2, rate: 1.0, idx: 0 } },
+    irena: { c: ctx.lux.npcs.irena, name: 'Iréna Solvay', role: 'Prévisionniste', voice: { pitch: 1.05, rate: 0.93, idx: 0 } },
+  };
+  story.irena = NPC.irena; ctx.NPC = NPC;
+  interactables.push({ pos: HB.bar, r: 1.6, label: 'E — Parler à Joss (barman)', fn: () => talk(NPC.joss, story.jossTree()) });
+  interactables.push({ pos: HB.clinic, r: 1.6, label: 'E — Parler au Dr Salek', fn: () => talk(NPC.salek, story.doctorTree()) });
+  interactables.push({ pos: ctx.lux.spots.concierge.customer, r: 1.6, label: 'E — Parler à Mira (conciergerie)', fn: () => talk(NPC.mira, story.conciergeTree()) });
+  interactables.push({ pos: ctx.lux.irenaSpot.talk, r: 1.8, label: 'E — Parler à Iréna Solvay', fn: () => talk(NPC.irena, story.irenaTree()) });
+  // ------------------------------------------------------------------ mode analyse (C) et codex (K)
+  const scanner = new Scanner(ctx, { game, toast, audio });
+  ctx.scanner = scanner;
+  {
+    for (const [k, S] of Object.entries(ctx.ships)) if (S.local) scanner.addPoint(S.local(0, 3.5, 0), k, ({ heron: 'Héron', mulet: 'Mulet H4', faucon: 'Faucon FC-31', navette: 'Navette ST-40' })[k] || k);
+    scanner.addPoint(ctx.lux.turntable.position.clone().add(new THREE.Vector3(0, 2.4, 0)), 'yacht', 'Aérodyne Série 9');
+    scanner.addPoint(ctx.lux.P(0, 0, 4.4), 'orrery', 'Sculpture orbitale');
+    scanner.addPoint(ctx.lux.sphere.position.clone(), 'sphere', 'Sphère des tendances');
+    scanner.addPoint(ctx.lux.P(0, 0, 11), 'couronne', 'Coupole de La Couronne');
+    scanner.addPoint(new THREE.Vector3(-105, DECK_Y + 2.6, 32), 'cour', 'Cour des Saveurs');
+    const fo = flight.onEvent; flight.onEvent = (e, pad) => { fo(e, pad); if (e === 'landed' && pad?.outpost?.id === 'lys') scanner.unlock('lys'); };
+    const co = combat.onEvent; combat.onEvent = (e, ...a) => { co(e, ...a); if (e === 'kill') scanner.unlock('breche'); };
+  }
+  const ROLE = { voyageur: 'Voyageur', entretien: 'Agent d\'entretien' };
+  const scanPeople = () => {
+    const L = [];
+    for (const a of crowd.agents) if (!a.away && a.char) L.push({ obj: a.char.root, name: nameFor(a.id + 11), role: ROLE[a.role] || (a.role ? a.role[0].toUpperCase() + a.role.slice(1) : 'Résident') });
+    (ctx.deckNpcs || []).forEach((n, i) => L.push({ obj: n.c.root, name: nameFor(i + 101), role: n.cook ? 'Cuisinier · Cour des Saveurs' : n.cust ? (n.meal ? 'Client · en train de manger' : 'Client · Cour des Saveurs') : 'Résident' }));
+    const named = new Map(Object.values(NPC).map((x) => [x.c, x]));
+    (ctx.habitatPeople || []).forEach((c, i) => L.push({ obj: c.root, name: named.get(c)?.name || nameFor(i + 201), role: named.get(c)?.role || 'Résident du pont habitat' }));
+    (ctx.luxPeople || []).forEach((c, i) => L.push({ obj: c.root, name: named.get(c)?.name || nameFor(i + 301), role: named.get(c)?.role || 'La Couronne' }));
+    return L;
+  };
   let inShop = null;
   const VENDORS = { nouilles: 'Mei', armes: 'Bastien Kestrel', pieces: 'Oriane', pharma: 'Dr Salek', combis: 'Ines Vega' };
   function shopGreeting() {
@@ -908,6 +943,7 @@ async function boot() {
         const aboard = crew.members.filter((m) => m.aboard).length, g = crew.gunner();
         lines.push(`<b>ÉQUIPAGE</b> ${crew.members.length} · ${aboard ? `${aboard} à bord` : crew.members.map((m) => `${m.data.name.split(' ')[0]} ${crew.status(m)}`).join(' · ')}${flight.active && heronGear.meshes.dorsal ? (g ? ` · tourelle : ${g.data.name.split(' ')[0]}` : ' · tourelle sans artilleur') : ''}`);
       }
+      const so = ctx.story?.objective(); if (so) lines.unshift(so);
       jobsEl.innerHTML = lines.join('<br>');
     }
     // repère d'orientation : la galerie marchande tant qu'elle n'a pas été visitée
@@ -932,7 +968,7 @@ async function boot() {
   // ------------------------------------------------------------------ commandes tactiles contextuelles
   // Un bouton principal (gros) et au plus quelques boutons secondaires, selon la situation.
   const TB = {};
-  for (const id of ['t-run', 't-view', 't-use', 't-fly', 't-up', 't-down', 't-mine', 't-fire', 't-msl', 't-gun', 't-med']) TB[id] = $(id);
+  for (const id of ['t-run', 't-view', 't-use', 't-fly', 't-up', 't-down', 't-mine', 't-fire', 't-msl', 't-gun', 't-med', 't-scan']) TB[id] = $(id);
   const SLOTS = [[100, 14], [96, 84], [34, 106], [168, 22], [162, 94], [108, 156], [40, 176]];
   let tbKey = '';
   function touchUI() {
@@ -972,7 +1008,7 @@ async function boot() {
       add('t-run', 'COURIR', 4); add('t-view', 'VUE', 5);
     } else {
       main.id = 't-use'; main.label = 'E';
-      add('t-run', 'COURIR', 0); add('t-view', 'VUE', 1);
+      add('t-run', 'COURIR', 0); add('t-view', 'VUE', 1); add('t-scan', ctx.scanner?.on ? 'FIN' : 'SCAN', 4);
       if (ground.armed) add('t-gun', 'ARME', 2);
       if (ground.hp < 100 && ground.armed && game.free('medpen') > 0) add('t-med', 'SOIN', 3);
     }
@@ -1074,6 +1110,12 @@ async function boot() {
     renderer.setExposure(1.15 - 0.45 * ctx.time.dusk);
     updateFreightHud();
     if (touch && running) touchUI();
+    dialog.update(dt); story.update(dt);
+    if (input.consume('scan') && running && !shop.isOpen && !dialog.active && (!flight.active || ground.onFoot)) scanner.toggle();
+    if ((flight.active && !ground.onFoot) || dialog.active) { if (scanner.on) scanner.toggle(false); }
+    if (input.consume('codex') && running && !shop.isOpen && !dialog.active && !scanner.codexOpen) openUI(() => scanner.openCodex(() => { input.enabled = true; if (touch) $('touch').classList.remove('hidden'); else $('view').requestPointerLock?.(); }));
+    if (scanner.on) scanner.update(dt, camera, scanPeople(), interactables);
+    if (dialog.active) dialog.updateCamera(dt, player);
     if (quality.name === 'medium') { renderer.three.shadowMap.autoUpdate = false; renderer.three.shadowMap.needsUpdate = (++shadowTick % 2) === 0; }
     renderer.render(dt);
     fpsAcc += dt; fpsN++;
