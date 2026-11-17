@@ -57,7 +57,7 @@ export class ShopUI {
         : this.mode === 'recruit' ? `<div class="sh-title">GUILDE DES ÉQUIPAGES</div><div class="sh-greet">« Des gens sérieux, payés à la mission. Vous signez, ils embarquent. »</div>`
         : `<div class="sh-title">INVENTAIRE</div><div class="sh-greet">Équipement personnel, vaisseau et objets.</div>`;
     const tabs = this.mode === 'store'
-      ? [['buy', 'Acheter'], ['sell', 'Vendre']]
+      ? (STORES[this.store].cats.includes('food') ? [['buy', 'La carte']] : [['buy', 'Acheter'], ['sell', 'Vendre']])
       : this.mode === 'board' ? [['offers', 'Offres'], ['active', `En cours (${this.missions.active.length})`]]
         : this.mode === 'dock' ? [['ops', 'Opérations'], ...(this.pad.id === 'ardent' ? [['refine', 'Raffinerie']] : []), ...(MARKETS[this.pad.id] ? [['market', 'Marché des matériaux']] : [])]
         : this.mode === 'recruit' ? [['cands', 'Candidats'], ['crew', `Mon équipage (${this.crew.members.length})`]]

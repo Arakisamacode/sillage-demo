@@ -119,6 +119,16 @@ qui servent de couverture. Le Héron s'y pose rampe face au pont.
 - **Récompenses** : 420 à 720 ¤ par pirate, puis le contrat de sécurité ou une prime de 1 500 ¤.
 - **À terre** : évacuation à bord, soins d'urgence (1 200 ¤), le raid échoue (le contrat reste ouvert).
 
+## Cour des Saveurs (restauration)
+
+Sur le pont habitat, le couloir nord du hall des ascenseurs mène à une grande salle de restauration
+(70 × 40 m, verrière sur l'espace, fontaine holographique, arbres, tables et tables hautes). Dix restaurants,
+chacun avec son enseigne, son menu lumineux, sa cuisine équipée et ses horaires : Dragon de Jade (chinois),
+Cantina Sol (mexicain), Fournil d'Orbite (boulangerie), Taqueria Cometa (tacos), Masala Station (indien),
+Sushi Orbital, Grill 66 (burgers), Pizzeria Vesuvio, Café Nébula, Phở Lune Rousse (vietnamien).
+E au comptoir : la carte du restaurant (chaque plat rend un peu de santé). Les cuisiniers passent du fourneau
+au comptoir, des clients mangent attablés, d'autres commandent puis mangent debout. Borne-plan à l'entrée.
+
 ## Vie de la station (horaires)
 
 Horloge accélérée (1 s réelle = 48 s à bord ; une journée = 30 min de jeu), affichée en haut à droite.
