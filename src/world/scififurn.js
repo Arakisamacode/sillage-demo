@@ -110,3 +110,40 @@ export function sciFurniture(ctx) {
   };
   return F;
 }
+
+// ------------------------------------------------------------------ revêtements de station (textures générées)
+const panelCache = {};
+/**
+ * Panneaux composites satinés (murs, façades, comptoirs) : joints biseautés tous les `cell` texels, légères variations,
+ * vernis. La texture couvre 2 m (UV métriques des boîtes : tex = 2) → panneaux de 1 m × 1 m par défaut.
+ */
+export function stationPanel(color, opts = {}) {
+  const key = color + JSON.stringify(opts);
+  if (panelCache[key]) return panelCache[key];
+  const S = 512, c = document.createElement('canvas'); c.width = c.height = S;
+  const g = c.getContext('2d'), col = new THREE.Color(color);
+  g.fillStyle = '#' + col.getHexString(); g.fillRect(0, 0, S, S);
+  const grd = g.createLinearGradient(0, 0, 0, S); grd.addColorStop(0, 'rgba(255,255,255,0.05)'); grd.addColorStop(1, 'rgba(0,0,0,0.05)'); g.fillStyle = grd; g.fillRect(0, 0, S, S);
+  for (let i = 0; i < 160; i++) { const x = Math.random() * S, y = Math.random() * S, r = 20 + Math.random() * 60; const gr = g.createRadialGradient(x, y, 0, x, y, r); gr.addColorStop(0, `rgba(${Math.random() < 0.5 ? '255,255,255' : '0,0,0'},0.03)`); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.fillRect(x - r, y - r, 2 * r, 2 * r); }
+  const cw = opts.cw ?? S / 2, ch = opts.ch ?? S / 2;
+  for (let x = 0; x < S; x += cw) { g.fillStyle = 'rgba(0,0,0,0.55)'; g.fillRect(x, 0, 3, S); g.fillStyle = 'rgba(255,255,255,0.22)'; g.fillRect(x + 3, 0, 1, S); }
+  for (let y = 0; y < S; y += ch) { g.fillStyle = 'rgba(0,0,0,0.55)'; g.fillRect(0, y, S, 3); g.fillStyle = 'rgba(255,255,255,0.22)'; g.fillRect(0, y + 3, S, 1); }
+  if (opts.vents) for (let x = cw / 2 - 40; x < S; x += cw) for (let k = 0; k < 6; k++) { g.fillStyle = 'rgba(0,0,0,0.35)'; g.fillRect(x, ch - 40 + k * 7, 80, 3); }
+  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
+  const b = new THREE.CanvasTexture(c); b.wrapS = b.wrapT = THREE.RepeatWrapping;
+  const m = new THREE.MeshPhysicalMaterial({ map: t, bumpMap: b, bumpScale: 1.2, roughness: opts.rough ?? 0.38, metalness: opts.metal ?? 0.05, clearcoat: opts.clear ?? 0.5, clearcoatRoughness: 0.2 });
+  return (panelCache[key] = m);
+}
+/** Sol en résine polie à grands panneaux (texture = 2,4 m de côté si UV métriques / 2,4). */
+export function resinFloor(base, seam, dots = null) {
+  const key = 'floor' + base + seam + dots;
+  if (panelCache[key]) return panelCache[key];
+  const c = document.createElement('canvas'); c.width = c.height = 512; const g = c.getContext('2d');
+  g.fillStyle = base; g.fillRect(0, 0, 512, 512);
+  for (let i = 0; i < 260; i++) { const x = Math.random() * 512, y = Math.random() * 512, r = 20 + Math.random() * 70; const gr = g.createRadialGradient(x, y, 0, x, y, r); gr.addColorStop(0, `rgba(${Math.random() < 0.5 ? '255,255,255' : '0,0,0'},0.025)`); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.fillRect(x - r, y - r, 2 * r, 2 * r); }
+  g.fillStyle = seam; g.fillRect(0, 0, 512, 3); g.fillRect(0, 0, 3, 512); g.fillRect(0, 254, 512, 2);
+  if (dots) { g.fillStyle = dots; g.fillRect(0, 0, 10, 10); }
+  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
+  const b = new THREE.CanvasTexture(c); b.wrapS = b.wrapT = THREE.RepeatWrapping;
+  return (panelCache[key] = new THREE.MeshPhysicalMaterial({ map: t, bumpMap: b, bumpScale: 1.5, roughness: 0.22, metalness: 0, clearcoat: 0.6, clearcoatRoughness: 0.12 }));
+}

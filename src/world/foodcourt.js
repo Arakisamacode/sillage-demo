@@ -3,7 +3,7 @@ import { DECK_Y } from './habitat.js';
 import { neonTexture, neonMaterial, Screen, FONT } from './signage.js';
 import { RESTAURANTS } from '../game/food.js';
 import { foodKit } from './foodprops.js';
-import { sciFurniture } from './scififurn.js';
+import { sciFurniture, stationPanel, resinFloor } from './scififurn.js';
 import { foodIconCanvas } from '../ui/thumbs.js';
 
 // Cour des Saveurs : grande salle de restauration du pont habitat (accès par le hall des ascenseurs).
@@ -20,7 +20,7 @@ export function buildFoodCourt(ctx) {
   const out = { stalls: [], chairs: [], standing: [], lights: [], fx: [] };
 
   // ------------------------------------------------------------------ couloir d'accès (hall des ascenseurs → cour)
-  const wallW = mats.paint(0xd8cfc0, { grime: 0.2, rough: 0.6 }), wood = mats.paint(0x6a4a32, { plain: true, rough: 0.55 });
+  const wallW = stationPanel(0xc4c9ce, { rough: 0.4, cw: 256, ch: 512 }), wood = mats.paint(0x6a4a32, { plain: true, rough: 0.55 });
   const dark = mats.paint(0x24282b), tiles = mats.tiles(0xb8a890);
   {
     const x0 = -118, x1 = -114, z0 = -5, z1 = COURT.z0;
@@ -38,16 +38,7 @@ export function buildFoodCourt(ctx) {
   // sol : grandes dalles polies (scan Poly Haven, UV métriques), allées en dalles sombres bordées de bandes lumineuses
   const slab = (w, d, tile) => { const g = new THREE.PlaneGeometry(w, d).rotateX(-Math.PI / 2); const uv = g.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * w / tile, uv.getY(i) * d / tile); return g; };
   // résine polie à panneaux (texture générée : joints fins, légères variations, inserts lumineux aux croisements)
-  const panelTex = (base, seam, dots) => {
-    const c = document.createElement('canvas'); c.width = c.height = 512; const g = c.getContext('2d');
-    g.fillStyle = base; g.fillRect(0, 0, 512, 512);
-    for (let i = 0; i < 260; i++) { const x = Math.random() * 512, y = Math.random() * 512, r = 20 + Math.random() * 70; const gr = g.createRadialGradient(x, y, 0, x, y, r); gr.addColorStop(0, `rgba(${Math.random() < 0.5 ? '255,255,255' : '0,0,0'},0.025)`); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.fillRect(x - r, y - r, 2 * r, 2 * r); }
-    g.fillStyle = seam; g.fillRect(0, 0, 512, 3); g.fillRect(0, 0, 3, 512); g.fillRect(0, 254, 512, 2);
-    if (dots) { g.fillStyle = dots; g.fillRect(0, 0, 10, 10); }
-    const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
-    const b = new THREE.CanvasTexture(c); b.wrapS = b.wrapT = THREE.RepeatWrapping;
-    return new THREE.MeshPhysicalMaterial({ map: t, bumpMap: b, bumpScale: 1.5, roughness: 0.22, metalness: 0, clearcoat: 0.6, clearcoatRoughness: 0.12, envMapIntensity: 1.0 });
-  };
+  const panelTex = resinFloor;
   const floorM = panelTex('#a8aeb4', '#6c737a', '#e8f4ff');
   const aisle = panelTex('#3a4048', '#22262b', null);
   geo(slab(W, D, 2.4), floorM, [cx, Y + 0.01, cz]);
@@ -279,22 +270,28 @@ function stall(ctx, r, cx, zf, dir, out) {
   const cyl = (r1, r2, h, m, p, seg = 14, rot = [0, 0, 0], col = false) => B.cyl(r1, r2, h, m, W(...p), [rot[0], rotY + rot[1], rot[2]], { seg, cast: false, collide: col });
   const sph = (rad, m, p, sc = [1, 1, 1], half = false) => { const g = half ? new THREE.SphereGeometry(rad, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2) : new THREE.SphereGeometry(rad, 14, 10); B.add(g, m, Builder_matrix(W(...p), [0, rotY, 0], sc), { cast: false }); };
   const glow = (c, i = 2.4) => mats.emissive(c, i);
-  const theme = mats.paint(r.wall, { grime: 0.25, rough: 0.55 }), accent = mats.paint(r.accent, { plain: true, rough: 0.5 });
+  // revêtements de station : panneaux composites satinés aux couleurs de l'enseigne, liserés lumineux
+  const wallC = new THREE.Color(r.wall).lerp(new THREE.Color(0x2a2e33), 0.35).getHex();
+  const theme = stationPanel(wallC, { rough: 0.4 }), accent = glow(r.color, 1.8);
+  const shell = stationPanel(0xe6e8ea, { rough: 0.3, ch: 128 }), graphite = stationPanel(0x2a2e33, { rough: 0.35, cw: 128, ch: 512 });
   const steel = mats.metal(0x9aa0a4, { rough: 0.3 }), darkM = mats.paint(0x1c1e20);
   const P = (c, rough = 0.6) => mats.plastic(c, rough);
   // structure : sol, cloisons, fond carrelé, façade, comptoir, plan de travail, hotte
-  B.add(new THREE.PlaneGeometry(9.6, 6).rotateX(-Math.PI / 2), mats.tiles(r.wall), Builder_matrix(W(0, 0.02, 3), [0, rotY, 0]), { cast: false });
-  for (const u of [-5, 5]) box(0.25, 4.6, 6, theme, [u, 2.3, 3], true);
-  box(10, 4.6, 0.1, theme, [0, 2.3, 5.95]);
-  box(9.6, 2.0, 0.05, mats.tiles(0xe8e4dc), [0, 1.7, 5.88]);
-  box(10.2, 0.9, 0.3, theme, [0, 4.15, 0.1]);
-  box(10.2, 0.1, 0.32, accent, [0, 3.72, 0.1]);
+  { const fg = new THREE.PlaneGeometry(9.6, 6).rotateX(-Math.PI / 2), uv = fg.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * 4, uv.getY(i) * 2.5);
+    B.add(fg, resinFloor('#2c3036', '#16191c'), Builder_matrix(W(0, 0.02, 3), [0, rotY, 0]), { cast: false }); }
+  for (const u of [-5, 5]) { box(0.25, 4.6, 6, theme, [u, 2.3, 3], true); box(0.04, 3.6, 0.04, accent, [u, 1.9, 0.02]); }
+  box(10, 4.6, 0.1, graphite, [0, 2.3, 5.95]);
+  box(9.6, 2.0, 0.05, shell, [0, 1.7, 5.88]);                                 // crédence composite blanche
+  box(9.6, 0.03, 0.03, glow(0xfff0dc, 2.2), [0, 0.99, 5.84]);                  // éclairage sous le plan
+  box(10.2, 0.9, 0.3, graphite, [0, 4.15, 0.1]);
+  box(10.2, 0.04, 0.32, accent, [0, 3.7, 0.1]);
   box(7.0, 1.05, 0.7, theme, [-0.6, 0.525, 1.2], true);
-  box(7.1, 0.06, 0.8, mats.smooth(0xd8d4cc, 0.25, 0.1), [-0.6, 1.08, 1.2]);
-  box(7.0, 0.12, 0.05, accent, [-0.6, 0.85, 0.83]);
-  box(9.2, 0.95, 0.75, steel, [0, 0.47, 5.3], true);
-  box(9.3, 0.05, 0.8, mats.metal(0xc8ccd0, { rough: 0.2 }), [0, 0.97, 5.3]);
-  box(6.0, 0.6, 1.1, darkM, [0, 2.85, 5.3]);
+  box(7.1, 0.06, 0.8, mats.smooth(0xe8eaec, 0.18, 0.05, { grime: 0.05, scratch: 0.1, rust: 0 }), [-0.6, 1.08, 1.2]);
+  box(7.1, 0.02, 0.02, accent, [-0.6, 1.05, 0.79]);                           // liseré lumineux sous le plan
+  box(7.0, 0.04, 0.05, accent, [-0.6, 0.08, 0.84]);                           // plinthe lumineuse
+  box(9.2, 0.95, 0.75, mats.smooth(0x9aa0a6, 0.3, 0.9, { grime: 0.1, rust: 0 }), [0, 0.47, 5.3], true);
+  box(9.3, 0.05, 0.8, mats.smooth(0xc8ccd0, 0.18, 0.9, { grime: 0.05, rust: 0 }), [0, 0.97, 5.3]);
+  box(6.0, 0.6, 1.1, mats.smooth(0x6a6e74, 0.3, 0.9, { grime: 0.15, rust: 0 }), [0, 2.85, 5.3]);
   box(6.0, 0.05, 1.0, glow(0xffe8c8, 1.5), [0, 2.53, 5.3]);
   // étagère murale
   box(8.6, 0.05, 0.3, steel, [0, 1.9, 5.75]);
@@ -323,7 +320,11 @@ function stall(ctx, r, cx, zf, dir, out) {
   const mm = new THREE.Mesh(new THREE.PlaneGeometry(4.0, 2.0), menu.material);
   mm.position.copy(V3(-0.2, 3.75, 5.85)); mm.rotation.y = rotY; scene.add(mm);
   // lampes au-dessus du comptoir
-  for (const u of [-3, -0.6, 1.8]) { cyl(0.01, 0.01, 0.9, darkM, [u, 3.2, 1.2], 4); cyl(0.2, 0.08, 0.18, glow(0xffd8a0, 2.2), [u, 2.7, 1.2], 12); }
+  for (const u of [-3, -0.6, 1.8]) {
+    cyl(0.006, 0.006, 0.9, darkM, [u, 3.2, 1.2], 4);
+    B.add(new THREE.TorusGeometry(0.16, 0.018, 8, 40), mats.smooth(0x3a3e44, 0.3, 0.9, { rust: 0 }), Builder_matrix(W(u, 2.75, 1.2), [Math.PI / 2, 0, 0]), { cast: false });
+    B.add(new THREE.TorusGeometry(0.16, 0.009, 6, 40), glow(0xfff0dc, 3), Builder_matrix(W(u, 2.735, 1.2), [Math.PI / 2, 0, 0]), { cast: false });
+  }
   // caisse et présentoir à couverts
   box(0.35, 0.25, 0.3, darkM, [2.2, 1.24, 1.2]);
   box(0.3, 0.18, 0.02, glow(0x6fd0ff, 1.4), [2.2, 1.32, 1.04], false, [-0.3, 0, 0]);
