@@ -29,6 +29,8 @@ import { buildBayCover, buildAirlockSign } from './world/baycover.js';
 import { buildHabitat, DECK_Y, Elevators } from './world/habitat.js';
 import { buildFurnish } from './world/furnish.js';
 import { buildFoodCourt } from './world/foodcourt.js';
+import { trayFactory, utensilMesh, DISH_OF } from './world/foodprops.js';
+import { Models } from './world/models.js';
 import { RESTAURANTS } from './game/food.js';
 import { Cargo, buildQuai } from './game/cargo.js';
 import { Missions } from './game/missions.js';
@@ -73,7 +75,9 @@ async function boot() {
   builder.cellSize = quality.name === 'low' ? 80 : 40;
   const ctx = { scene, camera, renderer, quality, mats, builder, manager, updaters: [], screens: [], time: new StationClock(8.6) };
 
-  progress(0.05, 'Construction du hangar');
+  progress(0.03, 'Chargement des modèles 3D');
+  ctx.models = await new Models(quality.name === 'low').load(undefined, (p) => progress(0.03 + 0.05 * p, 'Chargement des modèles 3D'));
+  progress(0.08, 'Construction du hangar');
   await tick();
   const sky = new Sky(scene, quality);
   buildHangar(ctx);
@@ -203,26 +207,30 @@ async function boot() {
       c.setOutfit(outfit || { top: tops[i % tops.length], bottom: [0x26282c, 0x2f3a4e, 0x4a4036][i % 3], accent: 0xc8b48a, belt: true });
       c.root.visible = false; c.root.traverse((o) => { o.castShadow = false; }); scene.add(c.root); people.push(c); return c;
     };
-    /** Petit moteur de routines (déplacements rectilignes et actions) pour les figurants du pont. */
+    /** Petit moteur de routines (déplacements, actions, attentes conditionnelles) pour les figurants du pont. */
     const npcs = [];
     const npc = (c, plan, active) => { const n = { c, plan, active, q: [], pos: c.root.position.clone(), t: 0 }; npcs.push(n); return n; };
+    const turn = (c, yaw, dt, k = 6) => { let dy = yaw - c.root.rotation.y; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); c.root.rotation.y += dy * (1 - Math.exp(-dt * k)); };
     const stepNpc = (n, dt) => {
       if (!n.q.length) n.q = n.plan(n);
       const s = n.q[0], c = n.c;
+      if (!s) return;
+      if (s.fn) { n.q.shift(); n.t = 0; s.fn(n); return; }
+      if (s.moveF && !s.move) s.move = s.moveF(n);
       if (s.move) {
         const d = new THREE.Vector3().subVectors(s.move, n.pos).setY(0), L = d.length();
+        s.each?.(n, dt);
         if (L < 0.08) { n.q.shift(); return; }
         n.pos.addScaledVector(d.normalize(), Math.min(L, (s.speed || 1.3) * dt));
         c.root.position.copy(n.pos);
-        let dy = Math.atan2(d.x, d.z) - c.root.rotation.y; dy = Math.atan2(Math.sin(dy), Math.cos(dy));
-        c.root.rotation.y += dy * (1 - Math.exp(-dt * 8));
+        turn(c, Math.atan2(d.x, d.z), dt, 8);
         c.setSpeed(s.speed || 1.3);
-        if (c.override && c.override !== 'sit' && c.override !== 'sitTalk') c.stop(0.2);
+        if (c.override) c.stop(0.25);
       } else {
-        if (n.t === 0) { c.setSpeed(0); if (s.anim && s.anim !== 'idle') c.play(s.anim, { fade: 0.35 }); else if (c.override) c.stop(0.3); }
+        if (n.t === 0) { c.setSpeed(0); if (s.anim && s.anim !== 'idle') c.play(s.anim, { fade: 0.35 }); else if (c.override && !s.keep) c.stop(0.3); }
         n.t += dt;
-        if (s.face !== undefined) { let dy = s.face - c.root.rotation.y; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); c.root.rotation.y += dy * (1 - Math.exp(-dt * 6)); }
-        if (n.t >= s.dur) { n.t = 0; n.q.shift(); }
+        if (s.face !== undefined) turn(c, typeof s.face === 'function' ? s.face(n) : s.face, dt);
+        if (s.until ? s.until(n, dt) : n.t >= s.dur) { n.t = 0; n.q.shift(); }
       }
     };
     const R2 = (a, b) => a + Math.random() * (b - a);
@@ -230,51 +238,230 @@ async function boot() {
     FC.stalls.forEach((st, i) => {
       const c = mk(i + 3, { top: 0xf2f2ee, bottom: 0x2a2c30, boot: 0x1a1a1a, accent: new THREE.Color(st.r.color).getHex(), zip: true });
       c.root.position.copy(st.counterSpot);
-      npc(c, (n) => {
+      const cook = npc(c, (n) => {
+        // un client attend au comptoir : le cuisinier vient le servir
+        if (st.line?.length) return [{ move: st.counterSpot, speed: 1.1 }, { anim: 'talk', dur: R2(2, 3), face: st.faceRoom }, { move: st.stove2, speed: 1.1 }, { anim: 'pickup', dur: 2.2, face: st.faceKitchen }, { move: st.counterSpot, speed: 1.1 }, { anim: 'interact', dur: 1.6, face: st.faceRoom }];
         const r = Math.random();
         if (r < 0.45) return [{ move: st.stove, speed: 1.0 }, { anim: 'interact', dur: R2(4, 8), face: st.faceKitchen }, { anim: 'idle', dur: R2(1, 2), face: st.faceKitchen }, { move: st.counterSpot, speed: 1.0 }];
         if (r < 0.65) return [{ move: st.stove2, speed: 1.0 }, { anim: 'pickup', dur: 2.4, face: st.faceKitchen }, { move: st.counterSpot, speed: 1.0 }];
         return [{ anim: Math.random() < 0.6 ? 'talk' : 'idle', dur: R2(3, 6), face: st.faceRoom }];
       }, () => ctx.time.open(st.r.id));
+      cook.cook = true;
+      st.line = [];
     });
-    // clients attablés
-    const chairs = FC.diners.slice(0, low ? 8 : 18);
-    chairs.forEach((ch, i) => {
-      ch.taken = true;
-      const c = mk(i);
-      c.root.position.copy(ch.p); c.root.rotation.y = ch.yaw;
-      npc(c, () => [{ anim: i % 2 ? 'sitTalk' : 'sit', dur: 999 }], () => ctx.time.open('galerie'));
-    });
-    // promeneurs : commandent à un comptoir, mangent debout à une table haute, recommencent
-    const row = (st) => (st.dir > 0 ? 44 : 20);
-    const via = (from, to) => {
-      if (Math.abs(from.z - to.z) < 0.5) return [{ move: to }];
-      const cross = Math.abs((from.x + to.x) / 2 + 120) < Math.abs((from.x + to.x) / 2 + 90) ? -120 : -90;
-      return [{ move: V(cross, from.z) }, { move: V(cross, to.z) }, { move: to }];
+
+    // ---------------------------------------------------------------- clients de la Cour : ils arrivent de la galerie par
+    // l'ascenseur, font la queue, commandent, emportent leur plateau, s'attablent, mangent (bouchées, mastication,
+    // conversation), débarrassent au point de tri puis redescendent à la galerie.
+    const trays = trayFactory(ctx), SH = ctx.habitat.shafts;
+    const P3 = (x, y, z) => new THREE.Vector3(x, y, z);
+    const DOOR_G = P3(-104.2, 0, -11);                     // couloir côté galerie, derrière la porte « MODULE HABITAT »
+    const inCab = (S) => { const P = player.pos; return P.x > S.x0 - 0.2 && P.x < S.x1 - 0.1 && Math.abs(P.z - S.c) < 1.1 && Math.abs(P.y - S.y) < 3; };
+    const cost = (S, y) => (ctx.elevators?.isAt(S, y) ? 0 : S.moving ? 2 : 1) + (S.waitN?.[y] || 0) * 0.3 + Math.random() * 0.4;
+    /** Prendre l'ascenseur : appel au palier, attente, embarquement, trajet, sortie. */
+    const elevSteps = (fromY, toY) => {
+      let S, inner;
+      return [
+        { fn: (n) => { S = [...SH].sort((a, b) => cost(a, fromY) - cost(b, fromY))[0]; S.boarding ||= new Set(); S.waiting ||= new Set(); S.waiting.add(n); } },
+        { moveF: () => P3(S.x1 + 1.2 + Math.random() * 1.0, fromY, S.c + (Math.random() - 0.5) * 1.7) },
+        { anim: 'idle', face: -Math.PI / 2, until: () => {
+          const E = ctx.elevators; if (!E) return false;
+          if (E.isAt(S, fromY)) { S.hold = Math.max(S.hold, 1.2); return S.doors[fromY].open > 0.85; }
+          if (!S.moving) E.call(S, fromY);
+          return false;
+        } },
+        { fn: (n) => { S.waiting.delete(n); S.boarding.add(n); inner = P3(S.x0 + 0.55 + Math.random() * 1.1, fromY, S.c + (Math.random() - 0.5) * 1.4); } },
+        { moveF: () => inner, speed: 1.0, each: () => { S.hold = Math.max(S.hold, 1.0); } },
+        { fn: (n) => { S.boarding.delete(n); n.cab = S; n.wait = 0; } },
+        { anim: 'idle', face: Math.PI / 2, until: (n, dt) => {
+          const E = ctx.elevators;
+          if (S.moving) { n.pos.y = S.y; n.c.root.position.y = S.y; return false; }
+          if (Math.abs(S.y - toY) < 0.05) { n.pos.y = n.c.root.position.y = toY; S.hold = Math.max(S.hold, 1.2); return S.doors[toY].open > 0.85; }
+          n.wait += dt;
+          // départ quand plus personne n'embarque ni n'attend à ce palier, et que le joueur n'est pas dans la cabine
+          if (E && n.wait > 2.2 && !S.boarding.size && ![...S.waiting].some((w) => Math.abs(w.pos.y - S.y) < 1) && !inCab(S)) E.send(S, toY);
+          return false;
+        } },
+        { fn: (n) => { n.cab = null; } },
+        { moveF: () => P3(S.x1 + 1.9, toY, S.c + (Math.random() - 0.5) * 1.2), each: () => { S.hold = Math.max(S.hold, 0.6); } },
+      ];
     };
-    for (let k = 0; k < (low ? 3 : 6); k++) {
-      const c = mk(k + 2);
-      const start = V(-116 + (k % 3) * 1.2, 20);
-      c.root.position.copy(start);
-      npc(c, (n) => {
-        const open = FC.stalls.filter((st) => ctx.time.open(st.r.id));
-        if (!open.length) return [{ anim: 'idle', dur: 4 }];
-        const st = open[Math.floor(Math.random() * open.length)];
-        const here = V(n.pos.x, Math.abs(n.pos.z - 44) < Math.abs(n.pos.z - 20) ? 44 : 20);
-        const rp = V(st.approach.x, row(st));
-        const tbl = FC.standing.filter((t) => (t.side > 0) === (st.dir > 0))[Math.floor(Math.random() * 4)];
-        const tp = V(tbl.p.x, row(st)), spot = V(tbl.p.x, tbl.p.z + tbl.side * 0.75);
-        return [{ move: here }, ...via(here, rp), { move: st.customer }, { anim: 'talk', dur: R2(3, 5), face: st.customerYaw }, { anim: 'idle', dur: R2(1.5, 3), face: st.customerYaw },
-          { move: rp }, { move: tp }, { move: spot }, { anim: 'interact', dur: R2(8, 14), face: tbl.side > 0 ? Math.PI : 0 }, { move: tp }];
-      }, () => ctx.time.open('galerie'));
+    // allées de la salle : rangées devant les stands (z 20 / 44), allées transversales x -120 / -90, couloirs entre tables
+    const LANES = [20, 27.25, 32.75, 38.25, 44];
+    const nearLane = (z) => LANES.reduce((a, b) => (Math.abs(b - z) < Math.abs(a - z) ? b : a));
+    const crossX = (x) => (x < -105 ? -120 : -90);
+    const tableChairs = FC.chairs.filter((ch) => ch.table);
+    /** chemin depuis une rangée vers la place ch (approche par le côté de la chaise) */
+    const chairPath = (fromZ, ch) => {
+      const t = ch.table, o = new THREE.Vector3().subVectors(ch.p, t).setY(0).normalize();
+      const side = ((ch.p.x * 13 + ch.p.z * 7) % 2) > 1 ? 1 : -1;
+      let lane, pts;
+      if (Math.abs(o.z) > 0.5) {
+        lane = o.z > 0 ? (t.z > 40 ? 44 : t.z + 2.75) : (t.z < 25 ? 20 : t.z - 2.75);
+        const sx = ch.p.x + side * 0.62;
+        pts = [V(sx, lane), V(sx, ch.p.z)];
+      } else {
+        lane = nearLane(t.z);
+        const ax = t.x + o.x * 1.6, sz = ch.p.z + side * 0.62;
+        pts = [V(ax, lane), V(ax, sz), V(ch.p.x, sz)];
+      }
+      const vx = crossX(t.x);
+      return { go: [V(vx, fromZ), V(vx, lane), ...pts], back: [...pts].reverse().concat([V(vx, lane)]), lane, vx };
+    };
+    const BINS = [{ p: V(-122.6, 44.3), face: Math.PI, row: 44 }, { p: V(-87.4, 19.7), face: 0, row: 20 }];
+    const rowOf = (st) => (st.dir > 0 ? 44 : 20);
+    const along = (from, to) => (Math.abs(from.z - to.z) < 0.5 ? [{ move: to }] : [{ move: V(crossX((from.x + to.x) / 2), from.z) }, { move: V(crossX((from.x + to.x) / 2), to.z) }, { move: to }]);
+    const freeChair = (near) => {
+      const free = tableChairs.filter((ch) => !ch.taken);
+      if (!free.length) return null;
+      free.sort((a, b) => a.p.distanceToSquared(near) - b.p.distanceToSquared(near));
+      return free[Math.floor(Math.random() * Math.min(8, free.length))];
+    };
+    const walkTo = (n, tgt, dt, sp = 1.1) => {
+      const d = new THREE.Vector3().subVectors(tgt, n.pos).setY(0), L = d.length();
+      if (L < 0.06) { n.c.setSpeed(0); return true; }
+      n.pos.addScaledVector(d.normalize(), Math.min(L, sp * dt)); n.c.root.position.copy(n.pos); turn(n.c, Math.atan2(d.x, d.z), dt, 8); n.c.setSpeed(sp);
+      return false;
+    };
+    /** pose le plateau sur la table devant la place ch */
+    const putTray = (n, ch) => {
+      const T = n.tray, t = ch.table;
+      n.c.carry = null; T.obj.removeFromParent();
+      T.obj.position.set(t.x + (ch.p.x - t.x) * 0.4, DECK_Y + 0.778, t.z + (ch.p.z - t.z) * 0.4);
+      T.obj.rotation.set(0, ch.yaw, 0); T.obj.scale.setScalar(1);
+      scene.add(T.obj); T.obj.updateMatrixWorld(true);
+    };
+    const holdTray = (n) => {
+      const T = n.tray; T.obj.removeFromParent();
+      T.obj.position.set(0, 0.98, 0.34); T.obj.rotation.set(0, 0, 0);
+      n.c.root.add(T.obj); n.c.carry = T.obj; n.c.carryHW = 0.215; n.c.carryY = 0.01; n.c.carryZ = -0.02;
+    };
+    const dropTray = (n) => { if (!n.tray) return; n.c.carry = null; n.tray.obj.removeFromParent(); n.tray = null; };
+    /** repas assis : bouchées (IK), pauses conversation, plat qui diminue */
+    const mealSteps = (ch, dur, start = 0) => [
+      { anim: 'sit', dur: 0.9, face: ch.yaw },
+      { fn: (n) => { n.meal = { T: dur, t: start * dur, talk: 0, eating: false, u: utensilMesh(n.tray.utensil) }; } },
+      { anim: 'sit', keep: true, face: ch.yaw, until: (n, dt) => {
+        const M = n.meal, c = n.c, T = n.tray;
+        M.t += dt;
+        const talking = (M.t % 24) > 18.5 && M.t < M.T - 4;
+        if (talking !== M.talking || !M.started) {
+          M.started = true; M.talking = talking;
+          if (talking) { c.eat(null); c.play('sitTalk', { fade: 0.5 }); }
+          else { c.play('sit', { fade: 0.5 }); c.eat(T.obj.localToWorld(T.dish.clone()), T.utensil === 'hand' ? null : M.u); }
+        }
+        const p = Math.min(1, M.t / M.T);
+        if (T.food) { T.food.scale.set(1 - 0.72 * p, Math.max(0.05, 1 - 0.9 * p), 1 - 0.72 * p); T.food.visible = p < 0.97; }
+        return M.t >= M.T;
+      } },
+      { fn: (n) => { n.c.eat(null); n.meal = null; } },
+      { anim: 'sit', keep: true, dur: R2(1, 3), face: ch.yaw },
+    ];
+    const leaveSteps = (n, ch, path) => {
+      const bin = BINS.reduce((a, b) => (Math.abs(b.p.x - ch.p.x) < Math.abs(a.p.x - ch.p.x) ? b : a));
+      return [
+        { fn: (m) => holdTray(m) },
+        ...path.back.map((p) => ({ move: p, speed: 1.15 })),
+        { fn: (m) => { ch.taken = null; } },
+        { move: V(path.vx, bin.row) }, { move: V(bin.p.x, bin.row) }, { move: bin.p },
+        { anim: 'pickup', dur: 1.1, face: bin.face },
+        { fn: (m) => dropTray(m) },
+        { anim: 'idle', dur: 0.6, face: bin.face },
+        ...along(V(bin.p.x, bin.row), V(-116, 20)),
+        ...exitSteps(),
+      ];
+    };
+    const exitSteps = () => [
+      { move: V(-116, 14) }, { move: V(-116, -3) }, { move: V(-116, -8.5) },
+      ...elevSteps(DECK_Y, 0),
+      { move: P3(-114, 0, -11) }, { move: DOOR_G },
+      { fn: (n) => { n.away = R2(6, 30); } },
+    ];
+    const orderSteps = () => [{ fn: (n) => {
+      const open = FC.stalls.filter((st) => ctx.time.open(st.r.id));
+      if (!open.length) { n.q.unshift(...exitSteps()); return; }
+      const st = open[Math.floor(Math.random() * open.length)];
+      const row = rowOf(st), here = V(n.pos.x, Math.abs(n.pos.z - 44) < Math.abs(n.pos.z - 20) ? 44 : 20);
+      const back = new THREE.Vector3().subVectors(st.approach, st.customer).setY(0).normalize();
+      n.q.unshift(
+        { move: here }, ...along(here, V(st.approach.x, row)),
+        { fn: (m) => st.line.push(m) },
+        // file d'attente : chacun avance d'une place quand le client devant lui est servi
+        { anim: 'idle', face: st.customerYaw, until: (m, dt) => { const i = st.line.indexOf(m); return walkTo(m, st.customer.clone().addScaledVector(back, i * 0.95), dt, 0.9) && i === 0; } },
+        { anim: 'talk', dur: R2(3, 5), face: st.customerYaw },
+        { anim: 'idle', dur: R2(4, 8), face: st.customerYaw },
+        { fn: (m) => {
+          const kinds = DISH_OF[st.r.cuisine] || ['pho'];
+          m.tray = trays(kinds[Math.floor(Math.random() * kinds.length)]);
+          holdTray(m);
+          st.line.splice(st.line.indexOf(m), 1);
+          const ch = freeChair(st.approach);
+          if (!ch) { m.q.unshift({ move: V(st.approach.x, row) }, { move: BINS[0].p }, { fn: dropTray }, ...exitSteps()); return; }
+          ch.taken = m;
+          const path = chairPath(row, ch);
+          m.q.unshift({ move: V(st.approach.x, row) }, ...path.go.map((p) => ({ move: p, speed: 1.1 })),
+            { fn: (k) => putTray(k, ch) }, { move: ch.p, speed: 0.7 }, ...mealSteps(ch, R2(50, 90)),
+            { fn: (k) => k.q.unshift(...leaveSteps(k, ch, path)) });
+        } });
+    } }];
+    const arriveSteps = () => [
+      { move: P3(-111.5, 0, -11) },
+      ...elevSteps(0, DECK_Y),
+      { move: V(-116, -7) }, { move: V(-116, 13) }, { move: V(-116 + R2(-1.2, 1.2), 20) },
+      ...orderSteps(),
+    ];
+    const tops2 = [0x6a4a32, 0x1a2436, 0x5d6168, 0xa89470, 0x2b3036, 0x7a2a24, 0x3a5a4a, 0x8a3a5a, 0xc8a46a, 0x2c4a6e, 0x4a2a5a, 0x9a5a2a];
+    const nCust = low ? 10 : 24;
+    const custs = [];
+    for (let k = 0; k < nCust; k++) {
+      const c = mk(k);
+      const n = npc(c, (m) => {
+        // nouvelle visite : arrive par la galerie (aux heures d'ouverture de la station)
+        if (!ctx.time.open('galerie')) return [{ fn: (q) => { q.away = 60; } }];
+        c.setOutfit({ top: tops2[Math.floor(Math.random() * tops2.length)], bottom: [0x26282c, 0x2f3a4e, 0x4a4036, 0x3a3a3e][Math.floor(Math.random() * 4)], accent: 0xc8b48a, belt: true });
+        m.pos.copy(DOOR_G); c.root.position.copy(DOOR_G); m.pos.y = 0;
+        return arriveSteps();
+      }, () => true);
+      n.cust = true; custs.push(n);
+      // état initial : une partie de la salle est déjà attablée, d'autres commandent, les derniers arrivent
+      const r = k / nCust;
+      if (r < 0.5) {
+        const ch = freeChair(V(R2(-134, -76), R2(22, 42)));
+        ch.taken = n;
+        const st = FC.stalls[k % FC.stalls.length];
+        const kinds = DISH_OF[st.r.cuisine] || ['pho'];
+        n.tray = trays(kinds[k % kinds.length]);
+        n.pos.copy(ch.p); c.root.position.copy(ch.p); c.root.rotation.y = ch.yaw;
+        putTray(n, ch);
+        const path = chairPath(ch.table.z > 32 ? 44 : 20, ch);
+        n.q = [...mealSteps(ch, R2(40, 90), R2(0.05, 0.8)), { fn: (m) => m.q.unshift(...leaveSteps(m, ch, path)) }];
+      } else if (r < 0.75) {
+        const p = V(R2(-130, -80), k % 2 ? 20 : 44);
+        n.pos.copy(p); c.root.position.copy(p);
+        n.q = orderSteps();
+      } else { n.away = R2(1, 25); n.pos.copy(DOOR_G); n.pos.y = 0; c.root.position.copy(n.pos); }
     }
     ctx.deckNpcs = npcs;
+    ctx.foodCustomers = custs;
+    /** figurants au rez-de-chaussée (hall des ascenseurs) : obstacles pour le joueur */
+    ctx.groundNpcBlockers = () => custs.filter((n) => n.solid && n.pos.y < 5).map((n) => ({ pos: n.c.root.position }));
     ctx.updaters.push((dt) => {
       const P = player.pos, here = P.y > DECK_Y - 5 && P.z > -6;
       for (const l of FC.lights) l.visible = here;
       ctx.audio?.foodCourt?.(here && P.z > 10, dt);
       const cam = ctx.camera.position;
+      // les ascenseurs avancent aussi quand le joueur est ailleurs (vol, boutique) : les passagers ne restent pas bloqués
+      if (ctx.elevators && !ctx.elevators.ticked) ctx.elevators.update(dt);
+      if (ctx.elevators) ctx.elevators.ticked = false;
       for (const n of npcs) {
+        if (n.cust) {
+          if (n.away > 0) { n.away -= dt; n.c.root.visible = n.solid = false; if (n.away <= 0) { n.away = 0; n.q = []; } else continue; }
+          stepNpc(n, dt);
+          const vis = Math.abs(P.y - n.pos.y) < 6 && n.c.root.position.distanceToSquared(P) < 3600;
+          n.c.root.visible = n.solid = vis && !n.away;
+          if (vis && n.c.root.position.distanceToSquared(cam) < 1444) n.c.update(dt, cam);
+          continue;
+        }
         const on = here && n.active();
         n.c.root.visible = on;
         n.solid = on;
@@ -833,7 +1020,7 @@ async function boot() {
         elevators.update(dt);
         if (elevators.riding) input.move.x = input.move.y = 0;
         if (ground.dead) input.move.x = input.move.y = 0;
-        player.update(dt, input, ground.onFoot ? ground.units.filter((u) => !u.down) : player.pos.y > DECK_Y - 5 ? deckBlockers() : [...crowd.agents.filter((a) => !a.attached && !a.away), ...ground.units.filter((u) => !u.down)], ground.onFoot ? [] : [...ctx.doors, ...cargo.blockers()]);
+        player.update(dt, input, ground.onFoot ? ground.units.filter((u) => !u.down) : player.pos.y > DECK_Y - 5 ? deckBlockers() : [...crowd.agents.filter((a) => !a.attached && !a.away), ...ground.units.filter((u) => !u.down), ...(ctx.groundNpcBlockers?.() || [])], ground.onFoot ? [] : [...ctx.doors, ...cargo.blockers()]);
         let near = null;
         if (ground.onFoot) near = ground.nearBoard() && !ground.dead ? { label: `E — Remonter à bord du Héron${ground.raid && !ground.raid.done ? ' (le raid continue)' : ''}`, fn: () => ground.reboard() } : null;
         else if (player.seated === seat) near = { label: touch ? 'DÉCOL. — Décoller · LEVER — Se lever' : 'ESPACE — Décoller · E — Se lever', fn: () => player.stand() };

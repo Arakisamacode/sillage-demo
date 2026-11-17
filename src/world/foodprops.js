@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import { foodMaterial as F } from './foodtex.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 // Bibliothèque d'objets détaillés pour la restauration : plats (bols garnis, pizzas, burgers, croissants,
 // baguettes, sushis, tacos, raviolis), vaisselle (tasses, verres, bouteilles étiquetées), batterie de cuisine
@@ -23,9 +25,9 @@ function geos() {
   G.croissant = new THREE.TorusGeometry(0.07, 0.035, 8, 14, Math.PI * 1.15);
   G.baguette = new THREE.CapsuleGeometry(0.03, 0.5, 4, 10);
   G.bun = new THREE.SphereGeometry(0.075, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2);
-  G.disc = new THREE.CylinderGeometry(1, 1, 1, 18);
-  G.crust = new THREE.TorusGeometry(1, 0.12, 6, 28);
-  G.ball = new THREE.SphereGeometry(1, 10, 7);
+  G.disc = new THREE.CylinderGeometry(1, 1, 1, 28);
+  G.crust = new THREE.TorusGeometry(1, 0.12, 8, 40);
+  G.ball = new THREE.SphereGeometry(1, 14, 10);
   G.box = new THREE.BoxGeometry(1, 1, 1);
   G.handle = new THREE.TorusGeometry(0.035, 0.008, 5, 10, Math.PI);
   G.shell = new THREE.CylinderGeometry(0.08, 0.08, 0.12, 14, 1, true, 0, Math.PI);
@@ -33,18 +35,18 @@ function geos() {
 }
 
 /** Fabrique liée à un Builder et aux matériaux. place(geo, mat, matriceLocale) dans un repère monde « base ». */
-export function foodKit(ctx) {
-  const { mats, builder: B } = ctx;
+export function foodKit(ctx, target = null) {
+  const { mats } = ctx, B = target || ctx.builder;
   geos();
   const M = {
-    ceramic: mats.smooth(0xf2f0ea, 0.25, 0.0), ceramicD: mats.smooth(0x2a2c2e, 0.3, 0.0), steel: mats.smooth(0xb8bcc0, 0.25, 0.9),
+    ceramic: mats.smooth(0xf4f2ec, 0.12, 0.0), ceramicD: mats.smooth(0x2a2c2e, 0.15, 0.0), steel: mats.smooth(0xb8bcc0, 0.25, 0.9),
     copper: mats.smooth(0xb87333, 0.25, 0.9), iron: mats.smooth(0x222428, 0.5, 0.6), wood: mats.paint(0x7a5232, { plain: true, rough: 0.7 }),
-    bamboo: mats.plastic(0xc8a46a, 0.85), dough: mats.plastic(0xd8973a, 0.65), doughL: mats.plastic(0xe8c07a, 0.7), cheese: mats.plastic(0xf2d06a, 0.5),
-    sauce: mats.plastic(0xb8301e, 0.4), pepperoni: mats.plastic(0x9a2a1e, 0.5), basil: mats.plastic(0x2a7a2a, 0.6), lettuce: mats.plastic(0x5aaa3a, 0.7),
-    tomato: mats.plastic(0xd8402a, 0.35), meat: mats.plastic(0x5a2a18, 0.7), meatL: mats.plastic(0x8a4a2a, 0.6), rice: mats.plastic(0xf4f2ea, 0.85),
-    nori: mats.plastic(0x1a2a1a, 0.6), salmon: mats.plastic(0xf08a5a, 0.4), tuna: mats.plastic(0xc8303a, 0.4), egg: mats.plastic(0xf8f4e8, 0.4), yolk: mats.plastic(0xf0b030, 0.3),
-    broth: mats.plastic(0xb8642a, 0.15), brothL: mats.plastic(0xd8a050, 0.15), curry: mats.plastic(0xd8782a, 0.3), noodle: mats.plastic(0xf0dca0, 0.5), herb: mats.plastic(0x4a9a3a, 0.7),
-    choco: mats.plastic(0x4a2a1a, 0.5), cream: mats.plastic(0xf8f2e2, 0.6), glassM: mats.glass(0xcfe8ff, 0.35), drinkA: mats.plastic(0xc87a2a, 0.1), drinkB: mats.plastic(0xe8e0c8, 0.3),
+    bamboo: F('bamboo', 0.8), dough: F('dough', 0.7, 1.4), doughL: F('doughL', 0.75), cheese: F('cheese', 0.42, 1.2),
+    sauce: F('sauce', 0.3), pepperoni: F('pepperoni', 0.45), basil: F('basil', 0.6), lettuce: F('lettuce', 0.55, 1.4),
+    tomato: F('tomato', 0.3), meat: F('meat', 0.75, 1.8), meatL: F('meatL', 0.55), rice: F('rice', 0.7, 1.6),
+    nori: F('nori', 0.55), salmon: F('salmon', 0.3), tuna: F('tuna', 0.3), egg: F('egg', 0.35, 0.5), yolk: mats.plastic(0xf0b030, 0.3),
+    broth: F('broth', 0.08, 0.3), brothL: F('brothL', 0.12, 0.3), curry: F('curry', 0.2, 0.6), noodle: F('noodle', 0.45), herb: F('herb', 0.6),
+    choco: F('choco', 0.45), cream: F('cream', 0.55, 0.6), glassM: mats.glass(0xcfe8ff, 0.35), drinkA: mats.plastic(0xc87a2a, 0.1), drinkB: mats.plastic(0xe8e0c8, 0.3),
     paper: mats.paint(0xf2f2ee, { plain: true, rough: 0.9 }), red: mats.plastic(0xc83a2a, 0.4), yellow: mats.plastic(0xe8c23a, 0.4), green: mats.plastic(0x3a8a3a, 0.4), black: mats.plastic(0x1a1a1c, 0.5),
     tray: mats.plastic(0x3a4a5a, 0.5), trayB: mats.plastic(0x6a3a2a, 0.5),
   };
@@ -52,10 +54,11 @@ export function foodKit(ctx) {
   /** pose une géométrie dans le repère base (Matrix4) avec la transformation locale m */
   const put = (base, geo, mat, m) => B.add(geo, mat, base.clone().multiply(m), { cast: false });
   const K = {
-    M, T, put,
+    M, T, put, G,
     base: (x, y, z, ry = 0) => T(x, y, z, ry),
     // ------------------------------------------------------------- plats
     bowl(base, x, z, kind = 'pho', y = 0) {
+      if (typeof kind === 'number') [kind, y] = [y ?? 'pho', kind];
       put(base, G.bowl, kind === 'ramen' ? M.ceramicD : M.ceramic, T(x, y, z));
       put(base, G.disc, kind === 'curry' ? M.curry : kind === 'miso' ? M.brothL : M.broth, T(x, y + 0.062, z, 0, 0.105, 0.004, 0.105));
       if (kind === 'pho' || kind === 'ramen') {
@@ -71,6 +74,7 @@ export function foodKit(ctx) {
       }
     },
     plate(base, x, z, kind = 'main', y = 0) {
+      if (typeof kind === 'number') [kind, y] = [y ?? 'main', kind];
       put(base, G.plate, M.ceramic, T(x, y, z));
       if (kind === 'main') {
         put(base, G.ball, M.rice, T(x - 0.04, y + 0.03, z + 0.02, 0, 0.055, 0.035, 0.05));
@@ -151,4 +155,87 @@ export function foodKit(ctx) {
     trays(base, x, z, y = 0, n = 6) { for (let k = 0; k < n; k++) K.tray(base, x, z, y + k * 0.022, 0, k % 2 ? M.tray : M.trayB); },
   };
   return K;
+}
+
+// ------------------------------------------------------------------ plateaux mobiles (repas des clients)
+/** Collecteur compatible Builder.add : regroupe la géométrie par matériau, puis la fusionne en maillages. */
+class Collector {
+  constructor() { this.by = new Map(); }
+  add(geo, mat, m) {
+    let g = geo.index ? geo.toNonIndexed() : geo.clone();
+    for (const k of Object.keys(g.attributes)) if (!['position', 'normal', 'uv'].includes(k)) g.deleteAttribute(k);
+    if (!g.attributes.uv) g.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(g.attributes.position.count * 2), 2));
+    g.applyMatrix4(m);
+    if (!this.by.has(mat)) this.by.set(mat, []);
+    this.by.get(mat).push(g);
+    return g;
+  }
+  group(filter, offset = null) {
+    const grp = new THREE.Group();
+    for (const [mat, geos] of this.by) {
+      if (!filter(mat)) continue;
+      const g = mergeGeometries(geos, false);
+      if (offset) g.translate(-offset.x, -offset.y, -offset.z);
+      g.computeBoundingSphere();
+      const o = new THREE.Mesh(g, mat); o.castShadow = false; o.receiveShadow = true; grp.add(o);
+    }
+    if (offset) grp.position.copy(offset);
+    return grp;
+  }
+}
+
+/** Plat servi selon la cuisine du restaurant. */
+export const DISH_OF = { chinois: ['dumplings', 'ramen'], mexicain: ['tacos', 'nachos'], boulangerie: ['croissant'], tacos: ['tacos'], indien: ['curry'], sushi: ['sushi'], burgers: ['burger'], pizzeria: ['pizza'], 'café': ['cake'], vietnamien: ['pho'] };
+
+/**
+ * Fabrique de plateaux : renvoie { obj, food, dish, utensil } ; obj = plateau complet (Group, repère : centre du plateau,
+ * +z vers la table), food = partie mangeable (pivot au centre du plat, on la réduit au fil du repas),
+ * dish = position locale du plat, utensil = 'chop' | 'fork' | 'spoon' | 'hand'.
+ */
+export function trayFactory(ctx) {
+  const templates = {};
+  const build = (kind) => {
+    const col = new Collector();
+    const K = foodKit(ctx, col), M = K.M, W = new THREE.Matrix4();
+    const dishware = new Set([M.ceramic, M.ceramicD, M.glassM, M.tray, M.trayB, M.steel, M.paper, M.bamboo, M.wood, M.red, M.drinkA, M.drinkB]);
+    K.tray(W, 0, 0, 0, 0, kind === 'burger' || kind === 'tacos' ? M.trayB : M.tray);
+    const y = 0.014, d = new THREE.Vector3(-0.03, y, 0.03);
+    let utensil = 'fork';
+    if (kind === 'pho' || kind === 'ramen') { K.bowl(W, d.x, d.z, kind, y); utensil = 'chop'; }
+    else if (kind === 'curry') { K.bowl(W, d.x, d.z, 'curry', y); utensil = 'spoon'; }
+    else if (kind === 'sushi') { K.plate(W, d.x, d.z, 'sushi', y); utensil = 'chop'; }
+    else if (kind === 'dumplings') { K.dumplings(W, d.x, d.z, y - 0.02); utensil = 'chop'; }
+    else if (kind === 'pizza') { K.put(W, K.G.plate, M.ceramic, K.T(d.x, y, d.z, 0, 1.25)); K.pizza(W, d.x, d.z, y + 0.012, 0.16); utensil = 'hand'; }
+    else if (kind === 'burger') { K.burger(W, d.x - 0.04, d.z, y); K.plate(W, d.x + 0.1, d.z - 0.02, 'fries', y - 0.01); utensil = 'hand'; }
+    else if (kind === 'tacos') { for (const k of [-1, 0, 1]) K.taco(W, d.x + k * 0.075, d.z, y - 0.02, 0); utensil = 'hand'; }
+    else if (kind === 'nachos') { K.plate(W, d.x, d.z, 'nachos', y); utensil = 'hand'; }
+    else if (kind === 'cake') { K.plate(W, d.x, d.z, 'cake', y); K.cup(W, 0.12, -0.06, y); utensil = 'fork'; }
+    else if (kind === 'croissant') { K.put(W, K.G.plate, M.ceramic, K.T(d.x, y, d.z, 0, 0.9)); K.cup(W, 0.12, -0.06, y); utensil = 'hand'; }
+    if (kind !== 'cake' && kind !== 'croissant') K.glass(W, 0.14, 0.08, y, kind === 'burger' ? M.drinkA : M.drinkB);
+    K.put(W, K.G.box, M.paper, K.T(-0.15, y + 0.002, -0.06, 0.3, 0.1, 0.004, 0.1));
+    const obj = col.group((m) => dishware.has(m));
+    const food = col.group((m) => !dishware.has(m), d);
+    if (kind === 'croissant' && ctx.models?.has('croissant')) { const cr = ctx.models.mesh('croissant'); cr.position.y = 0.012; cr.rotation.y = 0.4; food.add(cr); }
+    food.name = 'food'; obj.add(food);
+    return { obj, food, dish: d.clone(), utensil };
+  };
+  return (kind) => {
+    const t = templates[kind] || (templates[kind] = build(kind));
+    const obj = t.obj.clone(true);
+    const food = obj.getObjectByName('food');
+    return { obj, food, dish: t.dish, utensil: t.utensil };
+  };
+}
+
+/** Couverts tenus en main (baguettes, fourchette, cuillère). */
+export function utensilMesh(kind) {
+  const g = new THREE.Group();
+  const wood = new THREE.MeshStandardMaterial({ color: 0x8a5a32, roughness: 0.6 }), steel = new THREE.MeshStandardMaterial({ color: 0xc8ccd0, roughness: 0.2, metalness: 0.9 });
+  if (kind === 'chop') for (const dx of [-0.008, 0.008]) { const m = new THREE.Mesh(new THREE.CylinderGeometry(0.003, 0.0045, 0.22, 6), wood); m.position.set(dx, 0.07, 0); g.add(m); }
+  else if (kind === 'fork' || kind === 'spoon') {
+    const h = new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.15, 0.004), steel); h.position.y = 0.05; g.add(h);
+    const head = kind === 'spoon' ? new THREE.Mesh(new THREE.SphereGeometry(0.018, 10, 6).scale(1, 1.4, 0.4), steel) : new THREE.Mesh(new THREE.BoxGeometry(0.022, 0.045, 0.003), steel);
+    head.position.y = 0.14; g.add(head);
+  }
+  return g;
 }

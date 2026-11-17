@@ -199,6 +199,7 @@ export class CharacterLibrary {
 
 const _v = new THREE.Vector3(), _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _m = new THREE.Matrix4();
 const UP = new THREE.Vector3(0, 1, 0);
+const _f = new THREE.Vector3(), _r = new THREE.Vector3(), _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c = new THREE.Vector3(), _t = new THREE.Vector3();
 
 export class Character {
   constructor(lib, name, opts) {
@@ -391,6 +392,58 @@ export class Character {
 
   lookAt(p) { this.lookTarget = p; }
 
+  /**
+   * Repas (assis ou debout) : la main droite fait des allers-retours entre le plat et la bouche (IK à deux os),
+   * mastication entre les bouchées, la main gauche reste posée au bord du plateau, le regard suit l'assiette.
+   * target : position monde du plat (null pour arrêter) ; utensil : couvert tenu en main (Object3D) ou null.
+   */
+  eat(target, utensil = null) {
+    if (this._utensil) { this._utensil.removeFromParent(); this._utensil = null; }
+    this.meal = target ? { p: target.clone(), t: Math.random() * 3, n: 0, pause: 0, jit: new THREE.Vector3() } : null;
+    if (target && utensil) { this._utensil = utensil; this.root.add(utensil); }
+    this.lookTarget = null;
+  }
+  _eatPose(dt) {
+    const M = this.meal, b = this.bones;
+    if (!b.hand_r || !b.Head) return;
+    M.t += dt;
+    const P = 4.4 + M.pause;
+    if (M.t > P) { M.t -= P; M.n++; M.pause = M.n % 4 === 3 ? 2.5 + Math.random() * 2 : 0; M.jit.set((Math.random() - 0.5) * 0.06, 0, (Math.random() - 0.5) * 0.06); }
+    const k = M.t;
+    this.root.updateMatrixWorld(true);
+    const q = this.root.quaternion, fwd = _f.set(0, 0, 1).applyQuaternion(q), right = _r.set(-1, 0, 0).applyQuaternion(q);
+    // points clés : plat, bouche, repos (main posée près de l'assiette)
+    const plate = _a.copy(M.p).add(M.jit); plate.y += 0.05;
+    b.Head.getWorldPosition(_b);
+    const mouth = _b.addScaledVector(fwd, 0.1); mouth.y += 0.03;
+    const rest = _c.copy(M.p).addScaledVector(fwd, -0.2).addScaledVector(right, 0.12); rest.y += 0.03;
+    const sm = (x) => x * x * (3 - 2 * x), L = (u, v, x) => _t.copy(u).lerp(v, sm(THREE.MathUtils.clamp(x, 0, 1)));
+    let tgt;
+    if (k < 0.7) tgt = L(rest, plate, k / 0.7);
+    else if (k < 1.0) tgt = L(plate, plate, 0);
+    else if (k < 1.75) tgt = L(plate, mouth, (k - 1.0) / 0.75);
+    else if (k < 2.5) { tgt = L(mouth, mouth, 0); tgt.y += Math.sin(k * 14) * 0.004; }
+    else if (k < 3.2) tgt = L(mouth, rest, (k - 2.5) / 0.7);
+    else tgt = L(rest, rest, 0);
+    this.lookTarget = k < 1.2 || k > 3.4 ? M.p : null;
+    this._ik2(b.upperarm_r, b.lowerarm_r, b.hand_r, tgt.clone());
+    // main gauche au bord du plateau
+    if (b.hand_l) { const lh = _c.copy(M.p).addScaledVector(fwd, -0.14).addScaledVector(right, -0.24); lh.y += 0.01; this._ik2(b.upperarm_l, b.lowerarm_l, b.hand_l, lh.clone()); }
+    // couvert dans le prolongement de l'avant-bras, pointe vers le plat
+    const U = this._utensil;
+    if (U) {
+      const hw = b.hand_r.getWorldPosition(_a), fa = b.lowerarm_r.getWorldPosition(_b);
+      const dir = _c.subVectors(hw, fa).normalize();
+      dir.addScaledVector(fwd, 0.6).normalize();
+      const pos = _t.copy(hw).addScaledVector(dir, 0.04);
+      this.root.worldToLocal(pos);
+      U.position.copy(pos);
+      _q.setFromUnitVectors(UP, dir);
+      _q2.copy(q).invert().multiply(_q);
+      U.quaternion.copy(_q2);
+    }
+  }
+
   _locomotion() {
     const v = this.speed / this.heightScale * 1.0;
     const w = { idle: 0, walk: 0, jog: 0, run: 0 };
@@ -467,6 +520,7 @@ export class Character {
     this._applyLook(step);
     if (this.held) this._placeHeld();
     if (this.carry) this._carryPose();
+    if (this.meal) this._eatPose(step);
   }
 
   _applyLook(dt) {

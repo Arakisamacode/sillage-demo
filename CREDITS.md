@@ -57,6 +57,19 @@ Script : `tools/fetch_polyhaven.py` (diffuse, normale OpenGL, ARM), recompressé
 Source amont : https://ambientcg.com — licence : https://docs.ambientcg.com/license/
 Modification : conversion en JPEG.
 
+## Modèles 3D photoscannés Poly Haven (téléchargés directement)
+
+| Fichiers (`public/assets/models/ph/*.glb`) | Licence |
+|---|---|
+| `SchoolChair_01` (chaises de la Cour des Saveurs), `round_wooden_table_02` (tables), `modern_ceiling_lamp_01` (suspensions), `potted_plant_02`, `potted_plant_04` (plantes), `planter_box_01`, `metal_stool_03` | CC0 1.0 |
+| `croissant`, `hamburger_buns`, `carrot_cake`, `strawberry_chocolate_cake`, `lemon`, `food_lime_01`, `food_apple_01`, `food_avocado_01`, `food_kiwi_01`, `food_pomegranate_01`, `yellow_onion`, `food_ginger_01` | CC0 1.0 |
+| `wooden_cutting_board`, `wooden_bowl_02`, `brass_pot_01`, `jug_01`, `tea_set_01`, `wine_bottles_01`, `cardboard_box_01`, `plastic_crate_01`, `WetFloorSign_01` | CC0 1.0 |
+
+Source : https://polyhaven.com/models (page de chaque modèle : https://polyhaven.com/a/<identifiant>) — licence : https://polyhaven.com/license
+Script : `tools/fetch_ph_models.mjs` (glTF 1k, simplification meshoptimizer, textures JPEG 256–1024 px, variantes `_lo` pour la qualité basse).
+Les plats sans équivalent CC0 (pizzas, sushis, phở, currys, tacos, burgers…) sont modélisés dans le projet avec des textures
+alimentaires générées (`src/world/foodtex.js`).
+
 ## Créations originales du projet (CC0)
 
 - Textures procédurales : tôles, bardage nervuré, plaques de pont, caillebotis, grilles,

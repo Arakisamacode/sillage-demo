@@ -137,6 +137,16 @@ nettoyage, vapeur et flammes en cuisine, ambiance sonore (brouhaha, friture, vai
 sont solides (on ne les traverse plus). Performances : figurants du pont sans ombre portée, animation figée
 au-delà de 38 m, vaisselle fusionnée en géométrie statique.
 
+Mobilier et aliments photoscannés (Poly Haven, CC0) : chaises, tables, suspensions, plantes, croissants, gâteaux,
+pains à burger, agrumes, avocats, oignons, gingembre, planches à découper, service à thé, bouteilles, cagettes.
+Les plats cuisinés ont des textures alimentaires (croûte dorée, fromage gratiné, riz, saumon, bouillon, curry…).
+
+**Vie des clients** : ils arrivent de la galerie par l'**ascenseur** (appel au palier, attente, embarquement, trajet,
+sortie), font la queue au restaurant choisi, commandent, reçoivent leur plateau (plat selon la cuisine), le portent
+à deux mains jusqu'à une place libre, s'assoient et **mangent** (bouchées portées à la bouche avec baguettes, fourchette,
+cuillère ou à la main, mastication, pauses conversation ; le plat diminue), puis rapportent le plateau au point de tri
+et redescendent à la galerie. Le cuisinier vient servir quand un client attend.
+
 ## Vie de la station (horaires)
 
 Horloge accélérée (1 s réelle = 48 s à bord ; une journée = 30 min de jeu), affichée en haut à droite.
