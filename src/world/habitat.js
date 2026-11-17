@@ -192,7 +192,7 @@ export function buildHabitat(ctx) {
     benches.push({ p: new THREE.Vector3(x - 0.7, Y, HALL.z0 + 2.2), yaw: Math.PI }, { p: new THREE.Vector3(x + 0.7, Y, HALL.z0 + 2.2), yaw: Math.PI });
   }
   // plantes et éclairage
-  for (const [x, z] of [[-111, -22.5], [-81, -22.5], [-111, 0.5], [-81, 0.5]]) {
+  for (const [x, z] of [[-111, -22.5], [-81, -22.5], [-107.6, 1.2], [-81, 0.5]]) {
     B.cyl(0.4, 0.3, 0.7, wallD, [x, Y + 0.35, z], null, { cast: false });
     B.add(new THREE.IcosahedronGeometry(0.6, 1), mats.plastic(0x3a6a2a, 0.8), new THREE.Matrix4().makeTranslation(x, Y + 1.2, z), { cast: false });
   }
@@ -236,7 +236,7 @@ export function buildHabitat(ctx) {
     bar: new THREE.Vector3(bx - 1.2, Y, -12), bartender: new THREE.Vector3(bx + 0.9, Y, -12),
     clinic: new THREE.Vector3(-102, Y, 8.2), doctor: new THREE.Vector3(-102.4, Y, 8.9),
     bunk: new THREE.Vector3(-92.6, Y, 6.3),
-    onDeck: (p) => p.y > Y - 5,
+    onDeck: (p) => p.y > Y - 5 && p.y < Y + 15,
   };
 }
 
@@ -254,7 +254,7 @@ export class Elevators {
     this.onEvent('start', S);
   }
   call(S, y) { if (S.moving) return; if (this.isAt(S, y)) { S.hold = 3; return; } this._start(S, y, false); this.onEvent('called', S); }
-  ride(S) { if (S.moving) return; this._start(S, S.y < 1 ? DECK_Y : 0, true); }
+  ride(S) { if (S.moving) return; const [a, b] = S.levels || [0, DECK_Y]; this._start(S, Math.abs(S.y - a) < 1 ? b : a, true); }
   /** Départ demandé par un passager non joueur (figurant) vers le niveau y. */
   send(S, y) { if (S.moving || this.isAt(S, y)) return; this._start(S, y, false); }
   /** À appeler avant la mise à jour du joueur : déplace les cabines et le joueur embarqué. */

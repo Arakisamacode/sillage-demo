@@ -35,6 +35,18 @@ export const ITEMS = [
   I('o_navy', 'outfit', 'Combinaison de vol Marine', 1200, 'Coupe ajustée, liserés bleus. Les pilotes de convoi l\'adorent.', { outfit: { top: 0x1a2436, bottom: 0x1a2436, boot: 0x101216, accent: 0x3e8ad8, gloves: true, zip: true } }),
   I('o_black', 'outfit', 'Tenue tactique Charbon', 1450, 'Tissu anti-abrasion, poches de cuisse. Discrète.', { outfit: { top: 0x1c1e20, bottom: 0x24262a, boot: 0x0e0f10, accent: 0x6a6a5a, gloves: true, belt: true } }),
 
+  // ------------------------------------------------------------ haute couture (Maison Élysée, La Couronne)
+  I('lx_aurore', 'outfit', 'Ensemble « Aurore » nacre et or', 18500, 'Soie technique nacrée, passepoils or 24 carats. Coupe sur mesure par la Maison Élysée.', { lux: true, outfit: { top: 0xf4f0e8, bottom: 0xf4f0e8, boot: 0xd8c8a8, accent: 0xd4af37, zip: true, belt: true } }),
+  I('lx_eclipse', 'outfit', 'Costume « Éclipse »', 24000, 'Noir absolu à pigments photoniques, liserés dorés. Pour les réceptions de la Couronne.', { lux: true, outfit: { top: 0x121417, bottom: 0x121417, boot: 0x0a0a0a, accent: 0xd4af37, zip: true } }),
+  I('lx_pourpre', 'outfit', 'Ensemble « Pourpre impériale »', 21000, 'Velours de culture pourpre, boutons en aurélite polie.', { lux: true, outfit: { top: 0x6a1222, bottom: 0x1a1214, boot: 0x0e0a0a, accent: 0xe8c878, belt: true } }),
+  I('lx_opale', 'outfit', 'Tenue « Opale » ivoire et glacier', 15800, 'Tissu thermo-régulé à reflets opalins.', { lux: true, outfit: { top: 0xe8e4f0, bottom: 0x2a2c3a, boot: 0x1a1a22, accent: 0x9fd8ff, zip: true } }),
+  I('lx_azur', 'outfit', 'Combinaison de vol « Azur Prestige »', 32000, 'La combinaison des pilotes de yacht : fibre de carbone tissée, doublure en soie.', { lux: true, outfit: { top: 0x1a2a4a, bottom: 0x1a2a4a, boot: 0x0e1018, accent: 0xd8d8e8, zip: true, belt: true, gloves: true } }),
+
+  // ------------------------------------------------------------ combinaisons de haute technologie (Nova Atelier)
+  I('lx_halo', 'armor', 'Combinaison « Halo » céramique nacrée', 68000, 'Exosquelette souple, plaques céramiques nacrées, filets or. Régulation thermique active.', { lux: true, prot: 0.5, armor: { tier: 2, plate: 0xf2f0ea, under: 0x2a2c30, accent: 0xd4af37, light: 0xffe0a0 }, stats: { Protection: '50 %', Mobilité: 'Élevée', Finition: 'céramique nacrée' } }),
+  I('lx_onyx', 'armor', 'Combinaison « Onyx » chrome noir', 92000, 'Blindage intégral chrome noir, éclairage cyan, assistance musculaire.', { lux: true, prot: 0.62, armor: { tier: 3, plate: 0x16181c, under: 0x0a0b0c, accent: 0x4ad8ff, light: 0x6fe8ff }, stats: { Protection: '62 %', Mobilité: 'Élevée', Assistance: 'musculaire' } }),
+  I('lx_soleil', 'armor', 'Combinaison « Soleil » ivoire et or', 145000, 'La pièce maîtresse de l\'atelier : alliage céramique-or, protection maximale sans perte de mobilité.', { lux: true, prot: 0.72, armor: { tier: 3, plate: 0xe8e4dc, under: 0x3a3226, accent: 0xd4af37, light: 0xfff0c0 }, stats: { Protection: '72 %', Mobilité: 'Élevée', Finition: 'or 24 carats' } }),
+
   // ------------------------------------------------------------ armures
   I('a_light', 'armor', 'Armure légère « Pavois »', 2400, 'Plastron et protections d\'avant-bras. Ne gêne pas les mouvements.', { prot: 0.2, armor: { tier: 1, plate: 0x4a5058, under: 0x1b1e21, accent: 0x6e6a3a, light: 0x5fe6c8 }, stats: { Protection: '20 %', Mobilité: 'Élevée' } }),
   I('a_med', 'armor', 'Armure moyenne « Rempart »', 5600, 'Épaulières, cuissardes et plastron renforcé.', { prot: 0.4, armor: { tier: 2, plate: 0x3a4148, under: 0x1b1e21, accent: 0x7a7a3a, light: 0x5fe6c8 }, stats: { Protection: '40 %', Mobilité: 'Moyenne' } }),
@@ -76,7 +88,9 @@ export const HERON_SLOTS = [
 export const STORES = {
   armes: { label: 'Armurerie Kestrel', name: 'ARMURERIE KESTREL', cats: ['sidearm', 'primary'], greet: 'Bienvenue chez Kestrel. Tout est homologué station, pas de tir dans la galerie.' },
   pieces: { label: 'Équipement naval', name: 'ÉQUIPEMENT NAVAL', cats: ['shipWeapon', 'turret', 'shield', 'mining'], greet: 'Armement et composants. On installe directement sur votre appareil à quai.' },
-  combis: { label: 'Combinaisons Vega', name: 'COMBINAISONS VEGA', cats: ['outfit', 'armor'], greet: 'Essayez ce que vous voulez, la cabine est au fond.' },
+  combis: { label: 'Combinaisons Vega', name: 'COMBINAISONS VEGA', cats: ['outfit', 'armor'], filter: (i) => !i.lux, greet: 'Essayez ce que vous voulez, la cabine est au fond.' },
+  lx_mode: { label: 'Maison Élysée', name: 'MAISON ÉLYSÉE · HAUTE COUTURE', cats: ['outfit'], filter: (i) => i.lux, greet: 'Bienvenue à la Maison Élysée. Une coupe, une étoffe, une signature : laissez-nous vous habiller.' },
+  lx_suits: { label: 'Nova Atelier', name: 'NOVA ATELIER · COMBINAISONS', cats: ['armor'], filter: (i) => i.lux, greet: 'Chaque combinaison Nova est ajustée au millimètre. Protection, élégance, aucune concession.' },
   pharma: { label: 'Pharmacie', name: 'PHARMACIE', cats: ['consumable'], filter: (i) => ['medpen', 'medkit', 'ration'].includes(i.id), greet: 'Bonjour. Soins d\'urgence et vivres de bord.' },
   nouilles: { label: 'Nouilles Orbitales', name: 'NOUILLES ORBITALES', cats: ['consumable'], filter: (i) => i.id === 'noodles', greet: '« Un bol ? C\'est le meilleur bouillon de la station ! »' },
   ...Object.fromEntries(RESTAURANTS.map((r) => [r.id, { label: r.label, name: r.name, cats: ['food'], filter: (i) => i.stall === r.id, greet: r.greet }])),

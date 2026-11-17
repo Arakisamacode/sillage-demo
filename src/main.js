@@ -31,6 +31,7 @@ import { buildFurnish } from './world/furnish.js';
 import { buildFoodCourt } from './world/foodcourt.js';
 import { trayFactory, utensilMesh, DISH_OF } from './world/foodprops.js';
 import { Models } from './world/models.js';
+import { buildLuxury, populateLuxury, LUX_Y } from './world/luxury.js';
 import { RESTAURANTS } from './game/food.js';
 import { Cargo, buildQuai } from './game/cargo.js';
 import { Missions } from './game/missions.js';
@@ -93,6 +94,7 @@ async function boot() {
   ctx.habitat = buildHabitat(ctx);
   ctx.furnish = buildFurnish(ctx);
   ctx.food = buildFoodCourt(ctx);
+  ctx.lux = buildLuxury(ctx);
   ctx.lights = buildLighting(ctx);
   const lib = new CharacterLibrary(manager, quality);
   const libReady = lib.load(undefined, (p) => progress(0.6 + 0.3 * p, 'Chargement des personnages'));
@@ -446,13 +448,12 @@ async function boot() {
     /** figurants au rez-de-chaussée (hall des ascenseurs) : obstacles pour le joueur */
     ctx.groundNpcBlockers = () => custs.filter((n) => n.solid && n.pos.y < 5).map((n) => ({ pos: n.c.root.position }));
     ctx.updaters.push((dt) => {
-      const P = player.pos, here = P.y > DECK_Y - 5 && P.z > -6;
+      const P = player.pos, here = P.y > DECK_Y - 5 && P.y < DECK_Y + 15 && P.z > -6;
       for (const l of FC.lights) l.visible = here;
       ctx.audio?.foodCourt?.(here && P.z > 10, dt);
       const cam = ctx.camera.position;
       // les ascenseurs avancent aussi quand le joueur est ailleurs (vol, boutique) : les passagers ne restent pas bloqués
-      if (ctx.elevators && !ctx.elevators.ticked) ctx.elevators.update(dt);
-      if (ctx.elevators) ctx.elevators.ticked = false;
+      for (const E of [ctx.elevators, ctx.luxLift]) { if (E && !E.ticked) E.update(dt); if (E) E.ticked = false; }
       for (const n of npcs) {
         if (n.cust) {
           if (n.away > 0) { n.away -= dt; n.c.root.visible = n.solid = false; if (n.away <= 0) { n.away = 0; n.q = []; } else continue; }
@@ -527,6 +528,8 @@ async function boot() {
       for (const c of people) { c.root.visible = on; if (on) c.update(dt, null); }
     });
   }
+  // La Couronne : clientèle, personnel, mannequins
+  populateLuxury(ctx, lib, player, ctx.lux);
   ctx.crowd = crowd; ctx.player = player; ctx.scenes = scenes;
   // ------------------------------------------------------------------ équipage (bureau de recrutement de la galerie)
   const crew = new Crew(ctx, { game, cargo, flight, crowd, missions, player, loadout: heronGear });
@@ -647,6 +650,29 @@ async function boot() {
   const fadeDo = (fn, hold = 450) => { fadeEl.classList.add('on'); setTimeout(() => { fn(); setTimeout(() => fadeEl.classList.remove('on'), hold); }, 480); };
   const elevators = new Elevators(HB.shafts, player);
   ctx.elevators = elevators;
+  // ascenseur panoramique de La Couronne (pont habitat ↔ étage de prestige)
+  const luxLift = new Elevators(ctx.lux.shafts, player);
+  ctx.luxLift = luxLift;
+  luxLift.onEvent = (e, S, carried) => {
+    if (e === 'start' || e === 'arrived') audio.blip();
+    if (e === 'called') toast('Ascenseur panoramique appelé');
+    if (e === 'arrived' && carried) toast(S.y > DECK_Y + 1 ? 'La Couronne · Maison Élysée, Nova Atelier, Aérodyne, salon Le Zénith' : 'Pont habitat · bar La Comète, infirmerie, cabines · Cour des Saveurs');
+  };
+  for (const S of ctx.lux.shafts) for (const y of S.levels) {
+    interactables.push({ pos: S.inside(y), r: 1.2, when: () => luxLift.isAt(S, y), label: y === DECK_Y ? 'E — Ascenseur panoramique : monter à La Couronne' : 'E — Ascenseur panoramique : descendre au pont habitat', fn: () => luxLift.ride(S) });
+    interactables.push({ pos: new THREE.Vector3(S.x1 + 1.3, y, S.c), r: 1.3, when: () => !luxLift.isAt(S, y) && !S.moving, label: 'E — Appeler l\'ascenseur panoramique', fn: () => luxLift.call(S, y) });
+    interactables.push({ pos: new THREE.Vector3(S.x1 + 1.3, y, S.c), r: 1.3, when: () => S.moving, label: 'Ascenseur en mouvement…', fn: () => null });
+  }
+  {
+    const LS = ctx.lux.spots;
+    interactables.push({ pos: LS.couture.customer, r: 1.6, label: 'E — Maison Élysée : haute couture', fn: () => openUI(() => shop.openStore('lx_mode')) });
+    interactables.push({ pos: LS.nova.customer, r: 1.6, label: 'E — Nova Atelier : combinaisons de haute technologie', fn: () => openUI(() => shop.openStore('lx_suits')) });
+    interactables.push({ pos: LS.aero.pos, r: 1.8, label: 'E — Aérodyne : yacht stellaire Série 9', fn: () => toast('Aérodyne Série 9 · 48 500 000 ¤ · livraison sur commande, 14 mois · « Un essai en orbite peut être organisé pour nos clients privilégiés. »') });
+    const CONC = ['« Bienvenue à La Couronne. Un rendez-vous privé chez Nova Atelier ? Je m\'en charge. »', '« Le salon Le Zénith sert un millésime de Lys exceptionnel ce soir. »', '« La coupole a été polie la nuit dernière : la vue sur la géante est parfaite. »', '« Aérodyne présente sa Série 9 cette semaine seulement. »'];
+    interactables.push({ pos: LS.concierge.customer, r: 1.6, label: 'E — Conciergerie', fn: () => toast(CONC[Math.floor(Math.random() * CONC.length)]) });
+    const LUXD = ['Coupe de champagne de Lys', 'Cocktail « Nébuleuse »', 'Thé blanc des serres orbitales', 'Single malt vieilli en apesanteur'];
+    interactables.push({ pos: LS.bar.pos, r: 1.7, label: 'E — Le Zénith : commander (120 ¤)', fn: () => { if (!game.pay(120)) return 'Crédits insuffisants'; audio.coffee(); toast(`${LUXD[Math.floor(Math.random() * LUXD.length)]} · servi sur glace taillée`); } });
+  }
   elevators.onEvent = (e, S, carried) => {
     if (e === 'start' || e === 'arrived') audio.blip();
     if (e === 'called') toast('Ascenseur appelé · cabine en approche');
@@ -699,6 +725,7 @@ async function boot() {
     toast(open.length ? `Ouverts maintenant : ${open.join(' · ')}` : 'Tous les restaurants sont fermés à cette heure');
   } });
   for (const c of ctx.food.chairs) playerSeat(c.p.x, c.p.y, c.p.z, c.yaw, c);
+  for (const c of ctx.lux.seats) playerSeat(c.p.x, c.p.y, c.p.z, c.yaw, c);
   const OCCUPANTS = { '08': 'un mécanicien de nuit', '10': 'une pilote de convoi', '14': 'un négociant de Corvin' };
   for (const d of HB.cabinDoors) interactables.push({ pos: d.pos, r: 1.3, label: `E — Cabine ${d.num}`, fn: () => {
     audio.blip();
@@ -856,6 +883,7 @@ async function boot() {
     _blk.length = 0;
     for (const n of ctx.deckNpcs || []) if (n.solid) _blk.push({ pos: n.c.root.position });
     for (const c of ctx.habitatPeople || []) if (c.root.visible) _blk.push({ pos: c.root.position });
+    for (const c of ctx.luxPeople || []) if (c.root.visible) _blk.push({ pos: c.root.position });
     return _blk;
   }
   let inShop = null;
@@ -1017,8 +1045,8 @@ async function boot() {
         if (input.consume('view')) player.toggleView();
         if (cargo.carried) input.run = false;
         ground.footInput(dt, input);
-        elevators.update(dt);
-        if (elevators.riding) input.move.x = input.move.y = 0;
+        elevators.update(dt); luxLift.update(dt);
+        if (elevators.riding || luxLift.riding) input.move.x = input.move.y = 0;
         if (ground.dead) input.move.x = input.move.y = 0;
         player.update(dt, input, ground.onFoot ? ground.units.filter((u) => !u.down) : player.pos.y > DECK_Y - 5 ? deckBlockers() : [...crowd.agents.filter((a) => !a.attached && !a.away), ...ground.units.filter((u) => !u.down), ...(ctx.groundNpcBlockers?.() || [])], ground.onFoot ? [] : [...ctx.doors, ...cargo.blockers()]);
         let near = null;

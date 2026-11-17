@@ -148,6 +148,21 @@ sortie), font la queue au restaurant choisi, commandent, reçoivent leur plateau
 cuillère ou à la main, mastication, pauses conversation ; le plat diminue), puis rapportent le plateau au point de tri
 et redescendent à la galerie. Le cuisinier vient servir quand un client attend.
 
+## La Couronne (étage de prestige)
+
+Depuis le hall du pont habitat (coin nord-ouest), un **ascenseur panoramique en verre** monte 30 m plus haut jusqu'à
+La Couronne : une salle circulaire de 44 m de diamètre sous une **coupole nervurée vitrée** (24 nervures nacrées éclairées,
+anneaux dorés, oculus) qui s'ouvre sur l'espace et la planète. Sol en marbre noir veiné d'or avec incrustations,
+bassin miroir et sculpture orbitale animée au centre.
+
+- **Maison Élysée** (haute couture) : mannequins vivants sur podiums tournants, portants chromés, miroir en pied cerclé d'or,
+  table d'exposition ; E au comptoir : ensembles de 15 800 à 32 000 ¤.
+- **Nova Atelier** (combinaisons de haute technologie) : trois combinaisons exposées dans des vitrines cylindriques éclairées,
+  établi holographique ; combinaisons « Halo », « Onyx », « Soleil » (68 000 à 145 000 ¤, protection 50 à 72 %).
+- **Aérodyne** : yacht stellaire Série 9 sur plateau tournant, fiche technique holographique (48,5 M¤, sur commande).
+- **Le Zénith** : salon-bar en onyx rétroéclairé, étagères de bouteilles, tabourets et banquettes en velours (120 ¤ la coupe).
+- Conciergerie, sécurité privée, clientèle fortunée qui se promène et s'arrête aux vitrines, banquettes face à l'espace.
+
 ## Vie de la station (horaires)
 
 Horloge accélérée (1 s réelle = 48 s à bord ; une journée = 30 min de jeu), affichée en haut à droite.

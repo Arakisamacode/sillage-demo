@@ -65,7 +65,7 @@ export function buildFurnish(ctx) {
   // ------------------------------------------------------------------ pont habitat : salon, bibliothèque, lampadaires, écrans
   const Y = DECK_Y;
   const rug = (x, z, w, d, col) => box(w, 0.02, d, mats.plastic(col, 0.95), [x, Y + 0.02, z]);
-  rug(-108.5, -16, 5.2, 4.2, 0x5a2e2a); rug(-99.5, -9, 9, 9, 0x2a3440); rug(-108, -2.5, 4, 3.4, 0x3a4a3a);
+  rug(-108.5, -16, 5.2, 4.2, 0x5a2e2a); rug(-99.5, -9, 9, 9, 0x2a3440); rug(-108, -4.4, 4, 3.0, 0x3a4a3a);
   // salon : deux canapés face à face, table basse holographique
   const sofaM = mats.plastic(0x6a3a2a, 0.7);
   for (const [z, yaw] of [[-18.2, 0], [-13.8, Math.PI]]) {
@@ -82,11 +82,11 @@ export function buildFurnish(ctx) {
   ring.rotation.x = Math.PI / 2.3; ring.position.copy(holo.position); scene.add(ring);
   ctx.updaters.push((dt, t) => { holo.rotation.y = t * 0.4; ring.rotation.z = t * 0.25; });
   // bibliothèque et fauteuils (coin nord-ouest)
-  box(0.4, 2.4, 3.2, mats.paint(0x4a3a2a, { plain: true, rough: 0.6 }), [-111.6, Y + 1.2, -2.5], true);
-  for (let k = 0; k < 4; k++) for (let i = 0; i < 9; i++) box(0.25, 0.32 + ((i * 7 + k) % 3) * 0.06, 0.12, mats.plastic([0x7a2a24, 0x2a4a6a, 0xc8a46a, 0x3a5a3a, 0x5a4a7a][(i + k) % 5], 0.7), [-111.35, Y + 0.45 + k * 0.55, -3.8 + i * 0.3]);
-  for (const z of [-4, -1]) { box(0.9, 0.45, 0.9, mats.plastic(0x3a4a5a, 0.7), [-108.4, Y + 0.22, z], true); box(0.2, 0.55, 0.9, mats.plastic(0x3a4a5a, 0.7), [-108.95, Y + 0.7, z]); out.sofas.push({ x: -108.4, y: Y, z, yaw: Math.PI / 2 }); }
+  box(0.4, 2.4, 2.0, mats.paint(0x4a3a2a, { plain: true, rough: 0.6 }), [-111.6, Y + 1.2, -4.6], true);
+  for (let k = 0; k < 4; k++) for (let i = 0; i < 6; i++) box(0.25, 0.32 + ((i * 7 + k) % 3) * 0.06, 0.12, mats.plastic([0x7a2a24, 0x2a4a6a, 0xc8a46a, 0x3a5a3a, 0x5a4a7a][(i + k) % 5], 0.7), [-111.35, Y + 0.45 + k * 0.55, -5.45 + i * 0.3]);
+  for (const z of [-5.4, -3.2]) { box(0.9, 0.45, 0.9, mats.plastic(0x3a4a5a, 0.7), [-108.4, Y + 0.22, z], true); box(0.2, 0.55, 0.9, mats.plastic(0x3a4a5a, 0.7), [-108.95, Y + 0.7, z]); out.sofas.push({ x: -108.4, y: Y, z, yaw: Math.PI / 2 }); }
   // lampadaires
-  for (const [x, z] of [[-110.5, -20], [-106.2, -18.5], [-110.5, -0.5], [-82.5, -21], [-90, -21]]) {
+  for (const [x, z] of [[-110.5, -20], [-106.2, -18.5], [-106.4, 1.3], [-82.5, -21], [-90, -21]]) {
     B.cyl(0.03, 0.03, 1.7, mats.metal(0x2a2a2a), [x, Y + 0.85, z], null, { cast: false, seg: 6 });
     B.cyl(0.18, 0.25, 0.3, mats.emissive(0xffd0a0, 2.2), [x, Y + 1.8, z], null, { cast: false, seg: 12 });
   }
@@ -101,7 +101,7 @@ export function buildFurnish(ctx) {
   }, { period: 1, intensity: 1.5 });
   ctx.screens.push(news);
   const nm = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 1.35), news.material);
-  nm.position.set(-111.75, Y + 3.3, -2.5); nm.rotation.y = Math.PI / 2; scene.add(nm);
+  nm.position.set(-111.75, Y + 3.3, -4.6); nm.rotation.y = Math.PI / 2; scene.add(nm);
   // ------------------------------------------------------------------ hangar : terminal de diagnostic, casiers, annonces, racks de pièces
   {
     const diag = new Screen(320, 200, (c, w, h, t) => {
