@@ -6,13 +6,12 @@ import { loadBinary } from '../core/binary.js';
 // à la géométrie, puis posés dans le décor statique (Builder : fusion par matériau, peu d'appels de rendu).
 
 export const PH_MODELS = [
-  'SchoolChair_01', 'round_wooden_table_02', 'metal_stool_03', 'croissant', 'hamburger_buns', 'carrot_cake', 'strawberry_chocolate_cake',
+  'croissant', 'hamburger_buns', 'carrot_cake', 'strawberry_chocolate_cake',
   'lemon', 'food_lime_01', 'food_apple_01', 'food_avocado_01', 'yellow_onion', 'food_ginger_01', 'food_kiwi_01', 'food_pomegranate_01',
-  'potted_plant_04', 'potted_plant_02', 'planter_box_01', 'modern_ceiling_lamp_01', 'wooden_cutting_board', 'wooden_bowl_02', 'brass_pot_01',
-  'WetFloorSign_01', 'jug_01', 'tea_set_01', 'wine_bottles_01', 'cardboard_box_01', 'plastic_crate_01',
+  'potted_plant_04', 'potted_plant_02', 'wooden_cutting_board', 'wine_bottles_01', 'cardboard_box_01', 'plastic_crate_01',
 ];
 /** variantes allégées (qualité basse) */
-const LO = ['SchoolChair_01', 'round_wooden_table_02', 'modern_ceiling_lamp_01'];
+const LO = [];
 
 export class Models {
   constructor(low = false) { this.m = {}; this.low = low; }

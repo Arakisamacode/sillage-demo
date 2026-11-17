@@ -137,8 +137,9 @@ nettoyage, vapeur et flammes en cuisine, ambiance sonore (brouhaha, friture, vai
 sont solides (on ne les traverse plus). Performances : figurants du pont sans ombre portée, animation figée
 au-delà de 38 m, vaisselle fusionnée en géométrie statique.
 
-Mobilier et aliments photoscannés (Poly Haven, CC0) : chaises, tables, suspensions, plantes, croissants, gâteaux,
-pains à burger, agrumes, avocats, oignons, gingembre, planches à découper, service à thé, bouteilles, cagettes.
+Mobilier de station : sièges coque en composite sur pied pivotant, tables à liseré lumineux, suspensions annulaires
+à LED, banquettes, bacs hydroponiques éclairés, sol en résine polie à panneaux. Aliments et plantes photoscannés
+(Poly Haven, CC0) : croissants, gâteaux, pains à burger, agrumes, avocats, oignons, gingembre, fruits, bouteilles, cagettes.
 Les plats cuisinés ont des textures alimentaires (croûte dorée, fromage gratiné, riz, saumon, bouillon, curry…).
 
 **Vie des clients** : ils arrivent de la galerie par l'**ascenseur** (appel au palier, attente, embarquement, trajet,

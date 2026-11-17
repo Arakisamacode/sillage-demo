@@ -11,14 +11,11 @@ import path from 'path';
 const OUT = process.argv[2] || 'public/assets/models/ph';
 // [identifiant Poly Haven, taille des textures (px), nombre de triangles visé (0 = inchangé)]
 export const MODELS = [
-  ['SchoolChair_01', 1024, 0], ['round_wooden_table_02', 1024, 0], ['metal_stool_03', 512, 0],
-  ['SchoolChair_01', 512, 1600, '_lo'], ['round_wooden_table_02', 512, 1400, '_lo'], ['modern_ceiling_lamp_01', 256, 1200, '_lo'],
   ['croissant', 512, 1200], ['hamburger_buns', 512, 2400], ['carrot_cake', 512, 3000], ['strawberry_chocolate_cake', 512, 4000],
   ['lemon', 256, 700], ['food_lime_01', 256, 700], ['food_apple_01', 256, 800], ['food_avocado_01', 256, 800],
   ['yellow_onion', 256, 700], ['food_ginger_01', 256, 1200], ['food_kiwi_01', 256, 800], ['food_pomegranate_01', 256, 800],
-  ['potted_plant_04', 512, 4000], ['potted_plant_02', 1024, 16000], ['planter_box_01', 1024, 0],
-  ['modern_ceiling_lamp_01', 512, 0], ['wooden_cutting_board', 512, 1200], ['wooden_bowl_02', 512, 1500], ['brass_pot_01', 512, 0],
-  ['WetFloorSign_01', 512, 0], ['jug_01', 512, 2500], ['tea_set_01', 1024, 9000], ['wine_bottles_01', 512, 7000],
+  ['potted_plant_04', 512, 4000], ['potted_plant_02', 1024, 16000],
+  ['wooden_cutting_board', 512, 1200], ['wine_bottles_01', 512, 7000],
   ['cardboard_box_01', 512, 1200], ['plastic_crate_01', 512, 3000],
 ];
 

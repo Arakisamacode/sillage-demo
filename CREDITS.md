@@ -61,12 +61,14 @@ Modification : conversion en JPEG.
 
 | Fichiers (`public/assets/models/ph/*.glb`) | Licence |
 |---|---|
-| `SchoolChair_01` (chaises de la Cour des Saveurs), `round_wooden_table_02` (tables), `modern_ceiling_lamp_01` (suspensions), `potted_plant_02`, `potted_plant_04` (plantes), `planter_box_01`, `metal_stool_03` | CC0 1.0 |
+| `potted_plant_02`, `potted_plant_04` (plantes des bacs hydroponiques) | CC0 1.0 |
 | `croissant`, `hamburger_buns`, `carrot_cake`, `strawberry_chocolate_cake`, `lemon`, `food_lime_01`, `food_apple_01`, `food_avocado_01`, `food_kiwi_01`, `food_pomegranate_01`, `yellow_onion`, `food_ginger_01` | CC0 1.0 |
-| `wooden_cutting_board`, `wooden_bowl_02`, `brass_pot_01`, `jug_01`, `tea_set_01`, `wine_bottles_01`, `cardboard_box_01`, `plastic_crate_01`, `WetFloorSign_01` | CC0 1.0 |
+| `wooden_cutting_board`, `wine_bottles_01`, `cardboard_box_01`, `plastic_crate_01` | CC0 1.0 |
 
 Source : https://polyhaven.com/models (page de chaque modèle : https://polyhaven.com/a/<identifiant>) — licence : https://polyhaven.com/license
-Script : `tools/fetch_ph_models.mjs` (glTF 1k, simplification meshoptimizer, textures JPEG 256–1024 px, variantes `_lo` pour la qualité basse).
+Script : `tools/fetch_ph_models.mjs` (glTF 1k, simplification meshoptimizer, textures JPEG 256–1024 px).
+Le mobilier de la Cour (sièges coque, tables, suspensions, banquettes, bacs hydroponiques) et le sol en résine sont des créations
+du projet (`src/world/scififurn.js`, `src/world/foodcourt.js`).
 Les plats sans équivalent CC0 (pizzas, sushis, phở, currys, tacos, burgers…) sont modélisés dans le projet avec des textures
 alimentaires générées (`src/world/foodtex.js`).
 
