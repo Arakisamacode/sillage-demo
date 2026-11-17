@@ -2,6 +2,8 @@ import * as THREE from 'three';
 import { DECK_Y } from './habitat.js';
 import { neonTexture, neonMaterial, Screen, FONT } from './signage.js';
 import { RESTAURANTS } from '../game/food.js';
+import { foodKit } from './foodprops.js';
+import { foodIconCanvas } from '../ui/thumbs.js';
 
 // Cour des Saveurs : grande salle de restauration du pont habitat (accès par le hall des ascenseurs).
 // Dix restaurants autour d'une salle centrale : tables, fontaine, arbres, verrière sur l'espace.
@@ -126,6 +128,124 @@ export function buildFoodCourt(ctx) {
     B.colliderBox(0.8, 1.1, 0.8, [x, Y + 0.55, z]);
     out.standing.push({ p: new THREE.Vector3(x, Y, z), side: z < 32 ? -1 : 1 });
   }
+  // ------------------------------------------------------------------ détails de la salle
+  const K = ctx.foodKit || (ctx.foodKit = foodKit(ctx)), W0 = K.base(0, Y, 0);
+  // tables : condiments, serviettes ; places des clients attablés servies (plateau et plat)
+  const tableXs = Object.values(cols).flat();
+  out.diners = [];
+  let ti = 0;
+  for (const x of tableXs) for (const z of [24.5, 30, 35.5, 41]) {
+    K.caddy(W0, x - 0.12, z + 0.05, 0.775); K.napkins(W0, x + 0.15, z - 0.12, 0.775, 0.4);
+    ti++;
+    if (ti % 2) {
+      const chairsHere = out.chairs.filter((ch) => Math.abs(ch.p.x - x) < 1.2 && Math.abs(ch.p.z - z) < 1.2);
+      chairsHere.slice(0, 1 + (ti % 3)).forEach((ch, k) => {
+        out.diners.push(ch);
+        const tx = x + (ch.p.x - x) * 0.45, tz = z + (ch.p.z - z) * 0.45;
+        K.tray(W0, tx, tz, 0.775, ch.yaw);
+        const dish = (ti + k) % 7;
+        if (dish === 0) K.bowl(W0, tx - 0.06, tz, 0.795, 'pho'); else if (dish === 1) K.pizza(W0, tx, tz, 0.79, 0.13); else if (dish === 2) K.burger(W0, tx - 0.05, tz, 0.79); else if (dish === 3) K.plate(W0, tx, tz, 'sushi', 0.79); else if (dish === 4) K.bowl(W0, tx, tz, 0.795, 'curry'); else if (dish === 5) { K.taco(W0, tx - 0.05, tz, 0.79, ch.yaw); K.taco(W0, tx + 0.05, tz, 0.79, ch.yaw); } else K.plate(W0, tx, tz, 'main', 0.79);
+        K.glass(W0, tx + 0.15, tz + 0.08, 0.79, k % 2 ? K.M.drinkA : K.M.drinkB);
+      });
+    }
+  }
+  // îlots de tri (trois bacs, couvercles colorés, panneau)
+  const binC = [0x3a8a3a, 0xe8c23a, 0x3a5a9a];
+  for (const [x, z, ry] of [[-136.2, 32.5, Math.PI / 2], [-73.8, 32.5, -Math.PI / 2], [-122.6, 43.4, 0], [-87.4, 20.6, Math.PI]]) {
+    const cb = K.base(x, Y, z, ry);
+    for (let k = 0; k < 3; k++) {
+      K.put(cb, new THREE.BoxGeometry(0.42, 0.9, 0.5), mats.metal(0x5a5e62, { rough: 0.4 }), K.T(-0.45 + k * 0.45, 0.45, 0));
+      K.put(cb, new THREE.BoxGeometry(0.44, 0.06, 0.52), mats.plastic(binC[k], 0.4), K.T(-0.45 + k * 0.45, 0.92, 0));
+      K.put(cb, new THREE.BoxGeometry(0.3, 0.03, 0.08), mats.plastic(0x111111, 0.6), K.T(-0.45 + k * 0.45, 0.95, 0.12));
+    }
+    K.put(cb, new THREE.BoxGeometry(1.4, 0.3, 0.04), mats.paint(0x2a2c2e, { plain: true }), K.T(0, 1.25, -0.2));
+    for (let k = 0; k < 3; k++) K.put(cb, new THREE.BoxGeometry(0.36, 0.2, 0.01), mats.emissive(binC[k], 1.4), K.T(-0.45 + k * 0.45, 1.25, -0.175));
+    B.colliderBox(1.4, 1.0, 0.55, [x, Y + 0.5, z], [0, ry, 0]);
+  }
+  // affiches publicitaires (mur est et mur sud)
+  const posters = [['VISITEZ LYS', 'serres orbitales · navettes tous les cycles', '#7dff9a', '#0e2a1a'], ['PIZZERIA VESUVIO', '2 pizzas = 1 tiramisu offert', '#7dff6a', '#2a0e0e'], ['ARMURERIE KESTREL', 'homologué station · révision offerte', '#ff9a5a', '#1a1410'], ['CANTINA SOL', 'soirée tacos · jeudi 20 h', '#3ae0c8', '#1a0e2a'], ['GUILDE DES ÉQUIPAGES', 'artilleurs et manutentionnaires recherchés', '#ffd27a', '#141a22']];
+  posters.forEach(([t1, t2, col, bg], i) => {
+    const sc = new Screen(256, 360, (c, w, h) => {
+      c.fillStyle = bg; c.fillRect(0, 0, w, h);
+      const g = c.createRadialGradient(w / 2, 130, 10, w / 2, 130, 140); g.addColorStop(0, col); g.addColorStop(1, 'rgba(0,0,0,0)'); c.globalAlpha = 0.35; c.fillStyle = g; c.fillRect(0, 0, w, h); c.globalAlpha = 1;
+      c.strokeStyle = col; c.lineWidth = 3; c.beginPath(); c.arc(w / 2, 130, 70, 0, 7); c.stroke();
+      c.beginPath(); c.arc(w / 2, 130, 40, 0, 7); c.stroke();
+      c.fillStyle = col; c.font = `800 22px ${FONT}`; c.textAlign = 'center';
+      t1.split(' ').reduce((acc, wd) => { const l = acc[acc.length - 1]; if ((l + ' ' + wd).length > 16) acc.push(wd); else acc[acc.length - 1] = (l + ' ' + wd).trim(); return acc; }, ['']).forEach((ln, k) => c.fillText(ln, w / 2, 250 + k * 26));
+      c.fillStyle = '#e8e0d0'; c.font = `500 13px ${FONT}`; c.fillText(t2, w / 2, 320);
+    }, { period: 1e9, intensity: 1.3 });
+    ctx.screens.push(sc);
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(1.4, 1.97), sc.material);
+    if (i < 3) { m.position.set(C.x1 - 0.05, Y + 2.4, 24 + i * 8); m.rotation.y = -Math.PI / 2; } else { m.position.set(-136 + (i - 3) * 6, Y + 2.6, C.z0 + 0.03); }
+    scene.add(m);
+    if (i < 3) box(0.04, 2.1, 1.55, mats.metal(0x2a2826), [C.x1 - 0.02, Y + 2.4, 24 + i * 8]); else box(1.55, 2.1, 0.04, mats.metal(0x2a2826), [-136 + (i - 3) * 6, Y + 2.6, C.z0 + 0.01]);
+  });
+  // bannières suspendues aux poutres de la verrière (couleurs des restaurants)
+  RESTAURANTS.forEach((rr, i) => {
+    const x = hx0 + 3 + (i % 5) * 9, z = i < 5 ? hz0 + 1.5 : hz1 - 1.5;
+    const bt = neonTexture(rr.label.toUpperCase(), rr.color, { size: 60 });
+    const plane = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 2.6 / bt.aspect), new THREE.MeshBasicMaterial({ map: bt.tex, transparent: true, side: THREE.DoubleSide, color: new THREE.Color(1.6, 1.6, 1.6), depthWrite: false }));
+    box(2.8, 0.9, 0.02, mats.paint(rr.wall, { plain: true, rough: 0.8 }), [x, Y + 5.9, z]);
+    plane.position.set(x, Y + 5.9, z + (i < 5 ? 0.02 : -0.02)); if (i < 5) plane.rotation.y = 0; else plane.rotation.y = Math.PI;
+    scene.add(plane);
+    const back = plane.clone(); back.position.z = z + (i < 5 ? -0.02 : 0.02); back.rotation.y = plane.rotation.y + Math.PI; scene.add(back);
+    for (const dx of [-1.3, 1.3]) cyl(0.006, 0.006, 1.2, metal, [x + dx, Y + 6.95, z], null, 4);
+  });
+  // gaines de ventilation et chemins de câbles au plafond (hors verrière)
+  for (const z of [16.5, 48.5]) {
+    cyl(0.38, 0.38, W - 4, mats.metal(0xa0a4a8, { rough: 0.35 }), [cx, Y + C.h - 0.6, z], [0, 0, Math.PI / 2], 16);
+    for (let x = C.x0 + 4; x < C.x1 - 3; x += 4) { cyl(0.4, 0.4, 0.06, mats.metal(0x6a6e72), [x, Y + C.h - 0.6, z], [0, 0, Math.PI / 2], 16); box(0.04, 0.4, 0.04, metal, [x, Y + C.h - 0.2, z]); }
+    box(W - 4, 0.05, 0.35, mats.metal(0x3a3e42), [cx, Y + C.h - 1.15, z + (z < 30 ? 1.2 : -1.2)]);
+  }
+  // panneaux sur pied (ardoises) devant trois restaurants, potelets à sangle devant Grill 66
+  for (const st of out.stalls.filter((x) => ['fc_sushi', 'fc_nebula', 'fc_vesuvio', 'fc_jade'].includes(x.r.id))) {
+    const p = st.approach.clone().add(new THREE.Vector3(st.dir > 0 ? -3.6 : 3.6, 0, 0));
+    const ab = K.base(p.x, Y, p.z, st.dir > 0 ? Math.PI : 0);
+    const chalk = mats.paint(0x1c2420, { plain: true, rough: 0.9 });
+    K.put(ab, new THREE.BoxGeometry(0.6, 0.9, 0.03), chalk, K.T(0, 0.45, 0.12, 0, 1, 1, 1, -0.25));
+    K.put(ab, new THREE.BoxGeometry(0.6, 0.9, 0.03), chalk, K.T(0, 0.45, -0.12, 0, 1, 1, 1, 0.25));
+    K.put(ab, new THREE.BoxGeometry(0.64, 0.04, 0.04), K.M.wood, K.T(0, 0.9, 0));
+    const sc = new Screen(128, 192, (c, w, h) => { c.fillStyle = '#1c2420'; c.fillRect(0, 0, w, h); c.fillStyle = st.r.color; c.font = `700 16px ${FONT}`; c.fillText('AUJOURD\'HUI', 10, 28); c.fillStyle = '#f2f2ea'; c.font = `500 13px ${FONT}`; st.r.dishes.slice(0, 3).forEach(([n, pr], k) => { c.fillText(n.slice(0, 16), 10, 62 + k * 40); c.fillText(`${pr} ¤`, 10, 78 + k * 40); }); }, { period: 1e9, intensity: 1.0 });
+    ctx.screens.push(sc);
+    const face = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.75), sc.material);
+    face.position.set(p.x, Y + 0.46, p.z + (st.dir > 0 ? -0.155 : 0.155)); face.rotation.set(st.dir > 0 ? 0.25 : -0.25, st.dir > 0 ? Math.PI : 0, 0, 'YXZ'); scene.add(face);
+  }
+  {
+    const st = out.stalls.find((x) => x.r.id === 'fc_grill');
+    for (let k = 0; k < 4; k++) for (const dx of [-0.7, 0.7]) {
+      const x = st.approach.x + dx, z = st.approach.z + 0.6 + k * 0.9;
+      cyl(0.18, 0.2, 0.04, mats.metal(0x2a2a2a), [x, Y + 0.02, z], null, 14); cyl(0.025, 0.025, 0.95, mats.metal(0xc8ccd0, { rough: 0.2 }), [x, Y + 0.5, z], null, 8);
+      if (k < 3) box(0.02, 0.05, 0.9, mats.plastic(0xc83a2a, 0.5), [x, Y + 0.9, z + 0.45]);
+    }
+  }
+  // bancs face aux baies (ouest)
+  for (const z of [24, 32, 40]) {
+    box(0.6, 0.45, 2.4, mats.paint(0x6a4a32, { plain: true, rough: 0.6 }), [C.x0 + 1.4, Y + 0.22, z], null, true);
+    for (const dz of [-0.6, 0.6]) out.chairs.push({ p: new THREE.Vector3(C.x0 + 1.4, Y, z + dz), yaw: -Math.PI / 2, taken: null });
+  }
+  // marquage au sol : flèches et nom de la cour à l'entrée
+  const decal = mats.emissive(0xffd27a, 0.9);
+  for (let k = 0; k < 3; k++) { box(0.5, 0.01, 0.12, decal, [-116 - 0.18, Y + 0.02, 14 + k * 1.4], null, false); box(0.5, 0.01, 0.12, decal, [-116 + 0.18, Y + 0.02, 14 + k * 1.4], null, false); }
+  // robot de nettoyage qui patrouille dans les allées
+  {
+    const robot = new THREE.Group();
+    robot.add(new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.34, 0.16, 20), new THREE.MeshStandardMaterial({ color: 0xe8eaec, roughness: 0.35, metalness: 0.3 })));
+    const ringR = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.012, 6, 32), new THREE.MeshBasicMaterial({ color: new THREE.Color(0.4, 2.2, 2.6) })); ringR.rotation.x = Math.PI / 2; ringR.position.y = 0.06; robot.add(ringR);
+    const eye = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.03, 0.02), new THREE.MeshBasicMaterial({ color: new THREE.Color(0.5, 2.5, 3) })); eye.position.set(0, 0.04, 0.33); robot.add(eye);
+    scene.add(robot);
+    const loop = [[-134, 20.6], [-90.6, 20.6], [-90.6, 43.4], [-134, 43.4]].map(([x, z]) => new THREE.Vector3(x, Y + 0.09, z));
+    let seg = 0, k = 0;
+    ctx.updaters.push((dt, t) => {
+      if (!(ctx.player && ctx.player.pos.y > Y - 5)) { robot.visible = false; return; }
+      robot.visible = true;
+      const a = loop[seg], b = loop[(seg + 1) % loop.length], L = a.distanceTo(b);
+      k += (dt * 0.5) / L;
+      if (k >= 1) { k = 0; seg = (seg + 1) % loop.length; }
+      robot.position.lerpVectors(a, b, k);
+      robot.rotation.y = Math.atan2(b.x - a.x, b.z - a.z);
+      ringR.material.color.setRGB(0.4, 2.2 + Math.sin(t * 4) * 0.6, 2.6);
+    });
+  }
   // lumières (allumées quand le joueur est sur le pont)
   for (const [x, z, c] of [[-120, 32, 0xffd0a0], [-90, 32, 0xffc890]]) { const l = new THREE.PointLight(c, 0, 40, 1.4); l.position.set(x, Y + 6, z); l.visible = false; scene.add(l); out.lights.push(l); }
   // vapeur et flammes des cuisines
@@ -174,16 +294,25 @@ function stall(ctx, r, cx, zf, dir, out) {
   const nw = Math.min(8.6, 0.85 * nt.aspect);
   const sign = new THREE.Mesh(new THREE.PlaneGeometry(nw, nw / nt.aspect), neonMaterial(nt.tex, 2.5));
   sign.position.copy(V3(0, 4.15, -0.08)); sign.rotation.y = rotY; scene.add(sign);
-  // menu lumineux
-  const menu = new Screen(384, 200, (c, w, h) => {
-    c.fillStyle = '#100c0a'; c.fillRect(0, 0, w, h);
-    c.fillStyle = r.color; c.font = `700 20px ${FONT}`; c.fillText(r.label.toUpperCase(), 14, 30);
-    c.font = `500 15px ${FONT}`;
-    r.dishes.forEach(([name, price], i) => { c.fillStyle = '#f2ead8'; c.fillText(name, 14, 70 + i * 32); c.fillStyle = r.color; c.fillText(`${price} ¤`, 320, 70 + i * 32); });
-  }, { period: 1e9, intensity: 1.6 });
+  // menu lumineux illustré (dessins des plats, noms, prix)
+  const menu = new Screen(512, 256, (c, w, h) => {
+    const g = c.createLinearGradient(0, 0, 0, h); g.addColorStop(0, '#1a1410'); g.addColorStop(1, '#0c0a08'); c.fillStyle = g; c.fillRect(0, 0, w, h);
+    c.fillStyle = r.color; c.fillRect(0, 0, w, 4); c.font = `700 22px ${FONT}`; c.fillText(r.label.toUpperCase(), 14, 32);
+    c.fillStyle = '#a89880'; c.font = `500 12px ${FONT}`; c.fillText(`${r.cuisine} · ${String(r.hours[0]).padStart(2, '0')} h – ${String(r.hours[1] % 24).padStart(2, '0')} h`, 14, 50);
+    r.dishes.forEach(([name, price, icon], i) => {
+      const x = 8 + i * 126;
+      c.fillStyle = '#211a14'; c.fillRect(x, 62, 118, 182);
+      c.drawImage(foodIconCanvas(icon), x + 4, 66, 110, 69);
+      c.fillStyle = '#f2ead8'; c.font = `600 13px ${FONT}`;
+      const words = name.split(' '); let line = '', ly = 156;
+      for (const wd of words) { if ((line + ' ' + wd).trim().length > 15) { c.fillText(line.trim(), x + 6, ly); ly += 16; line = wd; } else line += ' ' + wd; }
+      c.fillText(line.trim(), x + 6, ly);
+      c.fillStyle = r.color; c.font = `700 18px ${FONT}`; c.fillText(`${price} ¤`, x + 6, 232);
+    });
+  }, { period: 1e9, intensity: 1.55 });
   ctx.screens.push(menu);
-  const mm = new THREE.Mesh(new THREE.PlaneGeometry(3.4, 1.77), menu.material);
-  mm.position.copy(V3(-0.2, 3.6, 5.85)); mm.rotation.y = rotY; scene.add(mm);
+  const mm = new THREE.Mesh(new THREE.PlaneGeometry(4.0, 2.0), menu.material);
+  mm.position.copy(V3(-0.2, 3.75, 5.85)); mm.rotation.y = rotY; scene.add(mm);
   // lampes au-dessus du comptoir
   for (const u of [-3, -0.6, 1.8]) { cyl(0.01, 0.01, 0.9, darkM, [u, 3.2, 1.2], 4); cyl(0.2, 0.08, 0.18, glow(0xffd8a0, 2.2), [u, 2.7, 1.2], 12); }
   // caisse et présentoir à couverts
@@ -194,31 +323,51 @@ function stall(ctx, r, cx, zf, dir, out) {
   const steam = (u, y, v) => fx.push({ type: 'steam', p: V3(u, y, v) });
   const flame = (u, y, v) => fx.push({ type: 'flame', p: V3(u, y, v) });
 
-  // ------------------------------------------------------------------ équipement propre à chaque cuisine
+  // ------------------------------------------------------------------ équipement propre à chaque cuisine (objets détaillés)
+  const K = ctx.foodKit || (ctx.foodKit = foodKit(ctx));
+  const base = K.base(cx, Y, zf, dir > 0 ? 0 : Math.PI);
+  const at = (u, v) => [-u, v];                           // repère du stand → repère « base »
+  const top = 1.11, back = 0.995;                          // dessus du comptoir, du plan de travail
+  const onC = (fn, u, v = 1.2, ...a) => { const [x, z] = at(u, v); fn(base, x, z, top, ...a); };
+  const onB = (fn, u, v = 5.3, ...a) => { const [x, z] = at(u, v); fn(base, x, z, back, ...a); };
+  // commun : distributeur de serviettes, pile de plateaux, pot à pourboires, frigo vitré, ustensiles, gaine d'extraction
+  onC(K.napkins, 1.55, 1.0); onC((b, x, z, y) => K.trays(b, x, z, y, 5), 2.55, 1.25); onC((b, x, z, y) => K.jar(b, x, z, y, K.M.paper), 1.9, 0.98);
+  box(0.8, 2.0, 0.7, mats.metal(0xc8ccd0, { rough: 0.25 }), [4.45, 1.0, 3.7], true);
+  box(0.02, 1.6, 0.56, mats.glass(0xcfe8ff, 0.3), [4.04, 1.1, 3.7]);
+  box(0.02, 0.8, 0.04, mats.metal(0x2a2c2e), [4.03, 1.1, 3.38]);
+  for (let k = 0; k < 3; k++) for (let j = 0; j < 4; j++) { const [x, z] = at(4.3, 3.48 + j * 0.15); K.bottle(base, x, z, 0.38 + k * 0.5, [K.M.red, K.M.green, K.M.yellow, K.M.drinkA][(j + k) % 4], K.M.glassM); }
+  box(0.02, 0.06, 0.62, glow(0xdff0ff, 1.6), [4.06, 1.95, 3.7]);
+  box(3.2, 0.03, 0.03, mats.metal(0x2a2c2e), [-2.5, 2.42, 5.82]);
+  for (let k = 0; k < 6; k++) { const [x, z] = at(-3.8 + k * 0.5, 5.78); if (k % 2) K.ladle(base, x, 2.42, z); else K.pan(base, x, 2.42, z); }
+  box(0.7, 4.0, 0.7, mats.metal(0x6a6e72, { rough: 0.5 }), [0, 5.15, 5.4]);
+  box(0.78, 0.08, 0.78, mats.metal(0x3a3e42), [0, 3.4, 5.4]);
+  box(9.6, 0.02, 1.6, mats.rubber(), [0, 0.03, 3.1]);
   const c = r.cuisine;
   if (c === 'chinois') {
-    for (const u of [-3, -1.6]) { sph(0.38, darkM, [u, 1.0, 5.2], [1, 0.45, 1], true); flame(u, 1.0, 5.2); cyl(0.04, 0.04, 0.5, wood(mats), [u + 0.35, 1.25, 5.2], 6, [0, 0, 1.2]); }
-    for (let k = 0; k < 3; k++) for (const u of [1.0, 1.7]) cyl(0.22, 0.22, 0.11, P(0xc8a46a, 0.8), [u, 1.16 + k * 0.11, 1.25], 14);
-    steam(1.35, 1.6, 1.25);
+    for (const u of [-3, -1.6]) { onB((b, x, z, y) => K.wok(b, x, z, y, 0.3), u); flame(u, 1.0, 5.2); }
+    for (let k = 0; k < 2; k++) onC(K.dumplings, 1.05 + k * 0.42, 1.25); steam(1.3, 1.35, 1.25);
+    onC(K.bowl, -2.6, 1.2, 'ramen'); onC(K.bowl, -2.15, 1.25, 'pho'); onC(K.cup, -1.6, 1.15);
+    onB(K.pot, 0.9, 5.3, 0.9); steam(0.9, 1.4, 5.3);
     for (const u of [-4, -1.3, 1.3, 4]) { cyl(0.008, 0.008, 0.4, darkM, [u, 3.5, -0.35], 4); sph(0.24, glow(0xff3a2a, 2.8), [u, 3.15, -0.35], [1, 1.25, 1]); box(0.06, 0.12, 0.06, accent, [u, 2.85, -0.35]); }
-    for (let k = 0; k < 4; k++) { box(0.05, 0.35, 0.05, darkM, [2.6 + k * 0.4, 2.0, 5.6]); sph(0.12, P(0x8a3a1a, 0.4), [2.6 + k * 0.4, 1.78, 5.6], [1, 1.5, 0.8]); }
-    for (let k = 0; k < 5; k++) cyl(0.09, 0.07, 0.05, P(0xf2f2ee, 0.3), [-2.8 + k * 0.25, 1.95, 5.75], 12);
+    for (let k = 0; k < 4; k++) { box(0.012, 0.35, 0.012, darkM, [2.6 + k * 0.4, 2.0, 5.6]); sph(0.12, P(0x8a3a1a, 0.4), [2.6 + k * 0.4, 1.76, 5.6], [1, 1.5, 0.8]); }
   } else if (c === 'mexicain') {
     const flagC = [0xff4a8a, 0x3ae0c8, 0xffd27a, 0x8a4aff, 0x7dff6a, 0xff7a1a];
-    for (let k = 0; k < 16; k++) box(0.42, 0.42, 0.01, P(flagC[k % 6], 0.9), [-4.7 + k * 0.62, 3.35 - Math.sin((k / 15) * Math.PI) * 0.25, -0.3], false, [0, 0, 0.0]);
+    for (let k = 0; k < 16; k++) box(0.42, 0.42, 0.01, P(flagC[k % 6], 0.9), [-4.7 + k * 0.62, 3.35 - Math.sin((k / 15) * Math.PI) * 0.25, -0.3]);
     for (const u of [-4.4, 4.4]) { cyl(0.3, 0.25, 0.4, P(0xb86a3a, 0.8), [u, 0.2, -0.5]); cyl(0.12, 0.14, 1.2, P(0x3a7a3a, 0.7), [u, 1.0, -0.5]); cyl(0.07, 0.08, 0.45, P(0x3a7a3a, 0.7), [u + 0.22, 1.2, -0.5]); cyl(0.07, 0.08, 0.4, P(0x3a7a3a, 0.7), [u - 0.2, 1.35, -0.5]); }
-    for (let k = 0; k < 6; k++) cyl(0.04, 0.04, 0.2, P(k % 2 ? 0x3a9a3a : 0xc83a2a, 0.3), [0.6 + k * 0.18, 1.21, 1.35]);
+    for (let k = 0; k < 6; k++) onC((b, x, z, y) => K.bottle(b, x, z, y, k % 2 ? K.M.green : K.M.red, k % 2 ? K.M.green : K.M.red), 0.55 + k * 0.16, 1.38);
+    onC(K.plate, -2.6, 1.2, 'nachos'); onC(K.bowl, -2.0, 1.25, 'chili'); onC(K.glass, -1.55, 1.15);
     for (const u of [-3.2, -2.4, -1.6]) sph(0.26, P(0xb8603a, 0.85), [u, 1.2, 5.3], [1, 0.9, 1]);
     flame(1.4, 1.0, 5.3); box(1.4, 0.06, 0.6, darkM, [1.4, 1.0, 5.3]);
     for (let k = 0; k < 4; k++) cyl(0.2, 0.2, 0.012, P(0xe8d8a8, 0.9), [3.0, 1.0 + k * 0.014, 5.3], 16);
   } else if (c === 'boulangerie') {
     box(3.0, 0.45, 0.6, mats.glass(0xcfe8ff, 0.25), [-1.2, 1.33, 1.2]);
-    for (let k = 0; k < 10; k++) sph(0.08, P([0xd8973a, 0xc8803a, 0x8a4a2a][k % 3], 0.6), [-2.4 + (k % 5) * 0.55, 1.18, 1.05 + Math.floor(k / 5) * 0.3], [1.6, 0.8, 1]);
-    for (let k = 0; k < 7; k++) cyl(0.035, 0.035, 0.75, P(0xd8973a, 0.7), [2.0 + (k % 4) * 0.12, 1.55, 1.45], 8, [0.35, 0, 0.12 * (k - 3)]);
-    box(0.6, 0.4, 0.3, P(0x8a6a3a, 0.9), [2.2, 1.28, 1.45]);
+    for (let k = 0; k < 8; k++) onC((b, x, z, y) => K.croissant(b, x, z, y + 0.005, k * 0.7), -2.5 + (k % 4) * 0.35, 1.05 + Math.floor(k / 4) * 0.28);
+    for (let k = 0; k < 2; k++) onC(K.plate, -0.95 + k * 0.32, 1.2, 'cake');
+    box(0.5, 0.35, 0.3, P(0x8a6a3a, 0.9), [2.2, 1.28, 1.45]);
+    for (let k = 0; k < 6; k++) onC((b, x, z, y) => K.baguette(b, x, z, y + 0.25, 0, -1.25 + (k % 3) * 0.08), 2.05 + (k % 3) * 0.12, 1.4 + Math.floor(k / 3) * 0.08);
     box(2.2, 1.6, 0.9, mats.paint(0x8a3a24, { grime: 0.6 }), [2.8, 1.75, 5.35]);
     box(1.2, 0.5, 0.05, glow(0xff8a3a, 3), [2.8, 1.6, 4.88]);
-    for (let k = 0; k < 8; k++) cyl(0.035, 0.035, 0.6, P(0xd8973a, 0.7), [-3.8 + k * 0.28, 2.15, 5.7], 8, [0, 0, Math.PI / 2]);
+    for (let k = 0; k < 6; k++) onB((b, x, z) => K.baguette(b, x, z, 1.92, Math.PI / 2), -3.8 + k * 0.38, 5.72);
     for (const u of [-4.2, -3.6]) box(0.45, 0.6, 0.35, P(0xf2f2ee, 0.9), [u, 0.3, 4.6]);
   } else if (c === 'tacos') {
     cyl(0.02, 0.02, 1.1, steel, [-2.4, 1.5, 5.25], 6);
@@ -226,52 +375,55 @@ function stall(ctx, r, cx, zf, dir, out) {
     sph(0.16, P(0xe8c23a, 0.5), [-2.4, 1.85, 5.25], [1, 1.3, 1]);
     box(0.7, 0.9, 0.05, glow(0xff5a1a, 2.6), [-2.4, 1.5, 5.62]); flame(-2.4, 1.3, 5.5);
     box(1.8, 0.06, 0.65, darkM, [0.6, 1.0, 5.3]); steam(0.6, 1.1, 5.3);
+    onC(K.plate, -2.5, 1.2, 'main'); for (let k = 0; k < 3; k++) onC((b, x, z, y) => K.taco(b, x, z, y, 0.3), -1.9 + k * 0.17, 1.2);
     for (const [u, col] of [[0.8, 0x4a9a3a], [1.5, 0xc83a2a], [2.2, 0xf2f2ee]]) { box(0.5, 0.12, 0.35, steel, [u, 1.16, 1.25]); for (let k = 0; k < 5; k++) sph(0.05, P(col, 0.4), [u - 0.16 + k * 0.08, 1.24, 1.25]); }
   } else if (c === 'indien') {
     cyl(0.45, 0.5, 0.9, P(0xa85a3a, 0.9), [-3.2, 0.45, 4.6], 16, [0, 0, 0], true);
     cyl(0.25, 0.25, 0.02, glow(0xff6a1a, 3.2), [-3.2, 0.91, 4.6], 14); flame(-3.2, 1.0, 4.6);
-    for (const u of [-1.2, -0.3, 0.6]) { cyl(0.22, 0.2, 0.28, mats.metal(0xb87333, { rough: 0.25 }), [u, 1.12, 5.3], 16); steam(u, 1.3, 5.3); }
-    const spice = [0xd8a21b, 0xc8402a, 0x8a5a2a, 0xe86a1a, 0x4a7a2a, 0xd84a8a];
-    for (let k = 0; k < 14; k++) cyl(0.05, 0.05, 0.14, P(spice[k % 6], 0.6), [-3.6 + k * 0.5, 1.99, 5.75], 10);
+    for (const u of [-1.2, -0.3, 0.6]) { onB(K.pot, u, 5.3, 0.75, K.M.copper); steam(u, 1.32, 5.3); }
+    const fills = [K.M.curry, K.M.tomato, K.M.yellow, K.M.herb, K.M.meat, K.M.red];
+    for (let k = 0; k < 12; k++) { const [x, z] = at(-3.6 + k * 0.62, 5.75); K.jar(base, x, z, 1.93, fills[k % 6]); }
     for (let k = 0; k < 18; k++) sph(0.04, glow([0xffd27a, 0xff7a1a, 0xff4a8a][k % 3], 3), [-4.8 + k * 0.56, 3.62 - Math.sin(k / 17 * Math.PI) * 0.2, -0.1]);
-    for (let k = 0; k < 4; k++) cyl(0.11, 0.09, 0.06, mats.metal(0xb87333, { rough: 0.25 }), [1.8 + k * 0.28, 1.14, 1.3], 12);
+    onC(K.bowl, -2.6, 1.2, 'curry'); onC(K.bowl, -2.1, 1.25, 'curry'); onC(K.plate, -1.5, 1.2, 'main'); onC(K.glass, -1.05, 1.15, K.M.cheese);
   } else if (c === 'sushi') {
     box(7.0, 0.04, 0.3, darkM, [-0.6, 1.13, 1.05]);
     const plateC = [0xc83a2a, 0x2a5a9a, 0xd9a21b, 0x3a7a3a];
-    for (let k = 0; k < 12; k++) { cyl(0.09, 0.09, 0.02, P(plateC[k % 4], 0.3), [-3.8 + k * 0.55, 1.16, 1.05], 12); box(0.1, 0.05, 0.06, P(k % 3 ? 0xe86a4a : 0xf2f2ee, 0.5), [-3.8 + k * 0.55, 1.19, 1.05]); }
+    for (let k = 0; k < 12; k++) { cyl(0.09, 0.09, 0.02, P(plateC[k % 4], 0.3), [-3.8 + k * 0.55, 1.16, 1.05], 12); const [x, z] = at(-3.8 + k * 0.55, 1.05); if (k % 2) { K.maki(base, x - 0.025, z, 1.17); K.maki(base, x + 0.025, z, 1.17); } else K.nigiri(base, x, z, 1.17, k % 4 ? K.M.salmon : K.M.tuna); }
     box(2.4, 0.4, 0.55, mats.glass(0xcfe8ff, 0.25), [2.2, 1.31, 1.3]);
     for (let k = 0; k < 5; k++) sph(0.07, P(k % 2 ? 0xe86a4a : 0xb8c0c8, 0.3), [1.3 + k * 0.42, 1.2, 1.3], [3, 0.8, 1]);
     for (let k = 0; k < 6; k++) box(0.75, 0.9, 0.01, P(0x1a2a4a, 0.9), [-3.9 + k * 1.55, 3.25, -0.12]);
     sph(0.3, glow(0xfff2e0, 2.2), [3.8, 3.0, -0.4], [1, 1.3, 1]);
-    box(1.5, 0.08, 0.6, mats.paint(0xc8a46a, { plain: true }), [-2.4, 1.0, 5.3]);
+    onB(K.plate, -2.4, 5.3, 'sushi'); onB(K.plate, -1.9, 5.3, 'sushi'); onB(K.bowl, -1.3, 5.3, 'miso');
   } else if (c === 'burgers') {
     box(2.2, 0.08, 0.65, darkM, [-2.2, 1.0, 5.3]); box(2.0, 0.02, 0.5, glow(0xff5a1a, 2.4), [-2.2, 0.98, 5.3]);
     for (let k = 0; k < 4; k++) cyl(0.1, 0.1, 0.03, P(0x4a2a1a, 0.6), [-2.9 + k * 0.45, 1.06, 5.3], 12);
     steam(-2.2, 1.2, 5.3);
     box(1.0, 0.95, 0.65, steel, [0.6, 0.47, 5.3]); box(0.8, 0.03, 0.5, P(0xd8a21b, 0.2), [0.6, 0.96, 5.3]);
     for (const u of [0.4, 0.8]) box(0.3, 0.12, 0.25, mats.metal(0x6a6e72), [u, 1.1, 5.3]);
-    for (const [u, col] of [[1.8, 0xc83a2a], [1.95, 0xe8c23a]]) cyl(0.045, 0.04, 0.22, P(col, 0.3), [u, 1.22, 1.35], 10);
-    for (let k = 0; k < 3; k++) { cyl(0.11, 0.11, 0.05, P(0xd8973a, 0.6), [-2.6 + k * 0.5, 1.14, 1.2], 12); cyl(0.11, 0.11, 0.04, P(0x4a2a1a, 0.6), [-2.6 + k * 0.5, 1.18, 1.2], 12); sph(0.11, P(0xd8973a, 0.6), [-2.6 + k * 0.5, 1.21, 1.2], [1, 0.6, 1], true); }
+    for (let k = 0; k < 3; k++) onC((b, x, z, y) => K.burger(b, x, z, y, 1.15), -2.7 + k * 0.42, 1.2);
+    onC(K.plate, -1.3, 1.2, 'fries'); onC(K.glass, -0.9, 1.15, K.M.cream);
+    onC((b, x, z, y) => K.bottle(b, x, z, y, K.M.red, K.M.red), 1.0, 1.38); onC((b, x, z, y) => K.bottle(b, x, z, y, K.M.yellow, K.M.yellow), 1.15, 1.38);
   } else if (c === 'pizzeria') {
     sph(1.0, mats.paint(0x8a4a2a, { grime: 0.7 }), [2.6, 0.95, 5.0], [1, 0.9, 0.9], true);
     box(1.9, 0.95, 1.6, mats.paint(0x6a3a24, { grime: 0.6 }), [2.6, 0.47, 5.0], true);
     box(0.6, 0.35, 0.05, glow(0xff7a2a, 3.2), [2.6, 1.15, 4.2]); flame(2.6, 1.1, 4.5);
     for (let k = 0; k < 6; k++) cyl(0.07, 0.07, 0.5, P(0x6a4a2a, 0.9), [1.6 + (k % 3) * 0.15, 0.08 + Math.floor(k / 3) * 0.13, 4.2], 8, [0, 0, Math.PI / 2]);
-    for (let k = 0; k < 3; k++) { cyl(0.24, 0.24, 0.02, P(0xd8973a, 0.7), [-2.6 + k * 0.7, 1.12, 1.2], 18); cyl(0.2, 0.2, 0.01, P(k === 1 ? 0xf2e6a8 : 0xc83a2a, 0.5), [-2.6 + k * 0.7, 1.135, 1.2], 18); }
-    box(0.6, 0.02, 0.35, P(0xc8a46a, 0.8), [-1.0, 1.0, 5.3]);
+    for (let k = 0; k < 3; k++) onC((b, x, z, y) => K.pizza(b, x, z, y, 0.24, k === 1 ? 'quatre' : 'pepperoni'), -2.6 + k * 0.62, 1.2);
+    box(0.35, 0.02, 0.35, mats.paint(0xc8a46a, { plain: true }), [1.2, 1.0, 5.3]); box(0.04, 0.02, 1.0, mats.paint(0xc8a46a, { plain: true }), [1.2, 1.0, 4.65]);
     for (const u of [-3.8, -3.3]) box(0.4, 0.55, 0.3, P(0xf2f2ee, 0.9), [u, 0.27, 4.6]);
   } else if (c === 'café') {
     box(0.9, 0.55, 0.5, mats.metal(0xc8ccd0, { rough: 0.15 }), [-2.4, 1.27, 5.3]); box(0.3, 0.12, 0.02, glow(0xff8a3a, 2), [-2.4, 1.45, 5.04]);
     steam(-2.4, 1.7, 5.3);
-    for (let k = 0; k < 6; k++) cyl(0.045, 0.035, 0.08, P(0xf2f2ee, 0.3), [-1.6 + (k % 3) * 0.13, 1.04 + Math.floor(k / 3) * 0.08, 5.3], 10);
+    for (let k = 0; k < 4; k++) onB(K.cup, -1.6 + k * 0.17, 5.25);
     box(2.6, 0.5, 0.6, mats.glass(0xcfe8ff, 0.25), [-1.2, 1.35, 1.2]);
-    for (let k = 0; k < 4; k++) { cyl(0.13, 0.13, 0.1, P([0x5a2a1a, 0xf2e6c8, 0xc83a5a, 0x8a5a2a][k], 0.6), [-2.2 + k * 0.6, 1.16, 1.2], 16); cyl(0.13, 0.13, 0.05, P(0xf2f2ee, 0.5), [-2.2 + k * 0.6, 1.24, 1.2], 16); }
+    for (let k = 0; k < 4; k++) onC(K.plate, -2.3 + k * 0.6, 1.2, 'cake');
+    onC(K.cup, 0.6, 1.15); onC(K.cup, 0.85, 1.15);
     for (const u of [3.4, 4.0]) box(0.5, 0.45, 0.35, P(0x8a6a3a, 0.95), [u, 0.22, 4.6]);
     box(1.2, 0.9, 0.04, mats.paint(0x1c2420), [3.0, 2.3, 5.84]);
   } else {
-    // phở : grandes marmites de bouillon, bols, herbes fraîches, lanternes jaunes
-    for (const u of [-3.0, -2.0]) { cyl(0.34, 0.32, 0.55, mats.metal(0x9aa0a4, { rough: 0.25 }), [u, 1.25, 5.25], 18); steam(u, 1.6, 5.25); flame(u, 0.98, 5.25); }
-    for (let k = 0; k < 5; k++) cyl(0.12, 0.09, 0.06, P(0xf2f2ee, 0.3), [0.4, 1.12 + k * 0.06, 1.3], 14);
+    for (const u of [-3.0, -2.1]) { onB(K.pot, u, 5.25, 1.35); steam(u, 1.5, 5.25); flame(u, 0.98, 5.25); }
+    for (let k = 0; k < 3; k++) onC(K.bowl, -2.6 + k * 0.38, 1.2, 'pho');
+    onC(K.plate, -1.3, 1.2, 'rolls'); onC(K.glass, -0.9, 1.15, K.M.drinkA);
     for (const [u, col] of [[1.0, 0x4a9a3a], [1.5, 0x6aba4a], [2.0, 0xe8e8c8]]) { box(0.42, 0.08, 0.3, steel, [u, 1.13, 1.25]); for (let k = 0; k < 4; k++) sph(0.05, P(col, 0.8), [u - 0.12 + k * 0.08, 1.19, 1.25], [1.4, 0.5, 1]); }
     for (const u of [-3.5, -1.2, 1.2, 3.5]) { cyl(0.008, 0.008, 0.35, darkM, [u, 3.5, -0.35], 4); sph(0.22, glow(0xffd23a, 2.6), [u, 3.15, -0.35], [1, 1.3, 1]); }
   }

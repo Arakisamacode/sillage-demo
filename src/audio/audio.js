@@ -324,6 +324,34 @@ export class Audio {
     }
   }
 
+  /** Ambiance de la Cour des Saveurs : brouhaha de salle, cliquetis de vaisselle, grésillements de cuisine. */
+  foodCourt(on, dt = 0.016) {
+    if (!this.ac || (!this._fc && !on)) return;
+    const ac = this.ac, t = ac.currentTime;
+    if (!this._fc) {
+      const n = this._src(); const bp = ac.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 520; bp.Q.value = 0.7;
+      const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 1600;
+      const g = ac.createGain(); g.gain.value = 0;
+      n.connect(bp).connect(lp).connect(g).connect(this.master); g.connect(this.revSend);
+      n.start(0, Math.random() * 3);
+      const n2 = this._src(); const hp = ac.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 3500;
+      const g2 = ac.createGain(); g2.gain.value = 0; n2.connect(hp).connect(g2).connect(this.master); n2.start(0, Math.random() * 3);
+      this._fc = { g, g2, acc: 0 };
+    }
+    const F = this._fc;
+    F.g.gain.setTargetAtTime(on && this.enabled ? 0.11 + Math.sin(t * 0.7) * 0.02 : 0, t, 0.6);
+    F.g2.gain.setTargetAtTime(on && this.enabled ? 0.012 : 0, t, 0.6);   // friture lointaine
+    if (!on || !this.enabled) return;
+    F.acc -= dt;
+    if (F.acc <= 0) {
+      F.acc = 0.4 + Math.random() * 1.6;
+      // tintement de vaisselle
+      const o = ac.createOscillator(); o.type = 'sine'; o.frequency.value = 1800 + Math.random() * 2400;
+      const gg = ac.createGain(); gg.gain.setValueAtTime(0.012 + Math.random() * 0.02, t); gg.gain.exponentialRampToValueAtTime(0.0005, t + 0.25);
+      o.connect(gg).connect(this.master); gg.connect(this.revSend); o.start(t); o.stop(t + 0.3);
+    }
+  }
+
   /** Tonalité de verrouillage missile. */
   lockTone() {
     if (!this.ac || !this.enabled) return;

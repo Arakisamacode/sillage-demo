@@ -10,7 +10,10 @@ import { shipGunMesh, turretMesh, miningMesh } from '../game/shipgear.js';
 const W = 160, H = 100;
 let cache = null;
 
-function draw2D(it) {
+/** Dessin d'un plat (même style que les vignettes) pour les menus lumineux. */
+export function foodIconCanvas(icon) { return drawCanvas({ cat: 'food', icon }); }
+function draw2D(it) { return drawCanvas(it).toDataURL(); }
+function drawCanvas(it) {
   const c = document.createElement('canvas'); c.width = W; c.height = H;
   const g = c.getContext('2d');
   const hex = (n) => '#' + new THREE.Color(n).getHexString();
@@ -49,7 +52,7 @@ function draw2D(it) {
     else if (it.id === 'ration') { g.fillStyle = '#6a7a5a'; g.fillRect(56, 26, 48, 54); g.fillStyle = '#d9a21b'; g.fillRect(56, 44, 48, 12); }
     else { g.fillStyle = '#f2e6d6'; g.beginPath(); g.ellipse(80, 56, 36, 20, 0, 0, Math.PI); g.fill(); g.strokeStyle = '#d84a3a'; g.beginPath(); g.moveTo(66, 20); g.lineTo(90, 52); g.moveTo(76, 18); g.lineTo(96, 50); g.stroke(); }
   }
-  return c.toDataURL();
+  return c;
 }
 
 function build() {

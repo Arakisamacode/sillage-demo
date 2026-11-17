@@ -201,7 +201,7 @@ async function boot() {
       const [model, hair] = looks[i % looks.length];
       const c = lib.create(model, { height: model.startsWith('UF') ? 1.66 + (i % 3) * 0.03 : 1.76 + (i % 3) * 0.04, hair, hairColor: [0x1a120c, 0x3a2414, 0x6a5040, 0x2a1d14][i % 4] });
       c.setOutfit(outfit || { top: tops[i % tops.length], bottom: [0x26282c, 0x2f3a4e, 0x4a4036][i % 3], accent: 0xc8b48a, belt: true });
-      c.root.visible = false; scene.add(c.root); people.push(c); return c;
+      c.root.visible = false; c.root.traverse((o) => { o.castShadow = false; }); scene.add(c.root); people.push(c); return c;
     };
     /** Petit moteur de routines (déplacements rectilignes et actions) pour les figurants du pont. */
     const npcs = [];
@@ -238,7 +238,7 @@ async function boot() {
       }, () => ctx.time.open(st.r.id));
     });
     // clients attablés
-    const chairs = FC.chairs.filter((_, i) => i % 3 === 0).slice(0, low ? 6 : 12);
+    const chairs = FC.diners.slice(0, low ? 8 : 18);
     chairs.forEach((ch, i) => {
       ch.taken = true;
       const c = mk(i);
@@ -268,25 +268,31 @@ async function boot() {
           { move: rp }, { move: tp }, { move: spot }, { anim: 'interact', dur: R2(8, 14), face: tbl.side > 0 ? Math.PI : 0 }, { move: tp }];
       }, () => ctx.time.open('galerie'));
     }
+    ctx.deckNpcs = npcs;
     ctx.updaters.push((dt) => {
       const P = player.pos, here = P.y > DECK_Y - 5 && P.z > -6;
       for (const l of FC.lights) l.visible = here;
+      ctx.audio?.foodCourt?.(here && P.z > 10, dt);
+      const cam = ctx.camera.position;
       for (const n of npcs) {
         const on = here && n.active();
         n.c.root.visible = on;
+        n.solid = on;
         if (!on) continue;
         stepNpc(n, dt);
-        n.c.update(dt, ctx.camera.position);
+        // au-delà de 38 m : animation figée (le déplacement continue), sinon mise à jour avec niveau de détail
+        if (n.c.root.position.distanceToSquared(cam) < 1444) n.c.update(dt, cam);
       }
     });
   }
   // habitants du pont habitat : barman, médecin, clients (animés seulement quand le joueur est sur le pont)
   {
-    const HB = ctx.habitat, people = [];
+    const HB = ctx.habitat, people = []; ctx.habitatPeople = people;
     const put = (model, opts, p, yaw, anim, outfit) => {
       const c = lib.create(model, opts); c.root.position.copy(p); c.root.rotation.y = yaw;
       if (outfit) c.setOutfit(outfit);
       if (anim) c.play(anim, { fade: 0 });
+      c.root.traverse((o) => { o.castShadow = false; });
       scene.add(c.root); people.push(c); c.root.visible = false; return c;
     };
     put('UM_dark', { height: 1.84, hair: 'Hair_Beard' }, HB.bartender, -Math.PI / 2, 'talk', { top: 0x2a2224, bottom: 0x1c1c1e, accent: 0xffb84a, zip: true });
@@ -657,6 +663,14 @@ async function boot() {
   const navEl = $('nav'), navTxt = navEl.querySelector('span'), jobsEl = $('jobs');
   let jobsAcc = 1, persistAcc = 0;
   const _p = new THREE.Vector3();
+  /** Figurants solides du pont habitat (Cour des Saveurs et promenade) pour les collisions du joueur. */
+  const _blk = [];
+  function deckBlockers() {
+    _blk.length = 0;
+    for (const n of ctx.deckNpcs || []) if (n.solid) _blk.push({ pos: n.c.root.position });
+    for (const c of ctx.habitatPeople || []) if (c.root.visible) _blk.push({ pos: c.root.position });
+    return _blk;
+  }
   let inShop = null;
   const VENDORS = { nouilles: 'Mei', armes: 'Bastien Kestrel', pieces: 'Oriane', pharma: 'Dr Salek', combis: 'Ines Vega' };
   function shopGreeting() {
@@ -819,7 +833,7 @@ async function boot() {
         elevators.update(dt);
         if (elevators.riding) input.move.x = input.move.y = 0;
         if (ground.dead) input.move.x = input.move.y = 0;
-        player.update(dt, input, ground.onFoot ? ground.units.filter((u) => !u.down) : [...crowd.agents.filter((a) => !a.attached), ...ground.units.filter((u) => !u.down)], ground.onFoot ? [] : [...ctx.doors, ...cargo.blockers()]);
+        player.update(dt, input, ground.onFoot ? ground.units.filter((u) => !u.down) : player.pos.y > DECK_Y - 5 ? deckBlockers() : [...crowd.agents.filter((a) => !a.attached && !a.away), ...ground.units.filter((u) => !u.down)], ground.onFoot ? [] : [...ctx.doors, ...cargo.blockers()]);
         let near = null;
         if (ground.onFoot) near = ground.nearBoard() && !ground.dead ? { label: `E — Remonter à bord du Héron${ground.raid && !ground.raid.done ? ' (le raid continue)' : ''}`, fn: () => ground.reboard() } : null;
         else if (player.seated === seat) near = { label: touch ? 'DÉCOL. — Décoller · LEVER — Se lever' : 'ESPACE — Décoller · E — Se lever', fn: () => player.stand() };
