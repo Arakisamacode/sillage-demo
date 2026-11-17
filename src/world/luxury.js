@@ -116,6 +116,21 @@ export function buildLuxury(ctx) {
   const fg = new THREE.ShapeGeometry(shape, 96); fg.rotateX(-Math.PI / 2);
   add(fg, floorM, M4(O.clone().setY(Y + 0.01)));
   box(R * 2, 0.4, R * 2, graphite, O.clone().setY(Y - 0.2));       // dalle (sous-face)
+  // structure porteuse : calice nacré sous la dalle, prolongé par un fût jusqu'au toit du hall du pont habitat,
+  // nervures et bagues lumineuses (visible depuis l'espace et par la verrière de la Cour des Saveurs)
+  {
+    const prof = [[R + 0.3, -0.35], [R - 0.6, -1.1], [R - 4, -2.6], [R - 9, -5.4], [R - 14, -9.5], [6.2, -14], [5.2, -18.5], [5.0, -(Y - (DECK_Y + 5.2))]];
+    const lat = new THREE.LatheGeometry(prof.map(([r, y]) => new THREE.Vector2(r, y)), 96);
+    add(lat, ds(pearl), M4(O.clone()));
+    for (let k = 0; k < 16; k++) {
+      const th = (k / 16) * Math.PI * 2;
+      B.tube(prof.slice(0, 7).map(([r, y]) => P(th, r + 0.25, y).toArray()), 0.22, graphite, { radial: 6, segments: 40, cast: false });
+    }
+    for (const [r, y] of [[R - 1.6, -1.6], [R - 9.2, -5.5], [5.25, -18]]) add(new THREE.TorusGeometry(r + 0.05, 0.06, 6, 128), glowGold, M4(O.clone().setY(Y + y), 0, [1, 1, 1], Math.PI / 2));
+    for (let k = 0; k < 24; k++) { const th = (k / 24) * Math.PI * 2; add(new THREE.SphereGeometry(0.12, 8, 6), mats.emissive(k % 2 ? 0xffffff : 0xff3a2a, 4), M4(P(th, R + 0.35, -0.35))); }
+    // fût : bagues et hublots éclairés
+    for (let y = -22; y < -14; y += 2.5) add(new THREE.TorusGeometry(5.1, 0.08, 6, 64), glowWhite, M4(O.clone().setY(Y + y), 0, [1, 1, 1], Math.PI / 2));
+  }
   // collisions de sol, en laissant libre la trémie de l'ascenseur
   const cb = (x0, x1, z0, z1) => B.colliderBox(x1 - x0, 0.3, z1 - z0, [(x0 + x1) / 2, Y - 0.15, (z0 + z1) / 2]);
   cb(O.x - R, LIFT.x0 - 0.1, O.z - R, O.z + R); cb(LIFT.x1 + 0.1, O.x + R, O.z - R, O.z + R);
@@ -419,22 +434,165 @@ export function populateLuxury(ctx, lib, player, L) {
   for (const m of L.mannequins) { const c = mk(m.k * 2, RICH[m.k], m.p.clone().setY(LUX_Y + 0.22), m.face, null); spin.push({ c, sp: 0.18 }); }
   // combinaisons de haute technologie dans les vitrines (Nova Atelier)
   for (const s of L.suits) { const c = mk(s.k + 1, { top: 0x1a1c20, bottom: 0x1a1c20, boot: 0x0a0a0a, accent: LUX_SUITS[s.k].accent, gloves: true }, s.p, s.face, null, { armor: LUX_SUITS[s.k], armorShadows: false }); spin.push({ c, sp: -0.25 }); }
-  // personnel : conciergerie, vendeurs, agent d'Aérodyne, barman, sécurité
+  // ---------------------------------------------------------------- moteur de routines (déplacements, actions, attentes)
+  const turnTo0 = (c, yaw, dt, k = 6) => { let d = yaw - c.root.rotation.y; d = Math.atan2(Math.sin(d), Math.cos(d)); c.root.rotation.y += d * (1 - Math.exp(-dt * k)); };
+  const step = (n, dt) => {
+    if (!n.q.length) n.q = n.plan(n);
+    const s = n.q[0], c = n.c;
+    if (!s) return;
+    if (s.fn) { n.q.shift(); n.t = 0; s.fn(n); return; }
+    if (s.moveF && !s.move) s.move = s.moveF(n);
+    if (s.move) {
+      const d = new THREE.Vector3().subVectors(s.move, n.pos).setY(0), len = d.length();
+      s.each?.(n, dt);
+      if (len < 0.08) { n.q.shift(); return; }
+      n.pos.addScaledVector(d.normalize(), Math.min(len, (s.speed || 1.05) * dt));
+      c.root.position.copy(n.pos); turnTo0(c, Math.atan2(d.x, d.z), dt, 8); c.setSpeed(s.speed || 1.05);
+      if (c.override) c.stop(0.25);
+    } else {
+      if (n.t === 0) { c.setSpeed(0); if (s.anim && s.anim !== 'idle') c.play(s.anim, { fade: 0.35 }); else if (c.override) c.stop(0.3); }
+      n.t += dt;
+      if (s.face !== undefined) turnTo0(c, typeof s.face === 'function' ? s.face(n) : s.face, dt);
+      if (s.until ? s.until(n, dt) : n.t >= s.dur) { n.t = 0; n.q.shift(); }
+    }
+  };
+  const actors = [];
+  const actor = (c, plan, opts = {}) => { const n = { c, plan, q: [], pos: c.root.position.clone(), t: 0, ...opts }; actors.push(n); return n; };
+  const R2 = (a, b) => a + Math.random() * (b - a);
+  const LP = L.P, FI = L.faceIn, at = (th, r) => LP(th, r), out = (th) => th;   // out : regard vers l'extérieur (vitrine)
+  const w = (th, r, sp) => ({ move: at(th, r), speed: sp });
+  const act = (anim, dur, face) => ({ anim, dur, face });
+
+  // ---------------------------------------------------------------- personnel : chacun sa routine de travail
   const staff = { top: 0x121417, bottom: 0x121417, boot: 0x0a0a0a, accent: 0xd4af37, zip: true };
-  const S = L.spots;
-  mk(0, staff, S.concierge.clerk, S.concierge.faceClerk, 'talk');
-  mk(4, { ...staff, accent: 0xf4f0e8 }, S.couture.clerk, S.couture.faceClerk, null);
-  mk(1, { ...staff, accent: 0x6fe8ff }, S.nova.clerk, S.nova.faceClerk, null);
-  mk(3, { top: 0xf4f0e8, bottom: 0x2a2c30, boot: 0x1a1a1a, accent: 0x8fe0ff, zip: true }, S.aero.staff, S.aero.face, 'talk');
-  mk(5, { top: 0x1a1214, bottom: 0x121417, boot: 0x0a0a0a, accent: 0xffd27a, zip: true }, S.bar.bartender, S.bar.faceBartender, 'talk');
-  mk(1, { top: 0x1a1c20, bottom: 0x1a1c20, boot: 0x0a0a0a, accent: 0xd4af37, gloves: true }, L.P(-Math.PI / 2 - 0.16, 16.4), L.faceIn(-Math.PI / 2 - 0.16), null, { armor: { tier: 2, plate: 0x24272c, under: 0x101214, accent: 0xd4af37, light: 0xffd27a }, armorShadows: false });
-  // clientèle assise (salon, galerie d'observation)
+  const S = L.spots, T0 = -Math.PI * 0.27, T1 = -Math.PI * 0.73, TA = Math.PI * 0.5, TB = Math.PI * 0.12, TC = -Math.PI / 2 + 0.22;
+  // conciergerie : accueil, saisie au terminal, accueil des arrivants
+  actor(mk(0, staff, S.concierge.clerk, S.concierge.faceClerk, null), () => [act('talk', R2(4, 7), FI(TC)), act('idle', R2(2, 4), FI(TC)), w(TC + 0.08, 15.2), act('interact', R2(3, 5), FI(TC + 0.08)), w(TC, 15.2), act('idle', R2(2, 3), FI(TC))]);
+  // Maison Élysée : comptoir, retouches aux portants, coup d'œil aux mannequins, pliage sur la table
+  actor(mk(4, { ...staff, accent: 0xf4f0e8 }, S.couture.clerk, S.couture.faceClerk, null), () => [
+    act(Math.random() < 0.5 ? 'talk' : 'idle', R2(4, 7), FI(T0 - 0.24)),
+    w(T0 - 0.27, 18.55), act('interact', R2(3, 5), out(T0 - 0.27)),
+    w(T0 - 0.24, 18.4), w(T0 - 0.15, 18.4), w(T0 + 0.12, 19.0), act('idle', 2, out(T0 + 0.12)),
+    w(T0 + 0.27, 18.55), act('interact', R2(3, 5), out(T0 + 0.27)),
+    w(T0 + 0.22, 17.0), w(T0 + 0.17, 15.25), act('idle', R2(2, 4), out(T0 + 0.17)),
+    w(T0 - 0.1, 14.55), act('interact', R2(3, 5), FI(T0 - 0.1)),
+    w(T0 - 0.15, 16.8), w(T0 - 0.15, 18.4), w(T0 - 0.24, 18.4),
+  ]);
+  // Nova Atelier : comptoir, contrôle des vitrines, réglage de l'établi holographique
+  actor(mk(1, { ...staff, accent: 0x6fe8ff }, S.nova.clerk, S.nova.faceClerk, null), () => [
+    act('idle', R2(4, 7), FI(T1 - 0.26)),
+    w(T1 - 0.33, 17.6), w(T1 - 0.33, 15.9), w(T1 - 0.18, 16.0), act('interact', R2(3, 4), out(T1 - 0.18)),
+    w(T1, 16.0), act('idle', R2(2, 3), out(T1)), w(T1 + 0.18, 16.0), act('interact', R2(3, 4), out(T1 + 0.18)),
+    w(T1 + 0.26, 14.3), act('interact', R2(4, 6), out(T1 + 0.26)),
+    w(T1 - 0.33, 15.9), w(T1 - 0.33, 17.6), w(T1 - 0.26, 17.6),
+  ]);
+  // Aérodyne : présentation du yacht, retour à la fiche technique
+  actor(mk(3, { top: 0xf4f0e8, bottom: 0x2a2c30, boot: 0x1a1a1a, accent: 0x8fe0ff, zip: true }, S.aero.staff, S.aero.face, null), () => [
+    act('talk', R2(4, 7), S.aero.face), w(TA - 0.5, 12.0), w(TA - 0.45, 8.2), w(TA - 0.2, 7.7),
+    act('talk', R2(4, 6), (n) => Math.atan2(L.turntable.position.x - n.pos.x, L.turntable.position.z - n.pos.z)),
+    w(TA - 0.45, 8.2), w(TA - 0.5, 12.0), w(TA - 0.3, 15.3),
+  ]);
+  // barman : service, essuyage du comptoir, bouteille sur l'étagère
+  actor(mk(5, { top: 0x1a1214, bottom: 0x121417, boot: 0x0a0a0a, accent: 0xffd27a, zip: true }, S.bar.bartender, S.bar.faceBartender, null), () => [
+    act('talk', R2(3, 6), FI(TB)), w(TB - 0.14, 18.3), act('interact', R2(3, 5), FI(TB - 0.14)),
+    w(TB + 0.08, 18.9), act('pickup', 2.4, out(TB + 0.08)), w(TB + 0.14, 18.3), act('interact', R2(2, 4), FI(TB + 0.14)), w(TB, 18.3),
+  ]);
+  // sécurité privée : ronde autour de l'arrivée de l'ascenseur
+  actor(mk(1, { top: 0x1a1c20, bottom: 0x1a1c20, boot: 0x0a0a0a, accent: 0xd4af37, gloves: true }, LP(-Math.PI / 2 - 0.16, 16.4), FI(-Math.PI / 2 - 0.16), null, { armor: { tier: 2, plate: 0x24272c, under: 0x101214, accent: 0xd4af37, light: 0xffd27a }, armorShadows: false }), () => [
+    act('idle', R2(6, 10), FI(-Math.PI / 2 - 0.16)), w(-Math.PI / 2 + 0.45, 16.6, 0.8), act('idle', R2(4, 6), FI(-Math.PI / 2 + 0.45)),
+    w(-Math.PI / 2 - 0.5, 16.6, 0.8), act('idle', R2(4, 6), FI(-Math.PI / 2 - 0.5)), w(-Math.PI / 2 - 0.16, 16.4, 0.8),
+  ]);
+  // clientèle assise (salon)
   L.seats.slice(0, 5).forEach((st, i) => { st.taken = true; mk(i + 2, RICH[(i + 2) % RICH.length], st.p, st.yaw, i % 2 ? 'sitTalk' : 'sit'); });
+
+  // ---------------------------------------------------------------- visiteurs fortunés : de leur cabine du pont habitat à
+  // La Couronne par l'ascenseur panoramique, quelques vitrines, le bar ou la vue, puis retour en cabine
+  const SH = L.shafts, HB = ctx.habitat;
+  const inCab = (Sh) => { const P = player.pos; return P.x > Sh.x0 - 0.2 && P.x < Sh.x1 - 0.1 && Math.abs(P.z - Sh.c) < 1.1 && Math.abs(P.y - Sh.y) < 3; };
+  const liftSteps = (fromY, toY) => {
+    const Sh = SH[0];
+    Sh.boarding ||= new Set(); Sh.waiting ||= new Set();
+    let inner;
+    return [
+      { fn: (n) => Sh.waiting.add(n) },
+      { moveF: () => new THREE.Vector3(Sh.x1 + 1.2 + Math.random() * 1.0, fromY, Sh.c + (Math.random() - 0.5) * 1.7) },
+      { anim: 'idle', face: -Math.PI / 2, until: () => {
+        const E = ctx.luxLift; if (!E) return false;
+        if (E.isAt(Sh, fromY)) { Sh.hold = Math.max(Sh.hold, 1.2); return Sh.doors[fromY].open > 0.85; }
+        if (!Sh.moving) E.call(Sh, fromY);
+        return false;
+      } },
+      { fn: (n) => { Sh.waiting.delete(n); Sh.boarding.add(n); inner = new THREE.Vector3(Sh.x0 + 0.7 + Math.random() * 0.9, fromY, Sh.c + (Math.random() - 0.5) * 1.1); } },
+      { moveF: () => inner, speed: 0.9, each: () => { Sh.hold = Math.max(Sh.hold, 1.0); } },
+      { fn: (n) => { Sh.boarding.delete(n); n.cab = Sh; n.wait = 0; } },
+      { anim: 'idle', face: Math.PI / 2, until: (n, dt) => {
+        const E = ctx.luxLift;
+        if (Sh.moving) { n.pos.y = Sh.y; n.c.root.position.y = Sh.y; return false; }
+        if (Math.abs(Sh.y - toY) < 0.05) { n.pos.y = n.c.root.position.y = toY; Sh.hold = Math.max(Sh.hold, 1.2); return Sh.doors[toY].open > 0.85; }
+        n.wait += dt;
+        if (E && n.wait > 2.2 && !Sh.boarding.size && ![...Sh.waiting].some((x) => Math.abs(x.pos.y - Sh.y) < 1) && !inCab(Sh)) E.send(Sh, toY);
+        return false;
+      } },
+      { fn: (n) => { n.cab = null; } },
+      { moveF: () => new THREE.Vector3(Sh.x1 + 1.9, toY, Sh.c + (Math.random() - 0.5) * 1.2), each: () => { Sh.hold = Math.max(Sh.hold, 0.6); } },
+    ];
+  };
+  // déplacements sous la coupole : par l'anneau de promenade (8,6 m) pour contourner bassin, plateau et comptoirs
+  const angOf = (p) => Math.atan2(p.x - LP(0, 0).x, p.z - LP(0, 0).z);
+  const ring = (a0, a1) => {
+    let d = a1 - a0; d = Math.atan2(Math.sin(d), Math.cos(d));
+    const n = Math.max(1, Math.ceil(Math.abs(d) / (Math.PI / 8))), pts = [];
+    for (let i = 0; i <= n; i++) pts.push({ move: at(a0 + (d * i) / n, 8.6) });
+    return pts;
+  };
+  const goTo = (n, th, r, extra = []) => { const a = angOf(n.pos); return [{ move: at(a, 8.6) }, ...ring(a, th).slice(1), { move: at(th, r) }, ...extra]; };
+  const STOPS = [
+    () => { const th = T0 - 0.24; return [...goToL(th, 16.4), act('talk', R2(5, 9), out(th)), act('idle', R2(2, 4), out(th))]; },
+    () => { const th = T1 - 0.26; return [...goToL(th, 15.7), act('talk', R2(5, 9), out(th)), act('idle', R2(2, 3), out(th))]; },
+    () => { const th = T0 + (Math.floor(Math.random() * 3) - 1) * 0.17; return [...goToL(th, 15.1), act('idle', R2(4, 7), out(th))]; },
+    () => { const th = T1 + (Math.floor(Math.random() * 3) - 1) * 0.18; return [...goToL(th, 15.6), act('idle', R2(4, 7), out(th))]; },
+    () => { const th = TA - 0.55; return [...goToL(th, 12.5), act(Math.random() < 0.5 ? 'talk' : 'idle', R2(5, 9), (n) => Math.atan2(L.turntable.position.x - n.pos.x, L.turntable.position.z - n.pos.z))]; },
+    () => { const th = TB + R2(-0.12, 0.12); return [...goToL(-0.07, 16.2), { move: at(th, 16.15) }, act('talk', R2(6, 12), out(th)), { move: at(-0.07, 16.2) }]; },
+    () => {
+      const st = L.seats.filter((x) => x.view && !x.taken)[0];
+      if (!st) return [];
+      const th = angOf(st.p);
+      return [{ fn: () => { st.taken = true; } }, ...goToL(th, 17.6), { move: st.p.clone(), speed: 0.6 }, act('sit', R2(15, 28), st.yaw), act('idle', 0.8, st.yaw), { move: at(th, 17.4) }, { fn: () => { st.taken = null; } }];
+    },
+  ];
+  let cur = null;
+  const goToL = (th, r) => goTo(cur, th, r);
+  const homes = HB.cabinDoors;
+  const visitPlan = (n) => {
+    if (!ctx.time.open('galerie')) return [{ fn: (m) => { m.away = 60; } }];
+    const home = homes[Math.floor(Math.random() * homes.length)];
+    n.c.setOutfit(RICH[Math.floor(Math.random() * RICH.length)]);
+    n.pos.copy(home.pos); n.c.root.position.copy(home.pos); n.c.root.rotation.y = Math.PI;
+    return [{ move: home.pos.clone().add(new THREE.Vector3(0, 0, -1.2)) }, ...liftSteps(DECK_Y, LUX_Y), ...luxStroll(), ...leave()];
+  };
+  const luxStroll = () => {
+    const picks = [...STOPS].sort(() => Math.random() - 0.5).slice(0, 2 + Math.floor(Math.random() * 2));
+    return picks.map((f) => ({ fn: (m) => { cur = m; m.q.unshift(...f()); } }));
+  };
+  const leave = () => [
+    { fn: (m) => { cur = m; m.q.unshift(...goToL(-Math.PI / 2, 14.6)); } },
+    ...liftSteps(LUX_Y, DECK_Y),
+    { fn: (m) => { const home = homes[Math.floor(Math.random() * homes.length)]; m.q.unshift({ move: home.pos.clone().add(new THREE.Vector3(0, 0, -1.2)) }, { move: home.pos.clone() }, { fn: (k) => { k.away = R2(15, 50); } }); } },
+  ];
+  const visitors = [];
+  const nV = ctx.quality.name === 'low' ? 4 : 7;
+  for (let i = 0; i < nV; i++) {
+    const c = mk(i + 3, RICH[i % RICH.length], homes[0].pos, 0, null);
+    const n = actor(c, visitPlan, { visitor: true });
+    if (i < nV / 2) { const p = at((i / nV) * Math.PI * 2, 8.6); n.pos.copy(p); c.root.position.copy(p); n.q = [...luxStroll(), ...leave()]; }
+    else n.away = R2(2, 40);
+    visitors.push(n);
+  }
   // promeneurs : tour du bassin, arrêts devant les vitrines
-  const stops = [S.couture.customer, S.nova.customer, S.aero.pos, L.P(Math.PI * 0.12, 15.6)];
-  for (let i = 0; i < 4; i++) {
-    const c = mk(i + 1, RICH[(i + 3) % RICH.length], L.loop[i * 4], 0, null);
-    walkers.push({ c, i: i * 4, pause: Math.random() * 3, pos: L.loop[i * 4].clone(), detour: null, k: i });
+  const stops = [S.couture.customer, S.nova.customer, LP(TA - 0.55, 12.5)];
+  for (let i = 0; i < 2; i++) {
+    const c = mk(i + 1, RICH[(i + 3) % RICH.length], L.loop[i * 8], 0, null);
+    walkers.push({ c, i: i * 8, pause: Math.random() * 3, pos: L.loop[i * 8].clone(), detour: null, k: i });
   }
   const turnTo = (c, yaw, dt, k = 6) => { let d = yaw - c.root.rotation.y; d = Math.atan2(Math.sin(d), Math.cos(d)); c.root.rotation.y += d * (1 - Math.exp(-dt * k)); };
   const stepWalk = (w, dt) => {
@@ -457,11 +615,20 @@ export function populateLuxury(ctx, lib, player, L) {
     const on = L.onLevel(player.pos);
     for (const l of L.lights) l.visible = on;
     for (const o of L.dynamic) if (o) o.visible = on || o === L.dynamic[0];
-    if (!on) { for (const c of people) c.root.visible = false; return; }
+    const cam = ctx.camera.position;
+    // visiteurs : simulés partout (pont habitat, ascenseur, coupole), visibles au niveau du joueur
+    for (const n of visitors) {
+      if (n.away > 0) { n.away -= dt; n.c.root.visible = false; if (n.away <= 0) { n.away = 0; n.q = []; } else continue; }
+      step(n, dt);
+      const vis = Math.abs(player.pos.y - n.pos.y) < 6 && n.c.root.position.distanceToSquared(player.pos) < 3600;
+      n.c.root.visible = vis;
+      if (vis && n.c.root.position.distanceToSquared(cam) < 1600) n.c.update(dt, cam);
+    }
+    if (!on) { for (const c of people) if (!visitors.some((v) => v.c === c)) c.root.visible = false; return; }
+    for (const n of actors) if (!n.visitor) step(n, dt);
     for (const w of walkers) stepWalk(w, dt);
     for (const s of spin) s.c.root.rotation.y += dt * s.sp;
-    const cam = ctx.camera.position;
-    for (const c of people) { c.root.visible = true; if (c.root.position.distanceToSquared(cam) < 1600) c.update(dt, cam); }
+    for (const c of people) { if (visitors.some((v) => v.c === c)) continue; c.root.visible = true; if (c.root.position.distanceToSquared(cam) < 1600) c.update(dt, cam); }
   });
-  return { people, walkers };
+  return { people, walkers, visitors, actors };
 }

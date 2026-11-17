@@ -217,7 +217,7 @@ export function buildHabitat(ctx) {
 
   // portes de cabines numérotées le long du mur nord (fermées, voyant libre / occupée)
   const cabinDoors = [];
-  [[-110, '08', true], [-98.5, '10', true], [-95.5, '11', false], [-84.8, '14', true], [-82, '15', false]].forEach(([x, num, busy]) => {
+  [[-107.6, '08', true], [-98.5, '10', true], [-95.5, '11', false], [-84.8, '14', true], [-82, '15', false]].forEach(([x, num, busy]) => {
     box(1.6, 2.8, 0.12, trim, [x, Y + 1.4, HALL.z1 - 0.2]);
     box(1.3, 2.6, 0.1, mats.metal(0x5a6066, { rough: 0.35 }), [x, Y + 1.3, HALL.z1 - 0.26]);
     box(0.25, 0.08, 0.04, busy ? mats.emissive(0xff4a3a, 3) : mats.emissive(0x7dff9a, 3), [x + 0.45, Y + 1.55, HALL.z1 - 0.32]);

@@ -161,7 +161,13 @@ bassin miroir et sculpture orbitale animée au centre.
   établi holographique ; combinaisons « Halo », « Onyx », « Soleil » (68 000 à 145 000 ¤, protection 50 à 72 %).
 - **Aérodyne** : yacht stellaire Série 9 sur plateau tournant, fiche technique holographique (48,5 M¤, sur commande).
 - **Le Zénith** : salon-bar en onyx rétroéclairé, étagères de bouteilles, tabourets et banquettes en velours (120 ¤ la coupe).
-- Conciergerie, sécurité privée, clientèle fortunée qui se promène et s'arrête aux vitrines, banquettes face à l'espace.
+- Personnel en activité : la conciergère saisit au terminal, la vendeuse d'Élysée retouche les portants et plie sur la table,
+  le conseiller Nova contrôle les vitrines et l'établi, l'agent d'Aérodyne présente le yacht, le barman essuie le comptoir et
+  va chercher des bouteilles, la sécurité fait sa ronde.
+- Visiteurs fortunés : ils sortent de leur cabine du pont habitat, prennent l'ascenseur panoramique (appel, attente,
+  trajet), font deux ou trois haltes (vitrines, comptoirs, yacht, bar, banquettes face à l'espace), puis redescendent.
+- La coupole repose sur un calice nacré nervuré, bagué de lumière, prolongé par un fût jusqu'au toit du hall du pont
+  habitat : la structure est visible depuis l'espace et par la verrière de la Cour des Saveurs.
 
 ## Vie de la station (horaires)
 
