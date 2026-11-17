@@ -129,6 +129,14 @@ Sushi Orbital, Grill 66 (burgers), Pizzeria Vesuvio, Café Nébula, Phở Lune R
 E au comptoir : la carte du restaurant (chaque plat rend un peu de santé). Les cuisiniers passent du fourneau
 au comptoir, des clients mangent attablés, d'autres commandent puis mangent debout. Borne-plan à l'entrée.
 
+Détail : plats modélisés (bols de phở et de ramen, makis et nigiris sur tapis roulant, pizzas, burgers, tacos,
+croissants et baguettes, raviolis vapeur, currys), woks, marmites, paniers vapeur, canards laqués, four à pizza,
+frigos vitrés garnis, rails d'ustensiles, menus illustrés, chevalets ardoise, plateaux servis sur les tables,
+condiments et serviettes, stations de tri, affiches, bannières suspendues, gaines de ventilation, robot de
+nettoyage, vapeur et flammes en cuisine, ambiance sonore (brouhaha, friture, vaisselle). Les figurants du pont
+sont solides (on ne les traverse plus). Performances : figurants du pont sans ombre portée, animation figée
+au-delà de 38 m, vaisselle fusionnée en géométrie statique.
+
 ## Vie de la station (horaires)
 
 Horloge accélérée (1 s réelle = 48 s à bord ; une journée = 30 min de jeu), affichée en haut à droite.
