@@ -1,6 +1,6 @@
 # Sillage — Hangar 07, station Halden-7
 
-Démo jouable dans le navigateur (Three.js + Vite) : un grand hangar d'atterrissage de station
+Jeu jouable dans le navigateur (Three.js + Vite) : un grand hangar d'atterrissage de station
 orbitale, relié par un sas à une galerie marchande, avec une baie donnant sur une planète.
 Univers original, ressources CC0 ou créées pour le projet (voir [CREDITS.md](CREDITS.md)).
 
