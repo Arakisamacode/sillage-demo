@@ -253,10 +253,11 @@ export class Elevators {
     S.from = S.y; S.to = to; S.k = 0; S.moving = true; S.carry = carry; S.closeT = 1.3; S.hold = 0;
     this.onEvent('start', S);
   }
-  call(S, y) { if (S.moving) return; if (this.isAt(S, y)) { S.hold = 3; return; } this._start(S, y, false); this.onEvent('called', S); }
+  call(S, y) { if (S.moving) return; if (this._inside(S) && !this.isAt(S, y)) return;   // le joueur est dans la cabine : on attend qu'il en sorte
+    if (this.isAt(S, y)) { S.hold = 3; return; } this._start(S, y, false); this.onEvent('called', S); }
   ride(S) { if (S.moving) return; const [a, b] = S.levels || [0, DECK_Y]; this._start(S, Math.abs(S.y - a) < 1 ? b : a, true); }
   /** Départ demandé par un passager non joueur (figurant) vers le niveau y. */
-  send(S, y) { if (S.moving || this.isAt(S, y)) return; this._start(S, y, false); }
+  send(S, y) { if (S.moving || this.isAt(S, y) || this._inside(S)) return; this._start(S, y, false); }
   /** À appeler avant la mise à jour du joueur : déplace les cabines et le joueur embarqué. */
   update(dt) {
     this.ticked = true;

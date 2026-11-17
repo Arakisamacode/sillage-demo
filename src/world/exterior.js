@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { platedHull } from './hullkit.js';
 import { Builder } from './builder.js';
-import { HX, Z_BAY, Z_BACK, H, GALLERY } from './layout.js';
+import { HX, Z_BAY, Z_BACK, H, GALLERY, AIRLOCK } from './layout.js';
 
 // Extérieur de la station Halden-7 (visible en vol) : enveloppe blindée du hangar et de la galerie,
 // corps cylindrique de 400 m, deux anneaux habités reliés par des rayons, hublots et balises.
@@ -23,7 +23,14 @@ export function buildExterior(ctx) {
   // ---------------------------------------------------------------- enveloppe du hangar
   const zc = (Z_BAY + Z_BACK) / 2, L = Z_BACK - Z_BAY + 4;
   B.box(HX * 2 + 7, 3.5, L, shell, [0, H + 2.2, zc], null, { tex: 8, cast: false });
-  for (const s of [-1, 1]) B.box(3.4, H + 8, L, shell, [s * (HX + 2.3), H / 2, zc], null, { tex: 8, cast: false });
+  // flanc est plein ; flanc ouest percé au droit du sas vers la galerie (le passage reste dégagé)
+  B.box(3.4, H + 8, L, shell, [HX + 2.3, H / 2, zc], null, { tex: 8, cast: false });
+  {
+    const x = -(HX + 2.3), z0 = zc - L / 2, z1 = zc + L / 2, ha = AIRLOCK.z - AIRLOCK.w / 2 - 1.4, hb = AIRLOCK.z + AIRLOCK.w / 2 + 1.4, top = AIRLOCK.h + 1.6;
+    B.box(3.4, H + 8, ha - z0, shell, [x, H / 2, (z0 + ha) / 2], null, { tex: 8, cast: false });
+    B.box(3.4, H + 8, z1 - hb, shell, [x, H / 2, (hb + z1) / 2], null, { tex: 8, cast: false });
+    B.box(3.4, H + 8 - (top + 4), hb - ha, shell, [x, top + (H + 8 - (top + 4)) / 2, AIRLOCK.z], null, { tex: 8, cast: false });
+  }
   B.box(HX * 2 + 7, H + 8, 3.4, shell, [0, H / 2, Z_BACK + 2.2], null, { tex: 8, cast: false });
   B.box(HX * 2 + 7, 5, L + 16, dark, [0, -3, zc - 8], null, { tex: 8, cast: false });
   // nervures et radiateurs sur le toit
@@ -33,7 +40,13 @@ export function buildExterior(ctx) {
   const G = GALLERY, gx = (G.x0 + G.x1) / 2, gw = G.x1 - G.x0 + 6;
   B.box(gw, 3, G.z1 - G.z0 + 14, shell, [gx, G.h + 1.6, (G.z0 + G.z1) / 2 + 4], null, { tex: 8, cast: false });
   B.box(gw, G.h + 4, 4, shell, [gx, G.h / 2, G.z1 + 9], null, { tex: 8, cast: false });
-  B.box(4, G.h + 4, G.z1 - G.z0 + 14, shell, [G.x0 - 5, G.h / 2, (G.z0 + G.z1) / 2 + 4], null, { tex: 8, cast: false });
+  {
+    // pignon ouest percé au droit du couloir du module habitat (porte « MODULE HABITAT », z = -11)
+    const zc2 = (G.z0 + G.z1) / 2 + 4, D = G.z1 - G.z0 + 14, z0 = zc2 - D / 2, z1 = zc2 + D / 2, dz = (G.z0 + G.z1) / 2 - 4, ha = dz - 2.3, hb = dz + 2.3, top = 4.2;
+    B.box(4, G.h + 4, ha - z0, shell, [G.x0 - 5, G.h / 2, (z0 + ha) / 2], null, { tex: 8, cast: false });
+    B.box(4, G.h + 4, z1 - hb, shell, [G.x0 - 5, G.h / 2, (hb + z1) / 2], null, { tex: 8, cast: false });
+    B.box(4, G.h + 4 - (top + 2), hb - ha, shell, [G.x0 - 5, top + (G.h + 4 - (top + 2)) / 2, dz], null, { tex: 8, cast: false });
+  }
   B.box(gw, 4, G.z1 - G.z0 + 14, dark, [gx, -2.2, (G.z0 + G.z1) / 2 + 4], null, { tex: 8, cast: false });
   // coursive du sas : coque creuse entre le mur extérieur du hangar et la galerie (le passage reste dégagé)
   {
