@@ -28,6 +28,8 @@ import { buildDerelict } from './world/derelict.js';
 import { buildBayCover, buildAirlockSign } from './world/baycover.js';
 import { buildHabitat, DECK_Y, Elevators } from './world/habitat.js';
 import { buildFurnish } from './world/furnish.js';
+import { buildFoodCourt } from './world/foodcourt.js';
+import { RESTAURANTS } from './game/food.js';
 import { Cargo, buildQuai } from './game/cargo.js';
 import { Missions } from './game/missions.js';
 import { Crew } from './game/crew.js';
@@ -86,6 +88,7 @@ async function boot() {
   buildAirlockSign(ctx);
   ctx.habitat = buildHabitat(ctx);
   ctx.furnish = buildFurnish(ctx);
+  ctx.food = buildFoodCourt(ctx);
   ctx.lights = buildLighting(ctx);
   const lib = new CharacterLibrary(manager, quality);
   const libReady = lib.load(undefined, (p) => progress(0.6 + 0.3 * p, 'Chargement des personnages'));
@@ -186,6 +189,95 @@ async function boot() {
       c.root.position.copy(m.p); c.root.position.y = 0.12; c.root.rotation.y = m.yaw;
       c.update(0.016, null);
       scene.add(c.root);
+    });
+  }
+  // ------------------------------------------------------------------ Cour des Saveurs : cuisiniers, clients attablés, promeneurs
+  {
+    const FC = ctx.food, people = [], V = (x, z) => new THREE.Vector3(x, DECK_Y, z);
+    const low = quality.name === 'low';
+    const looks = [['UM_light', 'Hair_SimpleParted'], ['UF_dark', 'Hair_Long'], ['UM_dark', 'Hair_Buzzed'], ['UF_light', 'Hair_Buns'], ['UM_light', 'Hair_Beard'], ['UF_dark', 'Hair_BuzzedFemale'], ['UM_dark', 'Hair_Beard'], ['UF_light', 'Hair_Long']];
+    const tops = [0x6a4a32, 0x1a2436, 0x5d6168, 0xa89470, 0x2b3036, 0x7a2a24, 0x3a5a4a, 0x8a3a5a, 0xc8a46a, 0x2c4a6e];
+    const mk = (i, outfit) => {
+      const [model, hair] = looks[i % looks.length];
+      const c = lib.create(model, { height: model.startsWith('UF') ? 1.66 + (i % 3) * 0.03 : 1.76 + (i % 3) * 0.04, hair, hairColor: [0x1a120c, 0x3a2414, 0x6a5040, 0x2a1d14][i % 4] });
+      c.setOutfit(outfit || { top: tops[i % tops.length], bottom: [0x26282c, 0x2f3a4e, 0x4a4036][i % 3], accent: 0xc8b48a, belt: true });
+      c.root.visible = false; scene.add(c.root); people.push(c); return c;
+    };
+    /** Petit moteur de routines (déplacements rectilignes et actions) pour les figurants du pont. */
+    const npcs = [];
+    const npc = (c, plan, active) => { const n = { c, plan, active, q: [], pos: c.root.position.clone(), t: 0 }; npcs.push(n); return n; };
+    const stepNpc = (n, dt) => {
+      if (!n.q.length) n.q = n.plan(n);
+      const s = n.q[0], c = n.c;
+      if (s.move) {
+        const d = new THREE.Vector3().subVectors(s.move, n.pos).setY(0), L = d.length();
+        if (L < 0.08) { n.q.shift(); return; }
+        n.pos.addScaledVector(d.normalize(), Math.min(L, (s.speed || 1.3) * dt));
+        c.root.position.copy(n.pos);
+        let dy = Math.atan2(d.x, d.z) - c.root.rotation.y; dy = Math.atan2(Math.sin(dy), Math.cos(dy));
+        c.root.rotation.y += dy * (1 - Math.exp(-dt * 8));
+        c.setSpeed(s.speed || 1.3);
+        if (c.override && c.override !== 'sit' && c.override !== 'sitTalk') c.stop(0.2);
+      } else {
+        if (n.t === 0) { c.setSpeed(0); if (s.anim && s.anim !== 'idle') c.play(s.anim, { fade: 0.35 }); else if (c.override) c.stop(0.3); }
+        n.t += dt;
+        if (s.face !== undefined) { let dy = s.face - c.root.rotation.y; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); c.root.rotation.y += dy * (1 - Math.exp(-dt * 6)); }
+        if (n.t >= s.dur) { n.t = 0; n.q.shift(); }
+      }
+    };
+    const R2 = (a, b) => a + Math.random() * (b - a);
+    // cuisiniers : fourneaux ↔ comptoir (présents aux heures d'ouverture)
+    FC.stalls.forEach((st, i) => {
+      const c = mk(i + 3, { top: 0xf2f2ee, bottom: 0x2a2c30, boot: 0x1a1a1a, accent: new THREE.Color(st.r.color).getHex(), zip: true });
+      c.root.position.copy(st.counterSpot);
+      npc(c, (n) => {
+        const r = Math.random();
+        if (r < 0.45) return [{ move: st.stove, speed: 1.0 }, { anim: 'interact', dur: R2(4, 8), face: st.faceKitchen }, { anim: 'idle', dur: R2(1, 2), face: st.faceKitchen }, { move: st.counterSpot, speed: 1.0 }];
+        if (r < 0.65) return [{ move: st.stove2, speed: 1.0 }, { anim: 'pickup', dur: 2.4, face: st.faceKitchen }, { move: st.counterSpot, speed: 1.0 }];
+        return [{ anim: Math.random() < 0.6 ? 'talk' : 'idle', dur: R2(3, 6), face: st.faceRoom }];
+      }, () => ctx.time.open(st.r.id));
+    });
+    // clients attablés
+    const chairs = FC.chairs.filter((_, i) => i % 3 === 0).slice(0, low ? 6 : 12);
+    chairs.forEach((ch, i) => {
+      ch.taken = true;
+      const c = mk(i);
+      c.root.position.copy(ch.p); c.root.rotation.y = ch.yaw;
+      npc(c, () => [{ anim: i % 2 ? 'sitTalk' : 'sit', dur: 999 }], () => ctx.time.open('galerie'));
+    });
+    // promeneurs : commandent à un comptoir, mangent debout à une table haute, recommencent
+    const row = (st) => (st.dir > 0 ? 44 : 20);
+    const via = (from, to) => {
+      if (Math.abs(from.z - to.z) < 0.5) return [{ move: to }];
+      const cross = Math.abs((from.x + to.x) / 2 + 120) < Math.abs((from.x + to.x) / 2 + 90) ? -120 : -90;
+      return [{ move: V(cross, from.z) }, { move: V(cross, to.z) }, { move: to }];
+    };
+    for (let k = 0; k < (low ? 3 : 6); k++) {
+      const c = mk(k + 2);
+      const start = V(-116 + (k % 3) * 1.2, 20);
+      c.root.position.copy(start);
+      npc(c, (n) => {
+        const open = FC.stalls.filter((st) => ctx.time.open(st.r.id));
+        if (!open.length) return [{ anim: 'idle', dur: 4 }];
+        const st = open[Math.floor(Math.random() * open.length)];
+        const here = V(n.pos.x, Math.abs(n.pos.z - 44) < Math.abs(n.pos.z - 20) ? 44 : 20);
+        const rp = V(st.approach.x, row(st));
+        const tbl = FC.standing.filter((t) => (t.side > 0) === (st.dir > 0))[Math.floor(Math.random() * 4)];
+        const tp = V(tbl.p.x, row(st)), spot = V(tbl.p.x, tbl.p.z + tbl.side * 0.75);
+        return [{ move: here }, ...via(here, rp), { move: st.customer }, { anim: 'talk', dur: R2(3, 5), face: st.customerYaw }, { anim: 'idle', dur: R2(1.5, 3), face: st.customerYaw },
+          { move: rp }, { move: tp }, { move: spot }, { anim: 'interact', dur: R2(8, 14), face: tbl.side > 0 ? Math.PI : 0 }, { move: tp }];
+      }, () => ctx.time.open('galerie'));
+    }
+    ctx.updaters.push((dt) => {
+      const P = player.pos, here = P.y > DECK_Y - 5 && P.z > -6;
+      for (const l of FC.lights) l.visible = here;
+      for (const n of npcs) {
+        const on = here && n.active();
+        n.c.root.visible = on;
+        if (!on) continue;
+        stepNpc(n, dt);
+        n.c.update(dt, ctx.camera.position);
+      }
     });
   }
   // habitants du pont habitat : barman, médecin, clients (animés seulement quand le joueur est sur le pont)
@@ -365,7 +457,7 @@ async function boot() {
   elevators.onEvent = (e, S, carried) => {
     if (e === 'start' || e === 'arrived') audio.blip();
     if (e === 'called') toast('Ascenseur appelé · cabine en approche');
-    if (e === 'arrived' && carried) toast(S.y > 1 ? 'Pont habitat · bar La Comète, infirmerie, cabines' : 'Rez-de-chaussée · galerie marchande');
+    if (e === 'arrived' && carried) toast(S.y > 1 ? 'Pont habitat · bar La Comète, infirmerie, cabines · Cour des Saveurs (couloir nord)' : 'Rez-de-chaussée · galerie marchande');
   };
   for (const S of HB.shafts) {
     for (const y of [0, DECK_Y]) {
@@ -403,6 +495,17 @@ async function boot() {
   for (const b of [...(CW.benchesWindow || []), ...(CW.benchesMid || [])]) playerSeat(b.x, 0, b.z, b.yaw, b);
   for (const c of [...HB.chairs, ...HB.benches]) playerSeat(c.p.x, c.p.y, c.p.z, c.yaw, c);
   for (const s2 of ctx.furnish.sofas) playerSeat(s2.x, s2.y, s2.z, s2.yaw, s2);
+  // ------------------------------------------------------------------ Cour des Saveurs : comptoirs, plan, sièges
+  for (const st of ctx.food.stalls) {
+    const r = st.r;
+    interactables.push({ pos: st.customer, r: 1.5, when: () => ctx.time.open(r.id), label: `E — ${r.label} : commander`, fn: () => openUI(() => shop.openStore(r.id)) });
+    interactables.push({ pos: st.customer, r: 1.5, when: () => !ctx.time.open(r.id), label: `${r.label} · fermé · ouvre à ${ctx.time.opensAt(r.id)}`, fn: () => null });
+  }
+  interactables.push({ pos: ctx.food.directory, r: 1.4, label: 'E — Plan de la Cour des Saveurs', fn: () => {
+    const open = RESTAURANTS.filter((r) => ctx.time.open(r.id)).map((r) => r.label);
+    toast(open.length ? `Ouverts maintenant : ${open.join(' · ')}` : 'Tous les restaurants sont fermés à cette heure');
+  } });
+  for (const c of ctx.food.chairs) playerSeat(c.p.x, c.p.y, c.p.z, c.yaw, c);
   const OCCUPANTS = { '08': 'un mécanicien de nuit', '10': 'une pilote de convoi', '14': 'un négociant de Corvin' };
   for (const d of HB.cabinDoors) interactables.push({ pos: d.pos, r: 1.3, label: `E — Cabine ${d.num}`, fn: () => {
     audio.blip();
@@ -451,7 +554,7 @@ async function boot() {
   const shop = new ShopUI({
     state: game,
     canEquipShip: () => flight.state === 'parked',
-    onAction: (a, it) => { if (a === 'buy' && it?.eat) audio.coffee(); else audio.blip(); },
+    onAction: (a, it) => { if (a === 'buy' && it?.eat) { audio.coffee(); if (ctx.ground) ctx.ground.hp = Math.min(100, ctx.ground.hp + (it.heal || 5)); } else audio.blip(); },
     onClose: () => {
       input.enabled = true;
       if (touch) $('touch').classList.remove('hidden');

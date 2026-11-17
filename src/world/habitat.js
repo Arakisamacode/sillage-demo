@@ -65,6 +65,7 @@ export function buildHabitat(ctx) {
   const Y = DECK_Y;
   room(LOBBY.x0, LOBBY.x1, LOBBY.z0, LOBBY.z1, Y, 4.2, [
     { side: 'e', a: -16, b: -6, h: 3.6 },
+    { side: 'n', a: -118, b: -114, h: 3.2 },                     // couloir vers la Cour des Saveurs
     ...CAB.map((c) => ({ side: 'w', a: c - 0.9, b: c + 0.9, h: 2.6 })),
   ]);
   room(HALL.x0, HALL.x1, HALL.z0, HALL.z1, Y, HALL.h, [
@@ -154,6 +155,7 @@ export function buildHabitat(ctx) {
   };
   sign('ASCENSEURS · PONT HABITAT', '#9fd8ff', 80, 5.2, [LOBBY.x0 + 0.2, 3.5, -11], Math.PI / 2);
   sign('ASCENSEURS · GALERIE', '#9fd8ff', 80, 4.6, [LOBBY.x0 + 0.2, Y + 3.5, -11], Math.PI / 2);
+  sign('COUR DES SAVEURS ▲', '#ffd27a', 80, 3.6, [-116, Y + 3.75, LOBBY.z1 - 0.2], Math.PI);
   sign('BAR LA COMÈTE', '#ffb84a', 110, 6, [HALL.x1 - 0.2, Y + 3.9, -12], -Math.PI / 2);
   sign('INFIRMERIE', '#7dff9a', 80, 3.2, [-104, Y + 3.3, HALL.z1 - 0.2], Math.PI);
   sign('CABINE 12', '#ffd27a', 70, 2.6, [-90, Y + 3.3, HALL.z1 - 0.2], Math.PI);

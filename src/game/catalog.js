@@ -1,3 +1,5 @@
+import { RESTAURANTS, dishItems } from './food.js';
+
 // Catalogue des biens vendus à bord de Halden-7. Prix en crédits (¤).
 // Les noms de marques et de modèles sont inventés pour ce projet.
 
@@ -11,6 +13,7 @@ export const CATEGORIES = {
   turret: 'Tourelle',
   shield: 'Bouclier',
   consumable: 'Consommable',
+  food: 'À la carte',
 };
 
 const I = (id, cat, name, price, desc, extra = {}) => ({ id, cat, name, price, desc, ...extra });
@@ -56,6 +59,7 @@ export const ITEMS = [
   I('noodles', 'consumable', 'Bol de nouilles', 18, 'Bouillon épicé, servi chaud.', { eat: true }),
 ];
 
+ITEMS.push(...dishItems());
 export const ITEM = Object.fromEntries(ITEMS.map((i) => [i.id, i]));
 
 // Emplacements du Héron : position (repère local de l'aire), taille maximale et catégories admises
@@ -75,6 +79,7 @@ export const STORES = {
   combis: { label: 'Combinaisons Vega', name: 'COMBINAISONS VEGA', cats: ['outfit', 'armor'], greet: 'Essayez ce que vous voulez, la cabine est au fond.' },
   pharma: { label: 'Pharmacie', name: 'PHARMACIE', cats: ['consumable'], filter: (i) => ['medpen', 'medkit', 'ration'].includes(i.id), greet: 'Bonjour. Soins d\'urgence et vivres de bord.' },
   nouilles: { label: 'Nouilles Orbitales', name: 'NOUILLES ORBITALES', cats: ['consumable'], filter: (i) => i.id === 'noodles', greet: '« Un bol ? C\'est le meilleur bouillon de la station ! »' },
+  ...Object.fromEntries(RESTAURANTS.map((r) => [r.id, { label: r.label, name: r.name, cats: ['food'], filter: (i) => i.stall === r.id, greet: r.greet }])),
 };
 
 // Minerais (prix au SCU : brut à la vente directe, raffiné après passage à la raffinerie)

@@ -15,7 +15,17 @@ function draw2D(it) {
   const g = c.getContext('2d');
   const hex = (n) => '#' + new THREE.Color(n).getHexString();
   g.lineJoin = 'round';
-  if (it.cat === 'outfit') {
+  if (it.cat === 'food') {
+    const ic = it.icon, P = (col, f) => { g.fillStyle = col; g.beginPath(); f(); g.fill(); };
+    if (ic === 'cup') { P('#f2f2ee', () => g.roundRect(58, 34, 40, 46, 6)); g.strokeStyle = '#f2f2ee'; g.lineWidth = 5; g.beginPath(); g.arc(102, 56, 10, -1.2, 1.2); g.stroke(); P('#6a3a1a', () => g.ellipse(78, 36, 18, 5, 0, 0, 7)); g.strokeStyle = 'rgba(255,255,255,.5)'; g.lineWidth = 2; g.beginPath(); g.moveTo(72, 28); g.bezierCurveTo(66, 20, 80, 16, 74, 8); g.stroke(); }
+    else if (ic === 'bread') { P('#d8973a', () => g.ellipse(80, 56, 48, 16, -0.25, 0, 7)); g.strokeStyle = '#a8671a'; g.lineWidth = 3; for (let k = -2; k <= 2; k++) { g.beginPath(); g.moveTo(74 + k * 16, 48 + k * 4); g.lineTo(86 + k * 16, 58 + k * 4); g.stroke(); } }
+    else if (ic === 'taco') { P('#e8c25a', () => g.ellipse(80, 60, 44, 30, 0, Math.PI, 0)); P('#4a9a3a', () => g.ellipse(80, 58, 36, 8, 0, Math.PI, 0)); P('#c83a2a', () => g.ellipse(70, 54, 8, 4, 0, 0, 7)); P('#f2e6c8', () => g.ellipse(92, 54, 8, 4, 0, 0, 7)); }
+    else if (ic === 'pizza') { P('#d8973a', () => g.ellipse(80, 52, 46, 30, 0, 0, 7)); P('#c83a2a', () => g.ellipse(80, 52, 38, 24, 0, 0, 7)); P('#f2e6a8', () => { for (const [x, y] of [[66, 46], [90, 44], [80, 60], [96, 58], [62, 60]]) { g.moveTo(x + 6, y); g.ellipse(x, y, 6, 4, 0, 0, 7); } }); }
+    else if (ic === 'burger') { P('#d8973a', () => g.ellipse(80, 38, 36, 16, 0, Math.PI, 0)); P('#4a9a3a', () => g.rect(46, 38, 68, 5)); P('#5a2a1a', () => g.rect(46, 43, 68, 10)); P('#e8c23a', () => g.rect(48, 53, 64, 4)); P('#d8973a', () => g.roundRect(46, 57, 68, 12, 5)); }
+    else if (ic === 'sushi') { for (let k = 0; k < 3; k++) { P('#f2f2ee', () => g.ellipse(52 + k * 28, 56, 12, 9, 0, 0, 7)); P('#e86a4a', () => g.ellipse(52 + k * 28, 52, 11, 5, 0, 0, 7)); } P('#1a1c1e', () => g.rect(40, 66, 80, 3)); }
+    else if (ic === 'plate') { P('#e8eef0', () => g.ellipse(80, 56, 50, 22, 0, 0, 7)); P('#c87a2a', () => g.ellipse(72, 52, 22, 10, 0, 0, 7)); P('#f2e6c8', () => g.ellipse(96, 56, 14, 8, 0, 0, 7)); P('#4a9a3a', () => g.ellipse(70, 46, 6, 3, 0, 0, 7)); }
+    else { P('#f2e6d6', () => g.ellipse(80, 54, 40, 22, 0, 0, Math.PI)); P('#c8642a', () => g.ellipse(80, 54, 38, 7, 0, 0, 7)); g.strokeStyle = '#3a2a1a'; g.lineWidth = 4; g.beginPath(); g.moveTo(92, 14); g.lineTo(84, 50); g.moveTo(102, 16); g.lineTo(90, 50); g.stroke(); }
+  } else if (it.cat === 'outfit') {
     const o = it.outfit;
     g.fillStyle = hex(o.top);
     g.beginPath(); g.moveTo(52, 22); g.lineTo(108, 22); g.lineTo(128, 48); g.lineTo(116, 56); g.lineTo(106, 44); g.lineTo(104, 70); g.lineTo(56, 70); g.lineTo(54, 44); g.lineTo(44, 56); g.lineTo(32, 48); g.closePath(); g.fill();
