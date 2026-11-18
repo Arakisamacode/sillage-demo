@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import { DECK_Y } from './habitat.js';
 
 // Vie du Grand Dôme : enfants (chat, balançoires, toboggan, tourniquet, bascule, canards), parents sur les bancs,
@@ -21,9 +21,19 @@ const vc = (g, col, jitter = 0) => {
   return g;
 };
 const T = (g, x, y, z, rx = 0, ry = 0, rz = 0, sx = 1, sy = 1, sz = 1) => g.applyMatrix4(new THREE.Matrix4().compose(new THREE.Vector3(x, y, z), new THREE.Quaternion().setFromEuler(new THREE.Euler(rx, ry, rz)), new THREE.Vector3(sx, sy, sz)));
-const merge = (list) => { const g = mergeGeometries(list); g.computeBoundingSphere(); return g; };
+/** fusion + occlusion ambiante approchée : dessous et creux assombris (lecture des volumes) */
+const merge = (list, ao = 0.45) => {
+  const g = mergeGeometries(list); g.computeBoundingBox(); g.computeBoundingSphere();
+  const p = g.attributes.position, c = g.attributes.color, n = g.attributes.normal, b = g.boundingBox, h = Math.max(1e-3, b.max.y - b.min.y);
+  for (let i = 0; i < p.count; i++) {
+    const t = (p.getY(i) - b.min.y) / h, k = (1 - ao) + ao * Math.min(1, 0.25 + t * 1.1) * (0.8 + 0.2 * Math.max(0, n.getY(i)));
+    c.setXYZ(i, c.getX(i) * k, c.getY(i) * k, c.getZ(i) * k);
+  }
+  return g;
+};
 function wool(r, detail = 2) {
-  const g = new THREE.IcosahedronGeometry(r, detail), p = g.attributes.position, v = new THREE.Vector3();
+  let g = new THREE.IcosahedronGeometry(r, detail + 1); g.deleteAttribute('uv'); g.deleteAttribute('normal'); g = mergeVertices(g);
+  const p = g.attributes.position, v = new THREE.Vector3();
   for (let i = 0; i < p.count; i++) { v.fromBufferAttribute(p, i); const n = 1 + 0.09 * Math.sin(v.x * 31) * Math.sin(v.y * 27) * Math.sin(v.z * 29) + 0.05 * Math.sin(v.x * 71 + v.z * 53); v.multiplyScalar(n); p.setXYZ(i, v.x, v.y, v.z); }
   g.computeVertexNormals(); return g;
 }
@@ -72,6 +82,24 @@ function speciesGeos() {
   const wing = new THREE.ShapeGeometry(new THREE.Shape([new THREE.Vector2(0, 0), new THREE.Vector2(0.05, 0.035), new THREE.Vector2(0.06, -0.005), new THREE.Vector2(0.035, -0.04), new THREE.Vector2(0, -0.01)]));
   S.wing = vc(wing, 0xffffff);
   const bw = new THREE.ShapeGeometry(new THREE.Shape([new THREE.Vector2(0, 0.04), new THREE.Vector2(0.28, -0.02), new THREE.Vector2(0.3, -0.06), new THREE.Vector2(0, -0.05)])); bw.rotateX(-Math.PI / 2);
+  // cochon : corps rose trapu, groin, oreilles tombantes, queue en tire-bouchon
+  S.pig = {
+    body: merge([vc(T(new THREE.CapsuleGeometry(0.24, 0.42, 6, 14), 0, 0.44, 0, Math.PI / 2, 0, 0, 1, 0.92, 1), 0xf0a8a0, 0.08), vc(T(new THREE.TorusGeometry(0.04, 0.012, 5, 10, 4.5), 0, 0.52, -0.47, 0, Math.PI / 2, 0), 0xe89890)]),
+    head: merge([vc(T(new THREE.SphereGeometry(0.16, 12, 9), 0, -0.02, 0.08, 0, 0, 0, 1, 0.95, 1.05), 0xf0a8a0, 0.06), vc(T(new THREE.CylinderGeometry(0.075, 0.08, 0.08, 12), 0, -0.05, 0.24, Math.PI / 2, 0, 0), 0xe08888),
+      vc(T(new THREE.SphereGeometry(0.014, 5, 4), 0.025, -0.05, 0.285), 0x5a2a2a), vc(T(new THREE.SphereGeometry(0.014, 5, 4), -0.025, -0.05, 0.285), 0x5a2a2a),
+      vc(T(new THREE.ConeGeometry(0.06, 0.12, 3), 0.1, 0.1, 0.06, 0.9, 0, -0.5), 0xe89890), vc(T(new THREE.ConeGeometry(0.06, 0.12, 3), -0.1, 0.1, 0.06, 0.9, 0, 0.5), 0xe89890),
+      vc(T(new THREE.SphereGeometry(0.016, 6, 4), 0.07, 0.03, 0.19), 0x101010), vc(T(new THREE.SphereGeometry(0.016, 6, 4), -0.07, 0.03, 0.19), 0x101010)]),
+    neck: new THREE.Vector3(0, 0.46, 0.38),
+    leg: vc(T(new THREE.CylinderGeometry(0.045, 0.04, 0.24, 7), 0, -0.12, 0), 0xd88880), hip: 0.24, hips: [[0.13, 0.22], [-0.13, 0.22], [0.13, -0.22], [-0.13, -0.22]],
+  };
+  // lapin : corps rond, longues oreilles, queue en pompon (déplacement par bonds)
+  const bun = (c) => ({
+    body: merge([vc(T(new THREE.SphereGeometry(0.1, 12, 9), 0, 0.1, 0, 0, 0, 0, 1, 0.95, 1.4), c, 0.08), vc(T(new THREE.SphereGeometry(0.04, 8, 6), 0, 0.13, -0.14), 0xf8f8f4), vc(T(new THREE.SphereGeometry(0.045, 8, 6), 0.06, 0.04, -0.06, 0, 0, 0, 0.8, 0.6, 1.6), c), vc(T(new THREE.SphereGeometry(0.045, 8, 6), -0.06, 0.04, -0.06, 0, 0, 0, 0.8, 0.6, 1.6), c)]),
+    head: merge([vc(T(new THREE.SphereGeometry(0.065, 10, 8), 0, 0.02, 0.04, 0, 0, 0, 1, 0.95, 1.1), c, 0.05), vc(T(new THREE.SphereGeometry(0.03, 8, 6), 0.03, 0.13, 0.0, -0.25, 0, -0.18, 0.5, 2.6, 0.9), c), vc(T(new THREE.SphereGeometry(0.03, 8, 6), -0.03, 0.13, 0.0, -0.25, 0, 0.18, 0.5, 2.6, 0.9), c),
+      vc(T(new THREE.SphereGeometry(0.011, 5, 4), 0.04, 0.04, 0.08), 0x0a0a0a), vc(T(new THREE.SphereGeometry(0.011, 5, 4), -0.04, 0.04, 0.08), 0x0a0a0a), vc(T(new THREE.SphereGeometry(0.01, 5, 4), 0, 0.0, 0.11), 0xd88a8a)]),
+    neck: new THREE.Vector3(0, 0.16, 0.13),
+  });
+  S.bunny = bun(0xc8b8a0); S.bunnyW = bun(0xf2f0ea); S.bunnyD = bun(0x5a4a3c);
   S.bird = { body: merge([vc(T(new THREE.SphereGeometry(0.05, 8, 6), 0, 0, 0, 0, 0, 0, 0.8, 0.7, 2.2), 0x1a1c2a), vc(T(new THREE.ConeGeometry(0.03, 0.14, 4), 0, 0, -0.16, -Math.PI / 2, 0, 0, 1, 1, 0.3), 0x1a1c2a), vc(T(new THREE.SphereGeometry(0.03, 6, 4), 0, -0.01, 0.06), 0xc84a2a)]), wing: vc(bw, 0x1e2232) };
   return S;
 }
@@ -102,15 +130,24 @@ export function populateGarden(ctx, lib, player, G) {
   const mk = (i, outfit, p, yaw, opt = {}) => {
     const [model, hair] = opt.look || ADULT[i % ADULT.length];
     const kid = !!opt.kid;
-    const c = lib.create(model, { height: kid ? R2(1.08, 1.32) : model.startsWith('UF') ? R2(1.62, 1.74) : R2(1.74, 1.88), hair, hairColor: [0x2a1d14, 0xd8c098, 0x4a3020, 0x16110d, 0x8a5a30][i % 5] });
+    const hgt = kid ? R2(1.14, 1.38) : model.startsWith('UF') ? R2(1.62, 1.74) : R2(1.74, 1.88);
+    const c = lib.create(model, { height: hgt, hair, hairColor: [0x2a1d14, 0xd8c098, 0x4a3020, 0x16110d, 0x8a5a30][i % 5] });
     c.setOutfit({ boot: 0x1a1a1a, accent: 0xf2f2ee, zip: false, belt: !kid, ...outfit });
     c.root.position.copy(p); c.root.rotation.y = yaw;
     c.root.traverse((o) => { o.castShadow = false; });
     c.kid = kid; c.root.visible = false; scene.add(c.root); people.push(c);
+    if (kid) c.model.position.y = -0.056 * hgt;   // jambes raccourcies : les pieds restent au sol
     return c;
   };
   // proportions d'enfant : tête plus grosse (os de tête, la coiffure suit)
-  const kidLook = (c) => { if (c.kid && c.bones.Head) c.bones.Head.scale.setScalar(1.32); };
+  // proportions d'enfant : tête plus grosse, jambes et bras plus courts (os redimensionnés après l'animation)
+  const kidLook = (c) => {
+    if (!c.kid) return;
+    const b = c.bones;
+    b.Head?.scale.setScalar(1.3); b.neck_01?.scale.setScalar(0.92);
+    for (const k of ['thigh_l', 'thigh_r']) b[k]?.scale.setScalar(0.88);
+    for (const k of ['upperarm_l', 'upperarm_r']) b[k]?.scale.setScalar(0.9);
+  };
 
   // ---------------------------------------------------------------- moteur de routines (comme à La Couronne) avec suivi du relief
   const turnTo = (c, yaw, dt, k = 6) => { const d = wrap(yaw - c.root.rotation.y); c.root.rotation.y += d * (1 - Math.exp(-dt * k)); };
@@ -241,6 +278,11 @@ export function populateGarden(ctx, lib, player, G) {
         { fn: (m) => { const a = mr.ang + m.mrA; m.pos.set(mr.c.x + Math.cos(a) * 1.9, mr.c.y, mr.c.z + Math.sin(a) * 1.9); m.pos.y = ground(m.pos); m.c.root.position.copy(m.pos); } },
         { move: playPt(), speed: 2.2 }];
     },
+    // enclos des lapins : on court voir les lapins, on leur tend une carotte à travers la clôture
+    bunnies: () => {
+      const P2 = G.rabbitPen, spot = at(P2.u + R2(-1.6, 1.6), P2.v - P2.d / 2 - 0.5);
+      return [{ move: at(P2.u + 3.5, P2.v - P2.d / 2 - 1.6), speed: 2.6 }, { move: spot, speed: 1.4 }, act('interact', R2(3, 5), 0), act('idle', R2(2, 5), 0), act('interact', 2.5, 0), { move: playPt(), speed: 2.6 }];
+    },
     // bascule : deux places
     seesaw: (n) => {
       const k = ss.busy.indexOf(null); if (k < 0) return kidPlans.tag(n);
@@ -253,7 +295,7 @@ export function populateGarden(ctx, lib, player, G) {
   const kidPlan = (n) => {
     if (n.inPond) return [];
     const r = Math.random();
-    const kind = r < 0.3 ? 'tag' : r < 0.5 ? 'swing' : r < 0.68 ? 'slide' : r < 0.84 ? 'merry' : 'seesaw';
+    const kind = r < 0.26 ? 'tag' : r < 0.44 ? 'swing' : r < 0.6 ? 'slide' : r < 0.74 ? 'merry' : r < 0.86 ? 'seesaw' : 'bunnies';
     return kidPlans[kind](n);
   };
   const nKids = low ? 4 : 6;
@@ -326,6 +368,7 @@ export function populateGarden(ctx, lib, player, G) {
     () => ({ dest: 'farm', last: at(15.6, R2(-3.5, 2.5)), face: 0 }),
     () => ({ dest: 'hill', last: null, face: Math.PI / 4 }),
     () => ({ dest: 'veg', last: at(R2(3, 10), -16.8), face: -Math.PI / 2 }),
+    () => ({ dest: Math.atan2(17.5, -13.5), last: at(G.rabbitPen.u + R2(-1.4, 1.4), G.rabbitPen.v - G.rabbitPen.d / 2 - 0.7), face: 0 }),
     () => ({ dest: 'play', last: at(PZ.u - 7.6, PZ.v - 1), face: Math.PI / 2 }),
   ];
   const walkPlan = (n) => {
@@ -355,6 +398,8 @@ export function populateGarden(ctx, lib, player, G) {
     return { sp, g, parts, list, region, opts };
   };
   const farmRegion = { pt: farmPt, ok: inFarm };
+  const PEN = G.rabbitPen, penOk = (u, v) => Math.abs(u - PEN.u) < PEN.w / 2 - 0.25 && Math.abs(v - PEN.v) < PEN.d / 2 - 0.25 && !(Math.abs(u - PEN.hutch.u) < 0.7 && Math.abs(v - PEN.hutch.v) < 0.5);
+  const penRegion = { pt: () => { for (let k = 0; k < 30; k++) { const u = PEN.u + R2(-PEN.w / 2, PEN.w / 2), v = PEN.v + R2(-PEN.d / 2, PEN.d / 2); if (penOk(u, v)) return [u, v]; } return [PEN.u, PEN.v]; }, ok: penOk };
   const pondOk = (u, v) => G.inPond(u, v, -0.9);
   const pondRegion = { pt: () => { for (let k = 0; k < 40; k++) { const u = G.POND.u + R2(-5, 5), v = G.POND.v + R2(-5, 5); if (pondOk(u, v)) return [u, v]; } return [G.POND.u, G.POND.v]; }, ok: pondOk };
   const herds = [
@@ -364,6 +409,10 @@ export function populateGarden(ctx, lib, player, G) {
     herd('drake', 2, pondRegion, { speed: 0.35, swim: true }),
     herd('duck', 2, pondRegion, { speed: 0.35, swim: true }),
     herd('duckling', low ? 2 : 4, pondRegion, { speed: 0.4, swim: true, follow: true }),
+    herd('pig', 2, farmRegion, { speed: 0.35, scale: (i) => (i ? 0.8 : 1) }),
+    herd('bunny', 2, penRegion, { speed: 1.1, hop: true }),
+    herd('bunnyW', low ? 1 : 2, penRegion, { speed: 1.1, hop: true }),
+    herd('bunnyD', 1, penRegion, { speed: 1.1, hop: true }),
   ];
   const _E2 = new THREE.Euler(0, 0, 0, 'ZYX'), _M = new THREE.Matrix4(), _P = new THREE.Matrix4(), _Q = new THREE.Quaternion(), _E = new THREE.Euler(), _V = new THREE.Vector3(), _S = new THREE.Vector3(), _O = new THREE.Vector3();
   const updHerd = (h, dt, T0) => {
@@ -393,7 +442,7 @@ export function populateGarden(ctx, lib, player, G) {
       const tgtHead = a.state === 'graze' ? (opts.peck ? (Math.sin(T0 * 9 + i) > 0.3 ? 1.1 : 0.2) : 0.95 + Math.sin(T0 * 3 + i) * 0.08) : Math.sin(T0 * 0.7 + i * 2) * 0.12;
       a.head += (tgtHead - a.head) * (1 - Math.exp(-dt * (opts.peck ? 18 : 4)));
       const y = opts.swim ? Y - 0.3 + Math.sin(T0 * 1.6 + i) * 0.008 : Y + H(a.u, a.v);
-      const bob = opts.swim ? 0 : Math.abs(Math.sin(a.ph)) * 0.015 * (moving > 0 ? 1 : 0);
+      const bob = opts.swim ? 0 : opts.hop ? Math.abs(Math.sin(a.ph * 0.5)) * 0.13 * (moving > 0 ? 1 : 0) : Math.abs(Math.sin(a.ph)) * 0.015 * (moving > 0 ? 1 : 0);
       _P.compose(_V.copy(W(a.u, 0, a.v)).setY(y + bob), _Q.setFromEuler(_E.set(opts.swim ? 0 : -0.04 * Math.sin(a.ph), a.yaw, opts.swim ? Math.sin(T0 * 1.3 + i) * 0.04 : 0)), _S.setScalar(a.s));
       parts.body.set(i, _P);
       _M.compose(_O.copy(g.neck), _Q.setFromEuler(_E.set(a.head, Math.sin(T0 * 0.5 + i * 3) * 0.3 * (a.state === 'idle' ? 1 : 0.2), 0)), _S.setScalar(1));
@@ -455,7 +504,8 @@ export function populateGarden(ctx, lib, player, G) {
   scene.traverse((o) => { if (o.isInstancedMesh && (o.material === animMat || o.material === wingMat)) animalMeshes.push(o); });
 
   // ---------------------------------------------------------------- mise à jour (simulée seulement à proximité du dôme)
-  let T0 = 0;
+  let T0 = 0, nightK = 0, base = null;
+  const MOON = new THREE.Color(0x6a88c8);
   const upd = (dt) => {
     const near = G.near(player.pos), inside = G.inside(player.pos);
     for (const m of animalMeshes) m.visible = near;
@@ -466,7 +516,17 @@ export function populateGarden(ctx, lib, player, G) {
     G.sky.uniforms.uDay.value = 1 - dusk;
     G.waterM.uniforms.uDay.value = 1 - dusk; G.waterM.uniforms.uT.value += dt; G.waterM.uniforms.uCam.value.copy(ctx.camera.position);
     G.sun.material.opacity = 1 - dusk;
-    for (const l of G.lightObjs) { const L = l.userData; l.visible = near; l.intensity = L.sun ? L.i * (1 - dusk * 0.85) : L.night ? L.i * (0.5 + dusk) : L.i; }
+    for (const l of G.lightObjs) { const L = l.userData; l.visible = near; l.intensity = L.sun ? L.i * (1 - dusk * 0.92) : L.night ? L.i * (0.5 + dusk * 1.5) : L.lamp ? L.i * dusk : L.i; }
+    // nuit sous la coupole : la lumière planétaire et l'ambiance de la station baissent, clair de lune bleuté
+    const LT = ctx.lights, k = (inside ? dusk : 0);
+    nightK += (k - nightK) * (1 - Math.exp(-dt * 2));
+    if (LT?.sun) {
+      if (base === null) base = { sun: LT.sun.intensity, hemi: LT.hemi?.intensity ?? 0, env: 0.85, col: LT.sun.color.clone() };
+      LT.sun.intensity = base.sun * (1 - 0.8 * nightK);
+      LT.sun.color.copy(base.col).lerp(MOON, nightK);
+      if (LT.hemi) LT.hemi.intensity = base.hemi * (1 - 0.75 * nightK);
+      ctx.scene.environmentIntensity = base.env * (1 - 0.7 * nightK);
+    }
     if (!near) { for (const c of people) c.root.visible = false; return; }
     T0 += dt;
     // équipements animés

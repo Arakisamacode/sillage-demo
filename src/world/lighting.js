@@ -47,6 +47,7 @@ export function buildLighting(ctx) {
   // ciel bleu de rebond faible, sol chaud
   const hemi = new THREE.HemisphereLight(0xb8c8de, 0x4a4a48, 0.75);
   scene.add(hemi);
+  out.hemi = hemi;
 
   // ------------------------------------------------------------- plafonniers : rampes linéaires émissives
   const lampMat = mats.emissive(0xe8f2ff, 7);

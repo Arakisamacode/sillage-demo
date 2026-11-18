@@ -42,6 +42,7 @@ import { Wingmen, PILOTS } from './game/wingmen.js';
 import { Briefing } from './ui/briefing.js';
 import { buildLuxury, populateLuxury } from './world/luxury.js';
 import { buildGarden } from './world/garden.js';
+import { buildSuperstructure } from './world/superstructure.js';
 import { populateGarden } from './world/gardenlife.js';
 import { RESTAURANTS } from './game/food.js';
 import { Cargo, buildQuai } from './game/cargo.js';
@@ -109,6 +110,7 @@ async function boot() {
   ctx.food = buildFoodCourt(ctx);
   ctx.lux = buildLuxury(ctx);
   ctx.garden = buildGarden(ctx);
+  ctx.superstructure = buildSuperstructure(ctx);
   ctx.lights = buildLighting(ctx);
   const lib = new CharacterLibrary(manager, quality);
   const libReady = lib.load(undefined, (p) => progress(0.6 + 0.3 * p, 'Chargement des personnages'));

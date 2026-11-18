@@ -71,6 +71,12 @@ export function buildExterior(ctx) {
       const ang = (a / 6) * Math.PI * 2;
       B.box(6, 72, 6, dark, [Math.cos(ang) * 84, 10 + Math.sin(ang) * 84, zr], [0, 0, ang + Math.PI / 2], { cast: false });
     }
+    // colliers de raidissement (segments pressurisés), sas entre segments
+    for (let k = 0; k < 48; k++) {
+      const a = (k / 48) * Math.PI * 2, p = new THREE.Vector3(Math.cos(a) * 120, 10 + Math.sin(a) * 120, zr);
+      const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), new THREE.Vector3(-Math.sin(a), Math.cos(a), 0));
+      B.add(new THREE.TorusGeometry(11.5, k % 4 ? 0.45 : 0.9, 6, 20), k % 4 ? hm.alt : dark, new THREE.Matrix4().compose(p, q, new THREE.Vector3(1, 1, k % 4 ? 0.6 : 1.4)), { cast: false });
+    }
     // hublots de l'anneau (petites bandes lumineuses sur la face extérieure)
     for (let i = 0; i < 90; i++) {
       const ang = R() * Math.PI * 2;

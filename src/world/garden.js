@@ -48,6 +48,7 @@ const FARM = { u0: 16.5, u1: 25, v0: -7.5, v1: 6.5 };
 const PLAY = { u: 2, v: 21 };
 const FLAT = [[-3, 4, 5.8, 7.5], [2, 21, 6.6, 8.4], [21.5, 3.2, 3.6, 5.5], [6.5, -21, 6.2, 8]];
 const VEG = { u0: 1, u1: 12, v0: -24, v1: -18 };
+const PEN = { u: -13.5, v: 17.5, w: 4.6, d: 3.4, hutch: { u: -15.1, v: 18.4 } };
 
 function grassBlades(mats) {
   // touffes d'herbe haute et fleurs sauvages : cartes texturées (canvas, transparence)
@@ -139,7 +140,7 @@ export function buildGarden(ctx) {
           vec3 n = normalize(vec3(g.x * 0.045, 1.0, g.y * 0.045));
           vec3 v = normalize(uCam - vW);
           float fr = 0.04 + 0.96 * pow(1.0 - max(dot(n, v), 0.0), 4.0);
-          vec3 sky = mix(vec3(0.95, 0.55, 0.35), vec3(0.55, 0.75, 0.95), uDay);
+          vec3 sky = mix(vec3(0.04, 0.06, 0.12), mix(vec3(0.95, 0.55, 0.35), vec3(0.55, 0.75, 0.95), smoothstep(0.5, 1.0, uDay)), smoothstep(0.0, 0.5, uDay));
           vec3 deep = mix(vec3(0.02, 0.05, 0.08), vec3(0.08, 0.28, 0.27), uDay);
           vec3 col = mix(deep, sky, fr);
           vec3 h = normalize(v + vec3(0.0, 1.0, 0.0));
@@ -219,7 +220,7 @@ export function buildGarden(ctx) {
   let rs = 7; const rnd = () => { rs = (rs * 16807) % 2147483647; return (rs - 1) / 2147483646; };
   const free = (u, v) => Math.hypot(u, v) < 26 && !inPond(u, v, 1.2) && Math.abs(Math.hypot(u, v) - 15) > 1.6 && Math.hypot(u - PLAZA.u, v - PLAZA.v) > PLAZA.r + 1 &&
     !(u > FARM.u0 - 1 && u < FARM.u1 + 1 && v > FARM.v0 - 1 && v < FARM.v1 + 1) && Math.hypot(u - PLAY.u, v - PLAY.v) > 7.5 && !(u > VEG.u0 - 1 && u < VEG.u1 + 1 && v > VEG.v0 - 1 && v < VEG.v1 + 1) &&
-    Math.hypot(u + 18, v - 13) > 3;
+    Math.hypot(u + 18, v - 13) > 3 && !(Math.abs(u - PEN.u) < PEN.w / 2 + 1.2 && Math.abs(v - PEN.v) < PEN.d / 2 + 1.2);
   for (let k = 0; k < (low ? 70 : 160); k++) { const u = (rnd() - 0.5) * 52, v = (rnd() - 0.5) * 52; if (free(u, v)) tuft(u, v, 0.8 + rnd() * 0.6); }
   const plants = ['fern_02', 'shrub_02', 'shrub_04', 'flower_gazania', 'flower_empodium', 'flower_ursinia', 'wild_rooibos_bush'];
   for (let k = 0, n = 0; k < 400 && n < (low ? 22 : 48); k++) {
@@ -418,6 +419,26 @@ export function buildGarden(ctx) {
     box(1.6, 0.4, 0.5, post, W(19, fh(19, -5.5) + 0.2, -5.5), 0, true); box(1.5, 0.02, 0.4, mats.glass(0x6aa8c8, 0.6), W(19, fh(19, -5.5) + 0.36, -5.5));
     ph('wooden_bucket_01', 20.4, -5.2, { fit: ['y', 0.45] }); ph('wicker_basket_02', 18, 4.8, { fit: ['x', 0.4] });
     out.farmZone = { u0: u0 + 0.8, u1: u1 - 0.8, v0: v0 + 0.8, v1: v1 - 0.8, barn: { u: bu, v: bv } };
+    // bauge des cochons (boue) au fond de l'enclos
+    { const mud = new THREE.CircleGeometry(1.7, 24); mud.rotateX(-Math.PI / 2); add(mud, mats.ph('raked_dirt', 0x4a3424, { rough: 0.75, metal: 0, grime: 0, scratch: 0, floor: 0 }), M4(W(21.8, fh(21.8, -4.6) + 0.03, -4.6), 0, [1.2, 1, 0.8])); }
+    // enclos des lapins (près de l'aire de jeux) : clôture basse, clapier, foin, carottes
+    {
+      const { u, v, w, d, hutch } = PEN, ph0 = (a, b) => fh(a, b);
+      for (const [a, b, c2, e] of [[u - w / 2, v - d / 2, u + w / 2, v - d / 2], [u + w / 2, v - d / 2, u + w / 2, v + d / 2], [u + w / 2, v + d / 2, u - w / 2, v + d / 2], [u - w / 2, v + d / 2, u - w / 2, v - d / 2]]) {
+        const L = Math.hypot(c2 - a, e - b), ang = Math.atan2(e - b, c2 - a), n = Math.ceil(L / 0.9);
+        for (let k = 0; k <= n; k++) { const t = k / n, pu = a + (c2 - a) * t, pv = b + (e - b) * t; box(0.07, 0.6, 0.07, post, W(pu, ph0(pu, pv) + 0.3, pv)); }
+        for (const y of [0.2, 0.48]) { const mu = (a + c2) / 2, mv = (b + e) / 2; box(L, 0.06, 0.03, planks, W(mu, ph0(mu, mv) + y, mv), -ang); }
+        const mu = (a + c2) / 2, mv = (b + e) / 2; B.colliderBox(L, 1.0, 0.25, W(mu, ph0(mu, mv) + 0.5, mv).toArray(), [0, -ang, 0]);
+      }
+      const hh = ph0(hutch.u, hutch.v);
+      box(1.1, 0.55, 0.8, planks, W(hutch.u, hh + 0.38, hutch.v)); box(1.25, 0.06, 0.95, roof, W(hutch.u, hh + 0.7, hutch.v), 0);
+      for (const s2 of [-1, 1]) box(0.06, 0.1, 0.06, post, W(hutch.u + s2 * 0.5, hh + 0.05, hutch.v));
+      box(0.4, 0.3, 0.02, mats.paint(0x1a1210, { plain: true }), W(hutch.u + 0.15, hh + 0.33, hutch.v + 0.41));
+      add(new THREE.CylinderGeometry(0.35, 0.4, 0.25, 12), mats.paint(0xd8b860, { plain: true, rough: 0.95 }), M4(W(u + 1.4, ph0(u + 1.4, v - 1) + 0.12, v - 1)));
+      for (let k = 0; k < 5; k++) { const cu = u + 0.6 + k * 0.12, cv = v + 0.9; add(new THREE.ConeGeometry(0.02, 0.14, 6), mats.plastic(0xff7a1a, 0.6), M4(W(cu, ph0(cu, cv) + 0.025, cv), k, [1, 1, 1], Math.PI / 2, 0)); }
+      add(new THREE.CylinderGeometry(0.12, 0.1, 0.06, 14), steel, M4(W(u - 0.8, ph0(u - 0.8, v - 1.1) + 0.03, v - 1.1)));
+      out.rabbitPen = PEN;
+    }
     const nt = neonTexture('FERME DU DÔME', '#ffd27a', { size: 60 });
     const sg = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 1.6 / nt.aspect), new THREE.MeshStandardMaterial({ map: nt.tex, transparent: true }));
     sg.position.copy(W(u0 - 0.1, fh(u0, 1) + 1.45, 1)); sg.rotation.y = -Math.PI / 2; scene.add(sg);
@@ -453,6 +474,7 @@ export function buildGarden(ctx) {
     cyl(0.04, 0.06, 1.6, mats.paint(0x2a2a2a, { plain: true }), W(u, h0 + 0.8, v), 8);
     ph('wooden_lantern_01', u, v, { fit: ['y', 0.42], dy: 1.6 });
     add(new THREE.SphereGeometry(0.07, 8, 6), glow(0xffc070, 3), M4(W(u, h0 + 1.78, v)));
+    out.lights.push({ pos: W(u, h0 + 1.9, v), color: 0xffb060, i: 9, d: 8, lamp: 1 });
   }
 
   // ---------------------------------------------------------------- coupole : vitrage, nervures, ciel artificiel, soleil
@@ -478,7 +500,7 @@ export function buildGarden(ctx) {
           return mix(mix(hsh(i), hsh(i + vec2(1, 0)), f.x), mix(hsh(i + vec2(0, 1)), hsh(i + vec2(1, 1)), f.x), f.y); }
         float fbm(vec2 p){ float a = 0.5, s = 0.0; for (int k = 0; k < 4; k++) { s += a * vn(p); p *= 2.03; a *= 0.5; } return s; }
         void main(){ float h = clamp(vP.y, 0.0, 1.0);
-          vec3 day = mix(vec3(0.58,0.78,0.96), vec3(0.16,0.40,0.85), pow(h, 0.8));
+          vec3 day = mix(vec3(0.46,0.68,0.94), vec3(0.14,0.36,0.82), pow(h, 0.7));
           vec3 dusk = mix(vec3(1.0,0.52,0.28), vec3(0.22,0.16,0.42), pow(h, 0.7));
           float d = smoothstep(0.25, 0.75, uDay);
           vec3 col = mix(dusk, day, d);
@@ -490,7 +512,7 @@ export function buildGarden(ctx) {
     });
     const skyM = new THREE.Mesh(new THREE.SphereGeometry(1, 64, 24, 0, Math.PI * 2, 0, Math.PI / 2), sky);
     skyM.scale.set(R - 0.3, H - 0.3, R - 0.3); skyM.position.copy(C); skyM.renderOrder = 1; scene.add(skyM);
-    const glassD = new THREE.MeshPhysicalMaterial({ color: 0xcfe8ff, roughness: 0.03, transparent: true, opacity: 0.05, side: THREE.FrontSide, depthWrite: false, envMapIntensity: 1.6, fog: false });
+    const glassD = new THREE.MeshPhysicalMaterial({ color: 0xcfe8ff, roughness: 0.03, transparent: true, opacity: 0.05, side: THREE.FrontSide, depthWrite: false, envMapIntensity: 0.5, specularIntensity: 0.35, fog: false });
     const dome = new THREE.Mesh(new THREE.SphereGeometry(1, 72, 24, 0, Math.PI * 2, 0, Math.PI / 2), glassD);
     dome.scale.set(R, H, R); dome.position.copy(C); dome.renderOrder = 2; scene.add(dome);
     // soleil artificiel (disque lumineux au zénith)

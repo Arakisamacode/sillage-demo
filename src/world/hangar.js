@@ -515,20 +515,55 @@ function signage(scene, mats) {
 
 function exterior(B, mats) {
   // grands bras de la station, vus dans l'encadrement de la baie
-  const hull = mats.metal(0x3a3f44, { rough: 0.65, grime: 0.4 });
+  const hull = mats.paint(0x5d6368, { grime: 0.8, scratch: 0.6, rust: 0.1 });
+  const hullD = mats.paint(0x464b50, { grime: 0.9, scratch: 0.7, rust: 0.12 });
   const dark = mats.metal(0x202427, { rough: 0.8 });
-  // structure en surplomb au-dessus de la baie
-  B.box(90, 6, 30, hull, [0, H + 3, Z_BAY - 15], null, { cast: true, receive: true });
-  // pylône gauche et droit avec treillis
+  const steel = mats.metal(0x6a7074, { rough: 0.45, grime: 0.5 });
+  const lamp = mats.emissive(0xffc070, 5), red = mats.emissive(0xff2a10, 8), white = mats.emissive(0xffffff, 6);
+  const o = { cast: false };
+  const rod = (a, b, r = 0.18, m = steel) => B.tube([a, b], r, m, { smooth: false, radial: 6, segments: 1, cast: false });
+  // structure en surplomb au-dessus de la baie (caisson plaqué, nervures, feux de bord)
+  B.box(90, 6, 30, hull, [0, H + 3, Z_BAY - 15], null, { cast: true, receive: true, tex: 6 });
+  for (let x = -42; x <= 42; x += 7) B.box(0.6, 6.4, 30.4, hullD, [x, H + 3, Z_BAY - 15], null, o);
+  for (let x = -40; x <= 40; x += 10) B.box(0.5, 0.3, 0.5, lamp, [x, H - 0.1, Z_BAY - 29.9], null, o);
+  // pylônes d'approche en treillis (4 membrures, cadres tous les 6 m, croisillons), bras d'amarrage en poutre Warren
   for (const s of [-1, 1]) {
-    B.box(10, 60, 10, hull, [s * 70, -10, Z_BAY - 70]);
-    for (let y = -30; y < 20; y += 6) B.box(14, 0.8, 14, dark, [s * 70, y, Z_BAY - 70], null, { cast: false });
-    B.box(4, 4, 120, hull, [s * 70, 18, Z_BAY - 60]);
-    B.box(0.8, 0.8, 0.8, mats.emissive(0xff2a10, 8), [s * 70, 20.4, Z_BAY - 118], null, { cast: false });
+    const cx = s * 70, cz = Z_BAY - 70, y0 = -40, y1 = 20, hw = 4;
+    const C = [[-hw, -hw], [hw, -hw], [hw, hw], [-hw, hw]];
+    for (const [dx, dz] of C) B.cyl(0.55, 0.55, y1 - y0, hull, [cx + dx, (y0 + y1) / 2, cz + dz], null, { cast: false, seg: 8 });
+    for (let y = y0 + 2; y <= y1; y += 6) {
+      for (let k = 0; k < 4; k++) { const [ax, az] = C[k], [bx, bz] = C[(k + 1) % 4]; rod([cx + ax, y, cz + az], [cx + bx, y, cz + bz], 0.28, hullD); }
+      if (y + 6 <= y1) for (let k = 0; k < 4; k++) { const [ax, az] = C[k], [bx, bz] = C[(k + 1) % 4]; rod([cx + ax, y, cz + az], [cx + bx, y + 6, cz + bz]); rod([cx + bx, y, cz + bz], [cx + ax, y + 6, cz + az]); }
+    }
+    // nœud de tête, local technique, balise et antenne
+    B.box(11, 3, 11, hull, [cx, y1 + 1.5, cz], null, { cast: false, tex: 6 });
+    B.box(6, 2.2, 5, hullD, [cx, y1 + 4.1, cz], null, o);
+    for (const dz of [-1.5, 0, 1.5]) B.box(0.05, 0.4, 0.9, mats.emissive(0xffd9a8, 2.2), [cx - s * 3.03, y1 + 4.2, cz + dz], null, o);
+    B.cyl(0.12, 0.12, 9, dark, [cx, y1 + 9.7, cz], null, { cast: false, seg: 6 });
+    B.box(0.6, 0.6, 0.6, red, [cx, y1 + 14.4, cz], null, o);
+    // bras : 4 membrures, montants et diagonales, caillebotis, feux de balisage
+    const z0 = cz + 5, z1 = Z_BAY - 2, ya = 16, yb = 20, w = 2.2;
+    for (const [dx, y] of [[-w, ya], [w, ya], [-w, yb], [w, yb]]) rod([cx + dx, y, z0], [cx + dx, y, z1], 0.35, hull);
+    for (let z = z0, k = 0; z < z1 - 1; z += 6, k++) {
+      for (const dx of [-w, w]) { rod([cx + dx, ya, z], [cx + dx, yb, z], 0.2); rod([cx + dx, k % 2 ? ya : yb, z], [cx + dx, k % 2 ? yb : ya, z + 6]); }
+      rod([cx - w, yb, z], [cx + w, yb, z], 0.2); rod([cx - w, ya, z], [cx + w, ya, z], 0.2);
+      if (k % 2 === 0) B.box(0.4, 0.4, 0.4, lamp, [cx - s * (w + 0.3), ya - 0.2, z], null, o);
+    }
+    B.box(w * 2 - 0.4, 0.15, z1 - z0, mats.grating ? mats.grating() : dark, [cx, ya + 0.1, (z0 + z1) / 2], null, o);
+    // feux d'approche en bout de bras (clignotants rouges et blancs)
+    B.box(1.4, 1.4, 1.4, hullD, [cx, yb + 0.6, z0 - 1.2], null, o);
+    B.box(0.8, 0.8, 0.8, red, [cx, yb + 1.7, z0 - 1.2], null, o);
+    for (const dx of [-1, 1]) B.box(0.5, 0.5, 0.5, white, [cx + dx * 1.2, ya, z0 - 1.2], null, o);
   }
-  // anneau d'amarrage en contrebas
-  B.box(200, 4, 20, dark, [0, -26, Z_BAY - 40]);
-  for (let x = -90; x <= 90; x += 15) B.box(1.2, 0.6, 0.6, mats.emissive(0xffc070, 5), [x, -23.7, Z_BAY - 30], null, { cast: false });
+  // anneau d'amarrage en contrebas : caisson plaqué, pinces d'amarrage, rampes lumineuses
+  B.box(200, 4, 20, hull, [0, -26, Z_BAY - 40], null, { cast: false, tex: 6 });
+  for (let x = -96; x <= 96; x += 8) B.box(0.6, 4.4, 20.4, hullD, [x, -26, Z_BAY - 40], null, o);
+  for (const z of [Z_BAY - 49.5, Z_BAY - 30.5]) B.box(200, 0.6, 0.6, hullD, [0, -23.9, z], null, o);
+  for (let x = -90; x <= 90; x += 15) {
+    B.box(1.2, 0.6, 0.6, lamp, [x, -23.7, Z_BAY - 30], null, o);
+    B.box(3, 1.6, 3, dark, [x + 7.5, -23.2, Z_BAY - 40], null, o);
+    B.box(0.8, 2.2, 0.8, steel, [x + 7.5, -21.6, Z_BAY - 40], null, o);
+  }
 }
 
 // ====================================================================== marquages au sol
