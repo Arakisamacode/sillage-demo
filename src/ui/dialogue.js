@@ -129,7 +129,7 @@ export class Dialogue {
     cam.position.copy(this.cam.pos); cam.lookAt(this.cam.look);
     // l'interlocuteur se tourne vers le joueur et le regarde
     const yaw = Math.atan2(to.x, to.z);
-    if (!c.seated) { let d = yaw - c.root.rotation.y; d = Math.atan2(Math.sin(d), Math.cos(d)); c.root.rotation.y += d * (1 - Math.exp(-dt * 3)); }
+    if (!/^sit/.test(c.override || '')) { let d = yaw - c.root.rotation.y; d = Math.atan2(Math.sin(d), Math.cos(d)); c.root.rotation.y += d * (1 - Math.exp(-dt * 3)); }
     c.lookAt(cam.position);
   }
 

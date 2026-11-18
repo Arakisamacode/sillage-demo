@@ -116,16 +116,71 @@ export class Audio {
   // --------------------------------------------------------------------------- annonces
   /** annonce libre (carillon + voix) */
   say(text) { this._sayText = text; this.announce('custom'); }
-  /** Réplique d'un personnage (voix de synthèse sans carillon) ; v : { pitch, rate }. */
+  /**
+   * Réplique d'un personnage ; v : { pitch, rate, idx }. Mode (réglage « Voix des personnages ») :
+   * auto (meilleure voix française du système, sinon voix stylisée), synth, stylized (voix inventée façon
+   * « langage de jeu », toujours disponible), off (sous-titres seuls).
+   */
   speakAs(text, v = {}) {
-    if (!this.enabled || !window.speechSynthesis || !window.SpeechSynthesisUtterance) return;
-    speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(text.replace(/[«»]/g, ''));
-    u.lang = 'fr-FR'; u.rate = v.rate ?? 1.0; u.pitch = v.pitch ?? 1.0; u.volume = 0.8;
-    const vs = speechSynthesis.getVoices().filter((x) => x.lang && x.lang.startsWith('fr'));
-    if (vs.length) u.voice = vs[(v.idx ?? 0) % vs.length];
-    speechSynthesis.speak(u);
+    if (!this.enabled) return;
+    const mode = this.voiceMode || 'auto';
+    if (mode === 'off') return;
+    const clean = text.replace(/[«»]/g, '');
+    const voice = mode === 'stylized' ? null : this._bestVoice(v.idx ?? 0);
+    if (window.speechSynthesis) speechSynthesis.cancel();
+    this._stopBabble();
+    if (voice) {
+      const u = new SpeechSynthesisUtterance(clean);
+      u.lang = 'fr-FR'; u.rate = v.rate ?? 1.0; u.pitch = v.pitch ?? 1.0; u.volume = 0.85; u.voice = voice;
+      u.onerror = () => this._babble(clean, v);
+      speechSynthesis.speak(u);
+    } else this._babble(clean, v);
   }
+  /** Voix françaises du système, les plus naturelles en premier (neuronales, « premium », en ligne). */
+  _bestVoice(idx) {
+    if (!window.speechSynthesis || !window.SpeechSynthesisUtterance) return null;
+    const all = speechSynthesis.getVoices();
+    if (!all.length && !this._vwait) { this._vwait = true; speechSynthesis.addEventListener?.('voiceschanged', () => { this._vlist = null; }); }
+    if (!this._vlist || this._vlist.n !== all.length) {
+      const score = (x) => (/natural|neural|premium|enhanced|online|google|wavenet/i.test(x.name) ? 10 : 0) + (x.localService ? 0 : 2) + (x.lang === 'fr-FR' ? 1 : 0);
+      this._vlist = all.filter((x) => x.lang && x.lang.toLowerCase().startsWith('fr')).sort((a, b) => score(b) - score(a));
+      this._vlist.n = all.length;
+    }
+    const L = this._vlist;
+    if (!L.length) return null;
+    const good = L.filter((x) => /natural|neural|premium|enhanced|online|google|wavenet/i.test(x.name));
+    const pool = good.length ? good : L;
+    return pool[idx % pool.length];
+  }
+  /** Voix stylisée : syllabes synthétisées (impulsions glottiques filtrées par deux formants de voyelle). */
+  _babble(text, v = {}) {
+    if (!this.ac) return;
+    const ac = this.ac, f0 = 105 * (v.pitch ?? 1) * (v.pitch > 1.05 ? 1.6 : 1), rate = v.rate ?? 1;
+    const V = { a: [800, 1250], e: [420, 2000], i: [300, 2300], o: [470, 820], u: [330, 750], y: [300, 1900] };
+    let t = ac.currentTime + 0.05;
+    const out = ac.createGain(); out.gain.value = 0.22; out.connect(this.master);
+    this._bab = out;
+    const words = text.slice(0, 260).split(/\s+/);
+    for (const w of words) {
+      const vowels = (w.toLowerCase().normalize('NFD').match(/[aeiouy]/g) || ['e']).slice(0, 4);
+      for (const vw of vowels) {
+        const d = (0.075 + Math.random() * 0.05) / rate;
+        const o = ac.createOscillator(); o.type = 'sawtooth';
+        const base = f0 * (0.92 + Math.random() * 0.16);
+        o.frequency.setValueAtTime(base, t); o.frequency.linearRampToValueAtTime(base * (0.9 + Math.random() * 0.2), t + d);
+        const g = ac.createGain(); g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(1, t + 0.012); g.gain.setValueAtTime(1, t + d * 0.7); g.gain.linearRampToValueAtTime(0, t + d);
+        const [F1, F2] = V[vw] || V.e;
+        const b1 = ac.createBiquadFilter(); b1.type = 'bandpass'; b1.frequency.value = F1; b1.Q.value = 6;
+        const b2 = ac.createBiquadFilter(); b2.type = 'bandpass'; b2.frequency.value = F2; b2.Q.value = 9;
+        const m = ac.createGain(); m.gain.value = 0.6;
+        o.connect(g); g.connect(b1).connect(out); g.connect(b2).connect(m).connect(out);
+        o.start(t); o.stop(t + d + 0.02);
+        t += d * 0.92;
+      }
+      t += (/[.,;:!?…]$/.test(w) ? 0.22 : 0.05) / rate;
+    }
+  }
+  _stopBabble() { if (this._bab) { try { this._bab.gain.setTargetAtTime(0, this.ac.currentTime, 0.02); } catch { /* */ } this._bab = null; } }
 
   announce(kind) {
     if (!this.ac || !this.enabled) return;

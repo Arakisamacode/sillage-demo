@@ -73,6 +73,7 @@ export class Agent {
   }
 
   update(dt, player) {
+    if (this.char.inDialog) { this.char.setSpeed(0); return; }   // en conversation avec le joueur
     if (!this.task) this._next();
     const t = this.task;
     t.t += dt;

@@ -94,7 +94,7 @@ export function buildFurnish(ctx) {
   const news = new Screen(320, 180, (c, w, h, t) => {
     c.fillStyle = '#0a0e14'; c.fillRect(0, 0, w, h);
     c.fillStyle = '#ffb84a'; c.font = `700 15px ${FONT}`; c.fillText('INFOS HALDEN', 12, 22);
-    const lines = ['Convoi de Lys : arrivée prévue aire 05', 'Cours du titane en hausse à Lys', 'Ceinture d\'Ardent : pirates signalés', 'Bar La Comète : soirée musique 22 h'];
+    const lines = ctx.newsLines?.() || ['Convoi de Lys : arrivée prévue aire 05', 'Cours du titane en hausse à Lys', 'Ceinture d\'Ardent : pirates signalés', 'Bar La Comète : soirée musique 22 h'];
     const i = Math.floor((t || 0) / 6) % lines.length;
     c.fillStyle = '#f2f2f2'; c.font = `500 14px ${FONT}`; c.fillText(lines[i], 12, 70); c.fillText(lines[(i + 1) % lines.length], 12, 100);
     c.fillStyle = '#5fe6ff'; c.fillRect(12, 150, ((t || 0) % 6) / 6 * 296, 4);

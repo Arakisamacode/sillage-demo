@@ -34,6 +34,7 @@ import { Models } from './world/models.js';
 import { Dialogue } from './ui/dialogue.js';
 import { Story } from './game/story.js';
 import { Scanner, nameFor } from './ui/scanner.js';
+import { peopleTree } from './game/chatter.js';
 import { buildLuxury, populateLuxury, LUX_Y } from './world/luxury.js';
 import { RESTAURANTS } from './game/food.js';
 import { Cargo, buildQuai } from './game/cargo.js';
@@ -217,6 +218,7 @@ async function boot() {
     const npc = (c, plan, active) => { const n = { c, plan, active, q: [], pos: c.root.position.clone(), t: 0 }; npcs.push(n); return n; };
     const turn = (c, yaw, dt, k = 6) => { let dy = yaw - c.root.rotation.y; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); c.root.rotation.y += dy * (1 - Math.exp(-dt * k)); };
     const stepNpc = (n, dt) => {
+      if (n.c.inDialog) { n.c.setSpeed(0); return; }
       if (!n.q.length) n.q = n.plan(n);
       const s = n.q[0], c = n.c;
       if (!s) return;
@@ -251,7 +253,7 @@ async function boot() {
         if (r < 0.65) return [{ move: st.stove2, speed: 1.0 }, { anim: 'pickup', dur: 2.4, face: st.faceKitchen }, { move: st.counterSpot, speed: 1.0 }];
         return [{ anim: Math.random() < 0.6 ? 'talk' : 'idle', dur: R2(3, 6), face: st.faceRoom }];
       }, () => ctx.time.open(st.r.id));
-      cook.cook = true;
+      cook.cook = true; cook.stall = st;
       st.line = [];
     });
 
@@ -508,6 +510,7 @@ async function boot() {
       { p: V(-114, -11), wait: 6, anim: 'idle', face: -Math.PI / 2 }, { p: V(-109, -4), wait: 0 }, { p: V(-98.5, 0.6), wait: 4, anim: 'idle', face: 0 }, { p: V(-104, -2), wait: 0 }]);
     const stepWalkers = (dt) => {
       for (const w of walkers) {
+        if (w.c.inDialog) { w.c.setSpeed(0); continue; }
         const T = w.route[w.i];
         if (w.pause > 0) {
           w.pause -= dt; w.c.setSpeed(0);
@@ -800,6 +803,10 @@ async function boot() {
   $('go').addEventListener('click', start);
   $('quality').addEventListener('change', (e) => { saveQuality(e.target.value); location.reload(); });
   $('sound').addEventListener('change', (e) => audio.setEnabled(e.target.checked));
+  // voix des personnages (réglage mémorisé) : auto, système, stylisée, sous-titres seuls
+  { const vm = $('voicemode'); let saved = null; try { saved = localStorage.getItem('sillage.voice'); } catch { /* */ }
+    if (saved) vm.value = saved; audio.voiceMode = vm.value;
+    vm.addEventListener('change', () => { audio.voiceMode = vm.value; try { localStorage.setItem('sillage.voice', vm.value); } catch { /* */ } audio.speakAs('Bonjour, pilote. Voici ma voix.', { pitch: 1, rate: 1 }); }); }
   const openMenu = () => {
     running = false; input.enabled = false;
     $('start').classList.remove('hidden'); $('touch').classList.add('hidden');
@@ -893,7 +900,9 @@ async function boot() {
     mira: { c: ctx.lux.npcs.concierge, name: 'Mira Castel', role: 'Conciergerie · La Couronne', voice: { pitch: 1.2, rate: 1.0, idx: 0 } },
     irena: { c: ctx.lux.npcs.irena, name: 'Iréna Solvay', role: 'Prévisionniste', voice: { pitch: 1.05, rate: 0.93, idx: 0 } },
   };
-  story.irena = NPC.irena; ctx.NPC = NPC;
+  story.irena = NPC.irena; ctx.NPC = NPC; story.aldric = ctx.lux.npcs.aldric;
+  ctx.newsLines = () => story.news();
+  const isAldric = (c) => c === ctx.lux.npcs.aldric && story.q.ch2 >= 1;
   interactables.push({ pos: HB.bar, r: 1.6, label: 'E — Parler à Joss (barman)', fn: () => talk(NPC.joss, story.jossTree()) });
   interactables.push({ pos: HB.clinic, r: 1.6, label: 'E — Parler au Dr Salek', fn: () => talk(NPC.salek, story.doctorTree()) });
   interactables.push({ pos: ctx.lux.spots.concierge.customer, r: 1.6, label: 'E — Parler à Mira (conciergerie)', fn: () => talk(NPC.mira, story.conciergeTree()) });
@@ -914,13 +923,47 @@ async function boot() {
   const ROLE = { voyageur: 'Voyageur', entretien: 'Agent d\'entretien' };
   const scanPeople = () => {
     const L = [];
-    for (const a of crowd.agents) if (!a.away && a.char) L.push({ obj: a.char.root, name: nameFor(a.id + 11), role: ROLE[a.role] || (a.role ? a.role[0].toUpperCase() + a.role.slice(1) : 'Résident') });
-    (ctx.deckNpcs || []).forEach((n, i) => L.push({ obj: n.c.root, name: nameFor(i + 101), role: n.cook ? 'Cuisinier · Cour des Saveurs' : n.cust ? (n.meal ? 'Client · en train de manger' : 'Client · Cour des Saveurs') : 'Résident' }));
+    for (const a of crowd.agents) if (!a.away && a.char) L.push({ obj: a.char.root, name: nameFor(a.id + 11, a.char), role: ROLE[a.role] || (a.role ? a.role[0].toUpperCase() + a.role.slice(1) : 'Résident') });
+    (ctx.deckNpcs || []).forEach((n, i) => L.push({ obj: n.c.root, name: nameFor(i + 101, n.c), role: n.cook ? 'Cuisinier · Cour des Saveurs' : n.cust ? (n.meal ? 'Client · en train de manger' : 'Client · Cour des Saveurs') : 'Résident' }));
     const named = new Map(Object.values(NPC).map((x) => [x.c, x]));
-    (ctx.habitatPeople || []).forEach((c, i) => L.push({ obj: c.root, name: named.get(c)?.name || nameFor(i + 201), role: named.get(c)?.role || 'Résident du pont habitat' }));
-    (ctx.luxPeople || []).forEach((c, i) => L.push({ obj: c.root, name: named.get(c)?.name || nameFor(i + 301), role: named.get(c)?.role || 'La Couronne' }));
+    (ctx.habitatPeople || []).forEach((c, i) => L.push({ obj: c.root, name: named.get(c)?.name || nameFor(i + 201, c), role: named.get(c)?.role || 'Résident du pont habitat' }));
+    (ctx.luxPeople || []).forEach((c, i) => L.push({ obj: c.root, name: isAldric(c) ? 'Aldric Venn' : named.get(c)?.name || nameFor(i + 301, c), role: isAldric(c) ? 'financier · transferts chiffrés vers Ardent ⚠' : named.get(c)?.role || 'La Couronne' }));
     return L;
   };
+  // ------------------------------------------------------------------ parler à n'importe qui (E près d'une personne)
+  const shopOf = (p) => { let best = null, bd = 64; for (const [id, sp] of Object.entries(ctx.shopSpots || {})) { const d = sp.customer.distanceToSquared(p); if (d < bd) { bd = d; best = id; } } return best; };
+  const talkers = () => {
+    const L = [], named = new Set(Object.values(NPC).map((x) => x.c));
+    for (const a of crowd.agents) if (!a.away && a.char && a.char.root.visible) {
+      const sid = a.role === 'commerçant' ? shopOf(a.pos) : null;
+      L.push({ c: a.char, key: a.id + 11, name: sid && VENDORS[sid] ? VENDORS[sid] : nameFor(a.id + 11, a.char), role: a.role, shop: sid ? STORES[sid].label : null, disp: sid ? `${STORES[sid].label}` : ROLE[a.role] || a.role });
+    }
+    (ctx.deckNpcs || []).forEach((n, i) => { if (n.c.root.visible) L.push({ c: n.c, key: i + 101, name: nameFor(i + 101, n.c), role: n.cook ? 'cuisinier' : 'client · cour', resto: n.stall?.r.name, dish: n.stall?.r.dishes[0][0].toLowerCase(), disp: n.cook ? `Cuisinier · ${n.stall?.r.label}` : 'Client · Cour des Saveurs' }); });
+    (ctx.habitatPeople || []).forEach((c, i) => { if (c.root.visible && !named.has(c)) L.push({ c, key: i + 201, name: nameFor(i + 201, c), role: 'résident', disp: 'Résident du pont habitat' }); });
+    (ctx.luxPeople || []).forEach((c, i) => { if (c.root.visible && !named.has(c) && !c.noTalk) L.push(isAldric(c) ? { c, key: 999, name: 'Aldric Venn', role: 'couronne', disp: 'Financier · investissements orbitaux', special: 'aldric' } : { c, key: i + 301, name: nameFor(i + 301, c), role: c.talkRole || 'couronne', disp: c.talkRole === 'personnel' ? 'Personnel de La Couronne' : 'Clientèle de La Couronne' }); });
+    return L;
+  };
+  const talkAny = { pos: new THREE.Vector3(), r: 2.2, label: '', target: null, when: () => !!talkAny.target, fn: () => {
+    const T = talkAny.target; if (!T) return;
+    const fem = /^UF/.test(T.c.name || '');
+    talk({ c: T.c, name: T.name, role: T.disp, voice: { pitch: fem ? 1.15 : 0.85, rate: 1.0, idx: T.key } }, T.special === 'aldric' ? story.aldricTree() : peopleTree(T, { story, game, toast }));
+  } };
+  let talkAcc = 0;
+  ctx.updaters.push((dt) => {
+    if ((talkAcc += dt) < 0.15 || dialog.active) return;
+    talkAcc = 0; talkAny.target = null;
+    const P = player.pos, fw = new THREE.Vector3(-Math.sin(player.yaw), 0, -Math.cos(player.yaw));
+    let best = 3.2;
+    for (const T of talkers()) {
+      const p = T.c.root.position, d = Math.hypot(p.x - P.x, p.z - P.z);
+      if (d > 1.9 || Math.abs(p.y - P.y) > 1.5) continue;
+      const dot = ((p.x - P.x) * fw.x + (p.z - P.z) * fw.z) / Math.max(d, 0.01);
+      const sc = d - dot;
+      if (dot > 0.25 && sc < best) { best = sc; talkAny.target = T; }
+    }
+    if (talkAny.target) { talkAny.pos.copy(P); talkAny.label = `E — Parler à ${talkAny.target.name} (${talkAny.target.disp})`; }
+  });
+  interactables.push(talkAny); ctx.talkAny = talkAny;
   let inShop = null;
   const VENDORS = { nouilles: 'Mei', armes: 'Bastien Kestrel', pieces: 'Oriane', pharma: 'Dr Salek', combis: 'Ines Vega' };
   function shopGreeting() {

@@ -159,6 +159,20 @@ et redescendent à la galerie. Le cuisinier vient servir quand un client attend.
   que la station s'effondrera dans quarante ans. Porter son noyau de calcul à la station agricole Lys (se poser),
   protéger la diffusion contre trois intercepteurs (combat spatial, transmissions radio avec portrait), revenir
   et choisir : rendre la projection publique ou la confier au Conseil (30 000 ¤). Objectif affiché en haut à gauche.
+- **Tout le monde parle** : E près de n'importe quelle personne (commerçants, mécaniciens, sécurité, voyageurs,
+  cuisiniers, clients de la Cour, résidents, clientèle et personnel de La Couronne). Répliques selon le métier et le
+  tempérament (aimable, pressé, méfiant, bavard), rumeurs qui mènent aux quêtes, avis qui changent selon vos choix.
+  La personne s'arrête, se tourne vers vous ; les clients attablés restent assis.
+- **Voix** (réglage « Voix » du menu) : Auto (meilleure voix française du système, sinon voix stylisée), Système,
+  Stylisée (voix inventée synthétisée, disponible sur tous les appareils), Sous-titres seuls.
+- **Quêtes secondaires** : la liqueur d'aurélite de Joss (Plateforme Ardent-3, 2 500 ¤) ; le sérum du Dr Salek
+  (station agricole Lys, 3 000 ¤ et une trousse de soins).
+- **Chapitre 2 « Les Fils de la Brèche »** (après L'Équation de Halden) : la sphère révèle qu'un client de La Couronne
+  finance les pirates. Le démasquer au salon du Zénith (mode analyse), puis choisir : le livrer à la sécurité, accepter
+  son pot-de-vin (15 000 ¤) ou, avec assez de Sérénité, le convaincre de financer l'escorte des convois. Intercepter
+  ensuite le cargo pirate (détruire ou aborder), faire son rapport (40 000 ¤).
+- **Conséquences visibles** : l'écran d'actualités du hall et les conversations des habitants reflètent vos choix
+  (courbe publiée ou confiée au Conseil, sort du financier).
 - **Mode analyse** (C, bouton SCAN) : filtre holographique et balayage, nom et fonction des personnes, points
   d'interaction, éléments remarquables à analyser (vaisseaux, yacht, sculpture, sphère, coupole, Cour des Saveurs)
   qui enrichissent le **codex** (K) : lieux, vaisseaux, culture, factions.

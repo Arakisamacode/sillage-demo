@@ -459,9 +459,9 @@ export function populateLuxury(ctx, lib, player, L) {
     c.root.visible = false; scene.add(c.root); people.push(c); return c;
   };
   // mannequins vivants sur podiums tournants (Maison Élysée)
-  for (const m of L.mannequins) { const c = mk(m.k * 2, RICH[m.k], m.p.clone().setY(LUX_Y + 0.22), m.face, null); spin.push({ c, sp: 0.18 }); }
+  for (const m of L.mannequins) { const c = mk(m.k * 2, RICH[m.k], m.p.clone().setY(LUX_Y + 0.22), m.face, null); c.noTalk = true; spin.push({ c, sp: 0.18 }); }
   // combinaisons de haute technologie dans les vitrines (Nova Atelier)
-  for (const s of L.suits) { const c = mk(s.k + 1, { top: 0x1a1c20, bottom: 0x1a1c20, boot: 0x0a0a0a, accent: LUX_SUITS[s.k].accent, gloves: true }, s.p, s.face, null, { armor: LUX_SUITS[s.k], armorShadows: false }); spin.push({ c, sp: -0.25 }); }
+  for (const s of L.suits) { const c = mk(s.k + 1, { top: 0x1a1c20, bottom: 0x1a1c20, boot: 0x0a0a0a, accent: LUX_SUITS[s.k].accent, gloves: true }, s.p, s.face, null, { armor: LUX_SUITS[s.k], armorShadows: false }); c.noTalk = true; spin.push({ c, sp: -0.25 }); }
   // ---------------------------------------------------------------- moteur de routines (déplacements, actions, attentes)
   const turnTo0 = (c, yaw, dt, k = 6) => { let d = yaw - c.root.rotation.y; d = Math.atan2(Math.sin(d), Math.cos(d)); c.root.rotation.y += d * (1 - Math.exp(-dt * k)); };
   const step = (n, dt) => {
@@ -532,11 +532,12 @@ export function populateLuxury(ctx, lib, player, L) {
     act('idle', R2(6, 10), FI(-Math.PI / 2 - 0.16)), w(-Math.PI / 2 + 0.45, 16.6, 0.8), act('idle', R2(4, 6), FI(-Math.PI / 2 + 0.45)),
     w(-Math.PI / 2 - 0.5, 16.6, 0.8), act('idle', R2(4, 6), FI(-Math.PI / 2 - 0.5)), w(-Math.PI / 2 - 0.16, 16.4, 0.8),
   ]);
+  for (const n of actors) n.c.talkRole = 'personnel';
   // Iréna Solvay, prévisionniste, devant sa sphère
   const irenaC = mk(2, { top: 0x14303a, bottom: 0x1a1c22, boot: 0x0e0e10, accent: 0xd4af37, zip: true, belt: true }, L.irenaSpot.p, L.irenaSpot.face, null);
   L.npcs = { concierge: conciergeC, irena: irenaC };
   // clientèle assise (salon)
-  L.seats.slice(0, 5).forEach((st, i) => { st.taken = true; mk(i + 2, RICH[(i + 2) % RICH.length], st.p, st.yaw, i % 2 ? 'sitTalk' : 'sit'); });
+  L.seats.slice(0, 5).forEach((st, i) => { st.taken = true; const c = mk(i + 2, RICH[(i + 2) % RICH.length], st.p, st.yaw, i % 2 ? 'sitTalk' : 'sit'); if (i === 1) L.npcs.aldric = c; });
 
   // ---------------------------------------------------------------- visiteurs fortunés : de leur cabine du pont habitat à
   // La Couronne par l'ascenseur panoramique, quelques vitrines, le bar ou la vue, puis retour en cabine
@@ -629,6 +630,7 @@ export function populateLuxury(ctx, lib, player, L) {
   }
   const turnTo = (c, yaw, dt, k = 6) => { let d = yaw - c.root.rotation.y; d = Math.atan2(Math.sin(d), Math.cos(d)); c.root.rotation.y += d * (1 - Math.exp(-dt * k)); };
   const stepWalk = (w, dt) => {
+    if (w.c.inDialog) { w.c.setSpeed(0); return; }
     if (w.pause > 0) { w.pause -= dt; w.c.setSpeed(0); if (w.look) turnTo(w.c, w.look, dt); if (w.pause <= 0) { if (w.c.override) w.c.stop(0.3); w.look = null; } return; }
     const T = w.detour || L.loop[w.i];
     const d = new THREE.Vector3().subVectors(T, w.pos).setY(0), len = d.length();
@@ -661,7 +663,7 @@ export function populateLuxury(ctx, lib, player, L) {
     for (const n of actors) if (!n.visitor) step(n, dt);
     for (const w of walkers) stepWalk(w, dt);
     for (const s of spin) s.c.root.rotation.y += dt * s.sp;
-    for (const c of people) { if (visitors.some((v) => v.c === c)) continue; c.root.visible = true; if (c.root.position.distanceToSquared(cam) < 1600) c.update(dt, cam); }
+    for (const c of people) { if (visitors.some((v) => v.c === c)) continue; c.root.visible = !c.gone; if (c.gone) continue; if (c.root.position.distanceToSquared(cam) < 1600) c.update(dt, cam); }
   });
   return { people, walkers, visitors, actors };
 }

@@ -4,9 +4,11 @@ import * as THREE from 'three';
 // (nom, fonction) et des points d'intérêt, entrées du codex débloquées en analysant les éléments remarquables.
 // Codex (touche K) : encyclopédie de la station et du secteur, enrichie au fil des analyses.
 
-const FIRST = ['Aurel', 'Liv', 'Noé', 'Sasha', 'Tarek', 'Inès', 'Malo', 'Yara', 'Kenji', 'Elsa', 'Ivo', 'Nadia', 'Oren', 'Lina', 'Bastien', 'Mei', 'Rafael', 'Talia', 'Sven', 'Adèle', 'Kofi', 'Zélie', 'Dario', 'Anouk'];
+const FIRST_M = ['Aurel', 'Noé', 'Tarek', 'Malo', 'Kenji', 'Ivo', 'Oren', 'Bastien', 'Rafael', 'Sven', 'Kofi', 'Dario', 'Elias', 'Yanis'];
+const FIRST_F = ['Liv', 'Inès', 'Yara', 'Elsa', 'Nadia', 'Lina', 'Mei', 'Talia', 'Adèle', 'Zélie', 'Anouk', 'Sasha', 'Maëlle', 'Ayla'];
 const LAST = ['Varenne', 'Okafor', 'Lindqvist', 'Moreau', 'Haddad', 'Sato', 'Kovač', 'Delmas', 'Ferreira', 'Nakamura', 'Brandt', 'Achour', 'Petrov', 'Laurier', 'Mensah', 'Quist', 'Ibarra', 'Vasseur'];
-const nameFor = (k) => `${FIRST[(k * 7 + 3) % FIRST.length]} ${LAST[(k * 13 + 5) % LAST.length]}`;
+/** nom stable pour une clé ; c : personnage (prénom accordé au modèle féminin / masculin) */
+const nameFor = (k, c) => { const F = /^UF/.test(c?.name || '') ? FIRST_F : FIRST_M; return `${F[(k * 7 + 3) % F.length]} ${LAST[(k * 13 + 5) % LAST.length]}`; };
 
 export const CODEX = {
   halden: { t: 'Halden-7', cat: 'Lieux', x: 'Station orbitale bâtie il y a deux siècles pour les chantiers navals du secteur. Cent quarante mille habitants. Les chantiers ont fermé ; la station vit du fret, des réparations et du commerce de La Couronne.' },
