@@ -276,3 +276,22 @@ body.scanning #view { filter: saturate(.55) hue-rotate(-8deg) brightness(1.05) c
 #codex summary { cursor: pointer; font-size: 15px; color: #e8f4fa; }
 #codex p { margin: 6px 0 2px; color: #b8c6d0; font-size: 14px; line-height: 1.5; }
 #codex .cx-lock { color: #4a5864; font-size: 13px; letter-spacing: .1em; margin: 6px 0; padding-left: 12px; }
+/* ------------------------------------------------------------ briefing de mission */
+#brief { position: fixed; inset: 0; z-index: 14; display: flex; align-items: center; justify-content: center; background: rgba(2,6,10,.55); padding: 14px; }
+#brief .br-panel { width: min(980px, 100%); max-height: 94vh; overflow: auto; background: rgba(5,12,18,.94); border: 1px solid rgba(111,216,255,.35); box-shadow: 0 0 50px rgba(60,180,255,.15); }
+#brief .br-head { display: flex; justify-content: space-between; align-items: center; padding: 12px 18px; letter-spacing: .3em; font-size: 14px; color: #9fe8ff; border-bottom: 1px solid rgba(111,216,255,.2); }
+#brief button { background: transparent; color: #f2ead8; border: 1px solid #3a4a56; padding: 6px 12px; font: inherit; font-size: 12px; letter-spacing: .12em; cursor: pointer; }
+#brief .br-body { display: flex; gap: 18px; padding: 16px 18px; flex-wrap: wrap; }
+#brief canvas { width: min(420px, 100%); aspect-ratio: 1; border: 1px solid rgba(111,216,255,.25); }
+#brief .br-info { flex: 1; min-width: 280px; }
+#brief h3 { margin: 0 0 8px; font-size: 20px; letter-spacing: .12em; color: #ffd27a; text-transform: uppercase; }
+#brief h4 { margin: 14px 0 6px; font-size: 12px; letter-spacing: .3em; color: var(--accent); text-transform: uppercase; }
+#brief p { margin: 0 0 8px; color: #c8d6e0; font-size: 14.5px; line-height: 1.5; }
+#brief ul { margin: 6px 0; padding-left: 18px; color: #e8f4fa; font-size: 14px; line-height: 1.6; }
+#brief .br-threat { color: #ff8a6a; letter-spacing: .2em; font-size: 13px; margin-top: 6px; }
+#brief .br-pilots { display: flex; gap: 10px; flex-wrap: wrap; }
+#brief .br-pilot { display: flex; gap: 8px; align-items: center; border: 1px solid #26323c; padding: 6px; flex: 1; min-width: 200px; }
+#brief .br-pilot.on { border-color: #6fd8ff; box-shadow: 0 0 12px rgba(111,216,255,.25); }
+#brief .br-pilot img { width: 64px; height: 64px; object-fit: cover; background: #0a1620; filter: saturate(.8) hue-rotate(160deg) sepia(.1); }
+#brief .br-pilot b { display: block; color: #8fe0ff; letter-spacing: .15em; } #brief .br-pilot span { display: block; font-size: 12px; color: #9aa6b2; margin-bottom: 4px; }
+#brief .br-go { margin-top: 16px; background: var(--accent); color: #111; border: 0; font-weight: 700; padding: 10px 24px; letter-spacing: .2em; }

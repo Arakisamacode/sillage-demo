@@ -375,6 +375,7 @@ export function peopleTree(person, { story }) {
       ...(person.order ? [{ t: 'Je voudrais commander.', tone: 'neutre', next: null, do: () => { setTimeout(person.order, 80); } }] : []),
       { t: 'Que faites-vous ici ?', tone: 'enquete', next: 'job' },
       { t: 'Parlez-moi de vous.', tone: 'calme', next: 'bio' },
+      { t: 'Je peux vous rendre service ?', tone: 'calme', next: 'favor', if: () => story.offersFavor?.(person) },
       { t: 'Des nouvelles intéressantes ?', tone: 'enquete', next: 'rumor' },
       { t: 'Comment va la vie à Halden ?', tone: 'neutre', next: 'opinion' },
       { t: 'Au revoir.', tone: 'calme', next: null, do: () => (mood === 'méfiant' ? `${person.name} vous rend un hochement de tête prudent.` : undefined) },
@@ -392,6 +393,10 @@ export function peopleTree(person, { story }) {
       if (mood === 'méfiant' && rep.serenite < 2 && i === 0) return { say: 'Ma vie ne regarde que moi. Revenez quand vous aurez fait vos preuves, on en reparlera.', choices: back };
       const next = { origin: 'Et aujourd\'hui, votre vie ?', situation: 'Vous avez un rêve ?', dream: 'Qu\'est-ce qui vous inquiète ?', worry: 'Racontez-moi un souvenir de la station.', anecdote: 'Merci de m\'avoir raconté tout ça.' }[order[i]];
       return { say: bio[order[i]], choices: [{ t: next, tone: 'calme', next: i < 4 ? 'bio' : 'again' }, ...back] };
+    },
+    favor: () => {
+      const f = (mem.favor ||= story.makeFavor(person));
+      return { say: f.say, choices: [{ t: `D'accord, je m'en charge. (${f.reward} ¤)`, tone: 'calme', next: null, do: () => { mem.favor = null; return story.acceptFavor(f); } }, { t: 'Désolé, pas maintenant.', tone: 'neutre', next: 'again' }] };
     },
     rumor: () => ({ say: mood === 'méfiant' && rep.audace < 2 ? 'Des rumeurs ? Je ne parle pas aux inconnus. Revenez quand on parlera de vous en bien.' : nextOf(RUMORS, mem, 'rumor', k), choices: [{ t: 'Vous en savez d\'autres ?', tone: 'enquete', next: 'rumor' }, ...back] }),
     opinion: { say: opinion, choices: back },

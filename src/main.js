@@ -35,6 +35,10 @@ import { Dialogue } from './ui/dialogue.js';
 import { Story } from './game/story.js';
 import { Scanner, nameFor } from './ui/scanner.js';
 import { peopleTree } from './game/chatter.js';
+import { buildBriefRoom, buildMerle } from './world/briefroom.js';
+import { buildNeon } from './world/neon.js';
+import { Wingmen, PILOTS } from './game/wingmen.js';
+import { Briefing } from './ui/briefing.js';
 import { buildLuxury, populateLuxury, LUX_Y } from './world/luxury.js';
 import { RESTAURANTS } from './game/food.js';
 import { Cargo, buildQuai } from './game/cargo.js';
@@ -89,7 +93,9 @@ async function boot() {
   ctx.ships = buildShips(ctx);
   buildProps(ctx);
   ctx.quai = buildQuai(ctx);
+  ctx.brief = buildBriefRoom(ctx);
   buildGallery(ctx);
+  buildNeon(ctx);
   buildExterior(ctx);
   ctx.outposts = buildOutposts(ctx);
   ctx.derelict = buildDerelict(ctx);
@@ -895,9 +901,38 @@ async function boot() {
     return _blk;
   }
   // ------------------------------------------------------------------ conversations cinématiques et récit principal
-  const dialog = new Dialogue(ctx, { audio, game, onClose: () => { input.enabled = true; if (touch) $('touch').classList.remove('hidden'); else $('view').requestPointerLock?.(); } });
+  const dialog = new Dialogue(ctx, { audio, game, onClose: () => { input.enabled = true; if (touch) $('touch').classList.remove('hidden'); else $('view').requestPointerLock?.(); if (ctx.story?.pendingBrief) { ctx.story.pendingBrief = false; setTimeout(() => ctx.openBrief?.(), 150); } } });
   ctx.dialog = dialog; ctx.toast = toast;
-  const story = new Story({ game, audio, dialog, toast, combat, flight, ground });
+  const story = new Story({ game, audio, dialog, toast, combat, flight, ground, outposts: ctx.outposts });
+  buildMerle(ctx, story.merle);
+  // ------------------------------------------------------------------ escadrille et briefing (table holographique du hangar)
+  const wing = new Wingmen(ctx, { combat, flight, game, dialog });
+  ctx.wing = wing;
+  const briefPeople = [];
+  PILOTS.forEach((P, i) => {
+    const c = lib.create(P.model, { height: P.model.startsWith('UF') ? 1.7 : 1.82, hair: P.hair });
+    c.setOutfit({ top: 0x1a2436, bottom: 0x1a2436, boot: 0x0e1014, accent: P.color, gloves: true, zip: true });
+    c.root.position.copy(ctx.brief.pilots[i]); c.root.lookAt(ctx.brief.center.x, c.root.position.y, ctx.brief.center.z);
+    c.root.traverse((o) => { o.castShadow = false; }); scene.add(c.root); c.pilot = P; briefPeople.push(c);
+  });
+  {
+    const off = lib.create('UF_dark', { height: 1.74, hair: 'Hair_Buns' });
+    off.setOutfit({ top: 0x2a3138, bottom: 0x2a3138, boot: 0x0e1014, accent: 0xffd27a, zip: true, belt: true });
+    off.root.position.copy(ctx.brief.officer); off.root.lookAt(ctx.brief.center.x, off.root.position.y, ctx.brief.center.z);
+    off.play('talk', { fade: 0 }); scene.add(off.root); briefPeople.push(off);
+  }
+  ctx.updaters.push((dt) => {
+    const near = player.pos.y < 5 && player.pos.distanceToSquared(ctx.brief.center) < 1600 && !flight.active;
+    for (const c of briefPeople) { c.root.visible = near; if (near) c.update(dt, ctx.camera.position); }
+  });
+  const snapPilots = () => { for (const c of briefPeople) if (c.pilot && !wing.portraits[c.pilot.id]) wing.portraits[c.pilot.id] = dialog.snapshot(c); };
+  const briefing = new Briefing({ game, audio, wing, pilots: PILOTS, onClose: () => { input.enabled = true; if (touch) $('touch').classList.remove('hidden'); else $('view').requestPointerLock?.(); } });
+  ctx.briefing = briefing;
+  const openBrief = () => { snapPilots(); openUI(() => briefing.show(story.brief())); };
+  ctx.openBrief = openBrief;
+  interactables.push({ pos: ctx.brief.table, r: 1.8, label: 'E — Table de briefing de l\'escadrille', fn: openBrief });
+  { const fo = flight.onEvent; flight.onEvent = (e, pad) => { fo(e, pad); if (e === 'takeoff') { snapPilots(); wing.launch(story.wingOffered() ? ['rook', 'lynx'] : []); } if (e === 'landed') wing.clear(true); }; }
+  { const co = combat.onEvent; combat.onEvent = (e, ...a) => { co(e, ...a); wing.onCombat(e, ...a); }; }
   ctx.story = story;
   { const fo = flight.onEvent; flight.onEvent = (e, pad) => { fo(e, pad); story.onFlight(e, pad); }; }
   { const co = combat.onEvent; combat.onEvent = (e, ...a) => { co(e, ...a); story.onCombat(e, ...a); }; }
@@ -911,9 +946,9 @@ async function boot() {
   story.irena = NPC.irena; ctx.NPC = NPC; story.aldric = ctx.lux.npcs.aldric;
   ctx.newsLines = () => story.news();
   const isAldric = (c) => c === ctx.lux.npcs.aldric && story.q.ch2 >= 1;
-  interactables.push({ pos: HB.bar, r: 1.6, label: 'E — Parler à Joss (barman)', fn: () => talk(NPC.joss, story.jossTree()) });
-  interactables.push({ pos: HB.clinic, r: 1.6, label: 'E — Parler au Dr Salek', fn: () => talk(NPC.salek, story.doctorTree()) });
-  interactables.push({ pos: ctx.lux.spots.concierge.customer, r: 1.6, label: 'E — Parler à Mira (conciergerie)', fn: () => talk(NPC.mira, story.conciergeTree()) });
+  interactables.push({ pos: HB.bar, r: 1.6, label: 'E — Parler à Joss (barman)', fn: () => talk(NPC.joss, story.withFavors('joss', story.jossTree())) });
+  interactables.push({ pos: HB.clinic, r: 1.6, label: 'E — Parler au Dr Salek', fn: () => talk(NPC.salek, story.withFavors('salek', story.doctorTree())) });
+  interactables.push({ pos: ctx.lux.spots.concierge.customer, r: 1.6, label: 'E — Parler à Mira (conciergerie)', fn: () => talk(NPC.mira, story.withFavors('mira', story.conciergeTree())) });
   interactables.push({ pos: ctx.lux.irenaSpot.talk, r: 1.8, label: 'E — Parler à Iréna Solvay', fn: () => talk(NPC.irena, story.irenaTree()) });
   // ------------------------------------------------------------------ mode analyse (C) et codex (K)
   const scanner = new Scanner(ctx, { game, toast, audio });
@@ -1001,7 +1036,7 @@ async function boot() {
     // repère d'orientation : la galerie marchande tant qu'elle n'a pas été visitée
     if (!game.d.galleryVisited && player.pos.x < -44 && !flight.active) { game.d.galleryVisited = true; game.save(); }
     const way = !game.d.galleryVisited && !flight.active && !ground.armed && player.pos.x > -33 ? { pos: new THREE.Vector3(-37, 1.6, -2), name: 'Galerie marchande · boutiques, recrutement' } : null;
-    const T = missions.navTarget() || (flight.active ? mining.navTarget(ardent) : null) || way;
+    const T = (flight.active ? ctx.story?.navTarget() : null) || missions.navTarget() || (flight.active ? mining.navTarget(ardent) : null) || way;
     if (!T || shop.isOpen) { navEl.classList.add('hidden'); return; }
     const from = flight.active ? flight.pos : player.pos;
     const d = from.distanceTo(T.pos);
@@ -1162,7 +1197,7 @@ async function boot() {
     renderer.setExposure(1.15 - 0.45 * ctx.time.dusk);
     updateFreightHud();
     if (touch && running) touchUI();
-    dialog.update(dt); story.update(dt);
+    dialog.update(dt); story.update(dt); wing.update(dt);
     if (input.consume('scan') && running && !shop.isOpen && !dialog.active && (!flight.active || ground.onFoot)) scanner.toggle();
     if ((flight.active && !ground.onFoot) || dialog.active) { if (scanner.on) scanner.toggle(false); }
     if (input.consume('codex') && running && !shop.isOpen && !dialog.active && !scanner.codexOpen) openUI(() => scanner.openCodex(() => { input.enabled = true; if (touch) $('touch').classList.remove('hidden'); else $('view').requestPointerLock?.(); }));

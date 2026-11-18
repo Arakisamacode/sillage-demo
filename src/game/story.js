@@ -7,11 +7,15 @@
 const R = (a) => a[Math.floor(Math.random() * a.length)];
 
 export class Story {
-  constructor({ game, audio, dialog, toast, combat, flight, ground }) {
-    Object.assign(this, { game, audio, dialog, toast, combat, flight, ground });
+  constructor({ game, audio, dialog, toast, combat, flight, ground, outposts }) {
+    Object.assign(this, { game, audio, dialog, toast, combat, flight, ground, outposts });
+    this.favors = (game.d.favors ||= []);
+    this.merle = new (this.flight.pos.constructor)(2600, 380, 1900);   // ruines de la station Merle
+    this.ch3scan = 0; this.ch3wave = false;
     this.s = (game.d.story ||= { step: 0, kills: 0, choice: null, heard: false });
     // quêtes secondaires et chapitre 2 : 0 = non commencée, 1 = en cours, 2 = objectif atteint (revenir), 3 = terminée
     this.q = (game.d.quests ||= { joss: 0, salek: 0, ch2: 0, ch2out: null, ch2t: 0 });
+    this.q.ch3 ??= 0;
     this.ch2T = -1;
     game.d.rep ||= { serenite: 0, audace: 0, halden: 0 };
     this.ambushT = -1;
@@ -35,6 +39,10 @@ export class Story {
     if (q.joss === 2) L.push('<b>SERVICE</b> · rapporter la bouteille à Joss (bar La Comète)');
     if (q.salek === 1) L.push('<b>SERVICE</b> · chercher le sérum du Dr Salek à la station agricole Lys (se poser)');
     if (q.salek === 2) L.push('<b>SERVICE</b> · rapporter le sérum au Dr Salek (infirmerie)');
+    if (q.ch3 === 1) H('LE SIGNAL DE MERLE', 'rejoindre les ruines de la station Merle (repère en vol)');
+    if (q.ch3 === 2) H('LE SIGNAL DE MERLE', `récupérer l'archive : rester près des ruines (${Math.min(100, Math.round(this.ch3scan / 20 * 100))} %)`);
+    if (q.ch3 === 3) H('LE SIGNAL DE MERLE', 'rapporter l\'archive de Merle à Iréna Solvay');
+    for (const f of this.favors) L.push(`<b>SERVICE</b> · ${f.short}`);
     return L.length ? L.join('<br>') : null;
   }
   /** Bandeau d'actualités de la station (écran du hall habitat) : reflète vos choix. */
@@ -42,6 +50,7 @@ export class Story {
     const L = ['Convoi de Lys : arrivée prévue aire 05', 'Cours du titane en hausse à Lys', 'Bar La Comète : soirée musique 22 h'];
     if (this.s.step >= 4) L.unshift(this.s.choice === 'public' ? 'COURBE DE SOLVAY : la projection publiée, comités de quartier' : 'CONSEIL : nouvelles routes de ravitaillement votées');
     else L.push('Ceinture d\'Ardent : pirates signalés');
+    if (this.q.ch3 >= 4) L.unshift(this.q.ch3out === 'lys' ? 'RÉSEAU DES STATIONS : la coopérative de Lys coordonne l\'entraide' : this.q.ch3out === 'open' ? 'ARCHIVE DE MERLE : publiée sur toutes les fréquences' : 'CONSEIL : un plan secret pour l\'avenir de Halden');
     if (this.q.ch2 >= 3) L.unshift(this.q.ch2out === 'arrest' ? 'SCANDALE : le financier Aldric Venn arrêté à La Couronne' : this.q.ch2out === 'convert' ? 'MÉCÉNAT : Aldric Venn finance l\'escorte des convois' : 'Ceinture d\'Ardent : un cargo pirate neutralisé');
     return L;
   }
@@ -52,6 +61,7 @@ export class Story {
     if (e === 'landed' && q.joss === 1 && id === 'ardent') { q.joss = 2; this.save(); this.toast('Liqueur d\'aurélite récupérée · à rapporter à Joss'); }
     if (e === 'landed' && q.salek === 1 && id === 'lys') { q.salek = 2; this.save(); this.toast('Sérum de la coopérative de Lys récupéré · à rapporter au Dr Salek'); }
     if (e === 'takeoff' && q.ch2 === 2) this.ch2T = 15;
+    if (e === 'landed') for (const f of [...this.favors]) if (f.type === 'parcel' && f.dest === id) this._favorDone(f);
     if (e === 'landed' && this.s.step === 1 && pad?.outpost?.id === 'lys') {
       this.s.step = 2; this.s.kills = 0; this.save();
       this._comm('Le relais de Lys a reçu le noyau. La diffusion démarre… et quelqu\'un écoute. Trois signatures se détachent de la ceinture. Ils veulent faire taire l\'équation : redécollez et tenez-les à distance.');
@@ -72,6 +82,17 @@ export class Story {
     }
   }
   update(dt) {
+    // chapitre 3 : approche et récupération de l'archive dans les ruines de Merle
+    const q = this.q, F = this.flight;
+    if ((q.ch3 === 1 || q.ch3 === 2) && F.state === 'flying') {
+      const d = F.pos.distanceTo(this.merle);
+      if (q.ch3 === 1 && d < 420) { q.ch3 = 2; this.ch3scan = 0; this.ch3wave = false; this.save(); this._comm('Vous y êtes. Approchez du cœur de l\'anneau brisé et tenez votre position : je télécharge l\'archive par votre transpondeur. Vingt secondes.'); }
+      if (q.ch3 === 2 && d < 520) {
+        this.ch3scan += dt;
+        if (this.ch3scan > 6 && !this.ch3wave) { this.ch3wave = true; this.combat.spawnWave(3, 1200, false); this._comm('Des charognards ! Ils fouillent ces ruines depuis des années. Tenez bon, le téléchargement continue tant que vous restez près de l\'anneau.'); }
+        if (this.ch3scan >= 20) { q.ch3 = 3; this.save(); this._comm('Archive complète. Pilote… Merle n\'est pas morte par hasard. Elle avait un plan pour sauver tout le secteur, et quelqu\'un l\'a enterré. Rentrez. Vite.'); }
+      }
+    }
     if (this.ch2T > 0 && this.flight.state === 'flying') {
       this.ch2T -= dt;
       if (this.ch2T <= 0 && this.q.ch2 === 2) {
@@ -93,6 +114,63 @@ export class Story {
     // une vague manquée (fuite, mort) : nouvelle tentative au prochain décollage
     if (this.s.step === 2 && this.flight.state === 'parked' && this.ambushT < 0) this.ambushT = -1;
   }
+  /** mission en cours pour la table de briefing */
+  brief() {
+    const st = this.s.step, q = this.q;
+    if (q.ch3 === 1 || q.ch3 === 2) return { title: 'Le Signal de Merle', text: 'Les ruines de la station Merle émettent un signal sur une fréquence oubliée. Approchez l\'anneau brisé et tenez votre position vingt secondes pour télécharger l\'archive. Charognards attendus dans le champ de débris.', destP: [2600, 1900], destName: 'Ruines de Merle', objectives: ['Rejoindre les ruines de Merle', 'Rester près de l\'anneau pendant le téléchargement', 'Repousser les charognards'], threat: 3, wing: 'offered', go: 'Lancer la mission' };
+    if (q.ch2 === 2) return { title: 'Interception : cargo des Fils de la Brèche', text: 'Venn a livré le rendez-vous : un cargo de ravitaillement pirate attend sur la route de Corvin avec son escorte. Décollez, l\'escadrille vous accompagne. Détruisez les escorteurs, puis le cargo… ou abordez-le.', dest: 'corvin', destName: 'Rendez-vous pirate', objectives: ['Décoller', 'Abattre l\'escorte', 'Détruire ou aborder le cargo'], threat: 3, wing: 'offered', go: 'Lancer la mission' };
+    if (st === 1 || st === 2) return { title: 'L\'Équation de Halden', text: st === 1 ? 'Portez le noyau de calcul d\'Iréna Solvay jusqu\'à la station agricole Lys et posez-vous sur leur plateforme. Leur relais diffusera le modèle vers quarante stations.' : 'La diffusion est interceptée. Redécollez de Lys et tenez les intercepteurs à distance jusqu\'à la fin de la transmission.', dest: 'lys', destName: 'Station agricole Lys', objectives: st === 1 ? ['Rejoindre Lys', 'Se poser sur la plateforme'] : ['Décoller de Lys', 'Abattre trois intercepteurs'], threat: st === 1 ? 1 : 2, wing: st === 2 ? 'offered' : 'hire', go: 'Lancer la mission' };
+    return { title: 'Patrouille et escorte', text: 'Pas de mission de l\'escadrille en cours. Vous pouvez engager des ailiers pour votre prochaine sortie : ils vous escortent sur les routes de fret et engagent les pirates à vos côtés.', dest: null, objectives: ['Ailiers engagés pour une sortie', 'Ils rentrent quand vous vous posez'], threat: 1, wing: 'hire', go: 'Compris' };
+  }
+  /** les missions de combat du récit fournissent l'escadrille */
+  wingOffered() { return this.s.step === 2 || this.q.ch2 === 2 || this.q.ch3 === 1 || this.q.ch3 === 2; }
+  /** repère de navigation (vol) */
+  navTarget() {
+    const pad = (id) => this.outposts?.find((o) => o.id === id)?.pad;
+    const q = this.q;
+    if (q.ch3 === 1 || q.ch3 === 2) return { pos: this.merle, name: 'Ruines de Merle' };
+    const want = this.s.step === 1 ? 'lys' : q.joss === 1 ? 'ardent' : q.salek === 1 ? 'lys' : this.favors.find((f) => f.type === 'parcel')?.dest;
+    const P = want && pad(want);
+    return P ? { pos: P.pos, name: P.name } : null;
+  }
+
+  // ---------------------------------------------------------------- services demandés par les habitants
+  offersFavor(person) { return person.key % 3 === 0 && this.favors.length < 3 && !this.favors.some((f) => f.giver === person.key) && !(this.game.d.favorsDone || []).includes(person.key); }
+  makeFavor(person) {
+    const k = person.key, dests = { corvin: 'au Relais Corvin', ardent: 'à la plateforme Ardent-3', lys: 'à la station agricole Lys' };
+    const NPCS = { joss: 'Joss, le barman de La Comète', salek: 'le Dr Salek, à l\'infirmerie', mira: 'Mira, à la conciergerie de La Couronne' };
+    const MSG = ['que je lui rembourserai sa dette à la fin du mois', 'que je ne viendrai pas jeudi, mais que je ne l\'oublie pas', 'que le paquet est arrivé et que tout va bien', 'merci pour l\'autre soir. Il comprendra'];
+    let f;
+    if (k % 2) {
+      const dest = Object.keys(dests)[k % 3];
+      const what = ['un colis pour ma sœur', 'des pièces de rechange pour mon cousin', 'des médicaments pour mon père', 'un cadeau d\'anniversaire pour ma fille'][k % 4];
+      f = { type: 'parcel', dest, reward: 900 + (k % 7) * 150, say: `J\'ai ${what}, ${dests[dest]}. Le fret coûte une fortune… Si vous passez par là, posez-vous, ils sauront à qui le remettre. Je vous paierai, promis.`, short: `livrer ${what.replace('ma ', 'la ').replace('mon ', 'le ')} de ${person.name} ${dests[dest]} (se poser)` };
+    } else {
+      const to = Object.keys(NPCS)[k % 3], msg = MSG[k % 4];
+      f = { type: 'message', to, reward: 300 + (k % 5) * 80, say: `Vous pourriez dire à ${NPCS[to]} ${msg} ? Je n\'ose pas y aller moi-même.`, short: `porter le message de ${person.name} à ${NPCS[to]}`, msg };
+    }
+    Object.assign(f, { id: Date.now() % 1e9 + k, giver: k, giverName: person.name });
+    return f;
+  }
+  acceptFavor(f) { this.favors.push(f); this.save(); return `Service accepté · ${f.short}`; }
+  _favorDone(f) {
+    this.favors.splice(this.favors.indexOf(f), 1);
+    (this.game.d.favorsDone ||= []).push(f.giver);
+    this.game.earn(f.reward); this.rep.halden += 1; this.save(); this.audio.blip();
+    this.dialog.transmit({ name: `${f.giverName} · message`, portrait: '', text: f.type === 'parcel' ? `Ils ont bien reçu le colis ! Merci, vraiment. Je vous ai viré ${f.reward} crédits.` : `Merci d'avoir fait passer mon message. ${f.reward} crédits pour vous.`, voice: { pitch: 1, rate: 1 } });
+    this.toast(`Service rendu à ${f.giverName} · ${f.reward} ¤ · réputation de Halden +1`);
+  }
+  /** ajoute aux conversations des personnages nommés la remise des messages qui leur sont destinés */
+  withFavors(who, tree) {
+    const me = this, start = tree.start;
+    tree.start = () => {
+      const node = typeof start === 'function' ? start() : start;
+      const extra = me.favors.filter((f) => f.type === 'message' && f.to === who).map((f) => ({ t: `J'ai un message de ${f.giverName}.`, tone: 'calme', next: null, do: () => { me._favorDone(f); return `Message transmis : « ${f.msg} »`; } }));
+      return { ...node, choices: [...extra, ...(node.choices || [])] };
+    };
+    return tree;
+  }
+
   _comm(text) {
     const I = this.irena;
     if (I && !I.portrait) I.portrait = this.dialog.snapshot(I.c);
@@ -133,6 +211,8 @@ export class Story {
           { t: 'Que montre la sphère, maintenant ?', tone: 'enquete', next: 'ch2', if: () => me.q.ch2 === 0 },
           { t: 'Venn est démasqué. Où est leur cargo ?', tone: 'neutre', next: null, if: () => me.q.ch2 === 2, do: () => 'Décollez : le cargo apparaîtra au rendez-vous' },
           { t: 'Le cargo des Fils de la Brèche est neutralisé.', tone: 'neutre', next: 'ch2end', if: () => me.q.ch2 === 3 },
+          { t: 'La sphère a-t-elle encore quelque chose à dire ?', tone: 'enquete', next: 'ch3', if: () => me.q.ch2 === 4 && me.q.ch3 === 0 },
+          { t: 'J\'ai l\'archive de Merle.', tone: 'neutre', next: 'ch3end', if: () => me.q.ch3 === 3 },
           { t: 'Prenez soin de vous, Iréna.', tone: 'calme', next: null },
           { t: 'Votre sphère prédit-elle quelque chose pour moi ?', tone: 'enquete', next: 'me' },
         ] };
@@ -153,7 +233,7 @@ export class Story {
       pay: { say: 'Trente mille crédits. Toutes mes économies, ou presque. Si la courbe a raison, l\'argent ne vaudra plus grand-chose ici de toute façon.',
         choices: [{ t: 'Marché conclu.', tone: 'ferme', next: 'job' }, { t: 'Gardez votre argent. Je le fais pour la station.', tone: 'calme', next: 'job' }] },
       job: { say: 'Voici le noyau de calcul. Portez-le jusqu\'à la station agricole Lys et posez-vous : leur vieux relais peut diffuser vers quarante stations. Méfiez-vous : ceux qui profitent du déclin ont des oreilles partout.',
-        choices: [{ t: '[Prendre le noyau] Je pars pour Lys.', tone: 'neutre', next: null, do: () => { s.step = 1; me.save(); me.audio.blip(); return 'Mission : L\'Équation de Halden · porter le noyau à la station agricole Lys'; } }] },
+        choices: [{ t: '[Prendre le noyau] Je pars pour Lys.', tone: 'neutre', next: null, do: () => { s.step = 1; me.save(); me.audio.blip(); me.pendingBrief = true; return 'Mission : L\'Équation de Halden · porter le noyau à la station agricole Lys'; } }] },
       whylys: { say: 'Parce que Lys nourrit la moitié du secteur. Quand elle parle, les autres écoutent. Et parce que son relais date d\'avant les péages : personne ne peut le censurer.', choices: [{ t: 'J\'y vais.', tone: 'neutre', next: null }] },
       herview: { say: 'Moi ? Je publierais tout, et je me tromperais peut-être. La vérité calme certaines foules et en affole d\'autres. Mon modèle ne sait pas répondre à ça. Vous, si.',
         choices: [{ t: 'Rendre la projection publique.', tone: 'calme', next: 'endPublic' }, { t: 'La remettre au Conseil.', tone: 'ferme', next: 'endCouncil' }] },
@@ -168,6 +248,20 @@ export class Story {
         choices: [{ t: 'J\'y vais.', tone: 'neutre', next: null, do: () => { me.q.ch2 = 1; me.save(); return 'Chapitre 2 : Les Fils de la Brèche · cherchez au salon du Zénith'; } }] },
       ch2end: { say: () => (me.q.ch2out === 'bribe' ? 'Le cargo est tombé, c\'est l\'essentiel. Quant à Venn… j\'ai vu les crédits arriver sur votre compte. La courbe ne juge pas. Moi un peu.' : me.q.ch2out === 'convert' ? 'Le cargo est tombé et Venn finance désormais l\'escorte des convois. Transformer un prédateur en protecteur… aucune de mes équations n\'avait prévu ça.' : 'Le cargo est tombé et Venn est entre les mains de la sécurité. La courbe s\'est encore infléchie. Vous devenez une variable très encombrante, pilote.'),
         choices: [{ t: '[Recevoir 40 000 ¤] Au prochain chapitre, Iréna.', tone: 'calme', next: null, do: () => { me.q.ch2 = 4; me.game.earn(40000); me.rep.halden += me.q.ch2out === 'bribe' ? 0 : 2; me.save(); me.audio.blip(); return 'Chapitre 2 terminé · 40 000 ¤'; } }] },
+      ch3: { say: 'Oui. Un signal. Faible, régulier, sur une fréquence oubliée depuis quarante ans. Il vient des ruines de la station Merle — celle qui s\'est effondrée quand vous étiez enfant, et dont les réfugiés vivent encore au pont habitat. Ma sphère dit que ce signal contient la pièce manquante de l\'équation.',
+        choices: [{ t: 'Je vais le chercher.', tone: 'calme', next: 'ch3go' }, { t: 'Pourquoi personne n\'y est allé avant ?', tone: 'enquete', next: 'ch3why' }] },
+      ch3why: { say: 'Parce que les ruines sont au milieu d\'un champ de débris infesté de charognards. Et parce que ceux qui ont laissé Merle mourir n\'avaient aucune envie qu\'on y retourne. La sécurité vous prête deux ailiers. Vous en aurez besoin.',
+        choices: [{ t: 'J\'y vais.', tone: 'calme', next: 'ch3go' }] },
+      ch3go: { say: 'Les coordonnées sont dans votre ordinateur de bord. Passez par la table de briefing du hangar : Freux et Lynx vous y attendent. Et pilote… revenez.',
+        choices: [{ t: '[Recevoir les coordonnées]', tone: 'neutre', next: null, do: () => { me.q.ch3 = 1; me.save(); me.pendingBrief = true; return 'Chapitre 3 : Le Signal de Merle · ruines repérées en vol'; } }] },
+      ch3end: { say: 'Montrez-moi… Le « Second Rivage ». Merle avait conçu un réseau d\'entraide entre toutes les stations : partage de vivres, de pièces, d\'escortes. Ils ont été ruinés par ceux qui profitaient de l\'isolement. Avec cette archive, la courbe peut s\'inverser. Mais à qui la confier ?',
+        choices: [
+          { t: 'À la coopérative de Lys. Le réseau doit appartenir à tous.', tone: 'calme', next: 'ch3fin', do: () => { me.q.ch3out = 'lys'; } },
+          { t: 'Au Conseil de Halden. Il faut quelqu\'un pour décider.', tone: 'ferme', next: 'ch3fin', do: () => { me.q.ch3out = 'council'; } },
+          { t: 'Publions-la sur toutes les fréquences. Que chacun s\'en empare.', tone: 'calme', next: 'ch3fin', if: () => me.rep.serenite >= 5, do: () => { me.q.ch3out = 'open'; } },
+        ] },
+      ch3fin: { say: () => ({ lys: 'Lys, donc. Des fermiers à la tête du plus grand réseau du secteur. L\'Histoire adore ce genre d\'ironie.', council: 'Le Conseil. Ils sauront l\'utiliser, je l\'espère. Je garderai une copie. Par précaution.', open: 'Sur toutes les fréquences… Plus personne ne pourra l\'enterrer. C\'est la décision la plus imprévisible que j\'aie jamais vue. J\'adore ça.' })[me.q.ch3out] + ' Prenez ceci : soixante mille crédits, et une combinaison Halo de chez Nova. Vous l\'avez méritée cent fois.',
+        choices: [{ t: '[Recevoir la récompense]', tone: 'calme', next: null, do: () => { me.q.ch3 = 4; me.game.earn(60000); me.game.d.owned.lx_halo = (me.game.d.owned.lx_halo || 0) + 1; me.rep.halden += 3; me.save(); me.audio.blip(); return 'Chapitre 3 terminé · 60 000 ¤ · combinaison « Halo » ajoutée au casier'; } }] },
       me: { say: 'Une seule personne ? Non. Mais je remarque que depuis votre arrivée, les variables bougent plus vite. Vous êtes ce que j\'appelle une anomalie. Les anomalies changent les courbes. Continuez.', choices: [{ t: 'Je prends ça pour un compliment.', tone: 'neutre', next: null }] },
     };
   }
@@ -176,7 +270,7 @@ export class Story {
   aldricTree() {
     const me = this, q = this.q;
     if (q.ch2 !== 1) return { start: { say: q.ch2out === 'bribe' ? 'Vous encore. Notre arrangement tient, j\'espère ?' : 'Je ne vous connais pas. Laissez-moi tranquille.', choices: [{ t: '[Partir]', tone: 'neutre', next: null }] } };
-    const done = (out, extra) => () => { q.ch2 = 2; q.ch2out = out; extra?.(); me.save(); me.audio.blip(); return out === 'bribe' ? '15 000 ¤ reçus · Venn livre le rendez-vous du cargo' : 'Venn livre le rendez-vous du cargo pirate · décollez'; };
+    const done = (out, extra) => () => { q.ch2 = 2; q.ch2out = out; extra?.(); me.save(); me.audio.blip(); me.pendingBrief = true; return out === 'bribe' ? '15 000 ¤ reçus · Venn livre le rendez-vous du cargo' : 'Venn livre le rendez-vous du cargo pirate · décollez'; };
     return {
       start: { say: 'Aldric Venn, investissements orbitaux. Vous bloquez ma vue, pilote.',
         choices: [

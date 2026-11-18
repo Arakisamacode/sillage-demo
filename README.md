@@ -177,6 +177,19 @@ et redescendent à la galerie. Le cuisinier vient servir quand un client attend.
   ensuite le cargo pirate (détruire ou aborder), faire son rapport (40 000 ¤).
 - **Conséquences visibles** : l'écran d'actualités du hall et les conversations des habitants reflètent vos choix
   (courbe publiée ou confiée au Conseil, sort du financier).
+- **Escadrille et briefing** : table holographique de l'escadrille dans le hangar (derrière le quai) avec la carte du
+  secteur, la commandante et les ailiers Freux et Lynx. Briefing animé (route, menace, objectifs) au lancement des
+  missions du récit, ou à la table. Engager un ailier : 2 000 ¤ la sortie ; les missions de combat du récit fournissent
+  l'escadrille. En vol, les ailiers tiennent la formation, engagent les pirates, encaissent, décrochent quand ils
+  sont trop touchés et parlent à la radio (portrait, voix).
+- **Chapitre 3 « Le Signal de Merle »** : un signal monte des ruines de la station Merle (repère en vol). Tenir la
+  position vingt secondes près de l'anneau brisé pour télécharger l'archive malgré les charognards, puis choisir à qui
+  confier le plan du « Second Rivage » : la coopérative de Lys, le Conseil, ou toutes les fréquences (60 000 ¤ et une
+  combinaison Halo).
+- **Services des habitants** : certaines personnes demandent un coup de main (colis à livrer dans une station : se
+  poser ; message à transmettre à Joss, au Dr Salek ou à Mira). Remerciement par radio, crédits, réputation.
+- **Galerie néon** : panneaux publicitaires holographiques suspendus (animés, parasites), hologrammes tournants au-dessus
+  de projecteurs, enseignes verticales en drapeau, tubes et liserés néon.
 - **Mode analyse** (C, bouton SCAN) : filtre holographique et balayage, nom et fonction des personnes, points
   d'interaction, éléments remarquables à analyser (vaisseaux, yacht, sculpture, sphère, coupole, Cour des Saveurs)
   qui enrichissent le **codex** (K) : lieux, vaisseaux, culture, factions.
