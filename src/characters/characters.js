@@ -270,6 +270,13 @@ export class Character {
     this.lookYaw = 0; this.lookPitch = 0;
     this.lodSkip = 0;
     this.acc = 0;
+    // élimination hors champ : sphère englobante de la pose de liaison, élargie (gestes, position assise)
+    this.model.traverse((o) => {
+      if (!o.isSkinnedMesh) return;
+      if (!o.geometry.boundingSphere) o.geometry.computeBoundingSphere();
+      o.boundingSphere = o.geometry.boundingSphere.clone(); o.boundingSphere.radius *= 1.35;
+      o.frustumCulled = true;
+    });
   }
 
   /** Action plein corps (discussion, assis, travail…). */

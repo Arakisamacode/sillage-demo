@@ -175,10 +175,10 @@ export function populateGarden(ctx, lib, player, G) {
   const gl = G.glacier, sn = G.snack;
   const glacierC = mk(0, { top: 0xf2f2ee, bottom: 0xff9ec8, accent: 0xff6a8a }, gl.vendor, gl.vendorYaw);
   glacierC.talkRole = 'glacier'; glacierC.shopId = 'dome_glace';
-  actor(glacierC, () => [act('idle', R2(4, 8), gl.vendorYaw), act('interact', R2(2, 3), gl.vendorYaw), act('talk', R2(3, 6), gl.vendorYaw)]);
+  actor(glacierC, () => [act('idle', R2(4, 8), gl.vendorYaw), act('interact', R2(2, 3), gl.vendorYaw), act('talk', R2(3, 6), gl.vendorYaw)]).shop = 'dome_glace';
   const snackC = mk(1, { top: 0x2a8a5a, bottom: 0x2a2e36, accent: 0xfff4e8 }, sn.vendor, sn.vendorYaw);
   snackC.talkRole = 'snack'; snackC.shopId = 'dome_snack';
-  actor(snackC, () => [act('interact', R2(4, 7), sn.vendorYaw), act('idle', R2(2, 4), sn.vendorYaw), act('pickup', 2.4, sn.vendorYaw + Math.PI), act('talk', R2(3, 5), sn.vendorYaw)]);
+  actor(snackC, () => [act('interact', R2(4, 7), sn.vendorYaw), act('idle', R2(2, 4), sn.vendorYaw), act('pickup', 2.4, sn.vendorYaw + Math.PI), act('talk', R2(3, 5), sn.vendorYaw)]).shop = 'dome_snack';
 
   // ---------------------------------------------------------------- fermier : abreuvoir, grange, enclos ; jardinière : potager
   const FZ = G.farmZone, inFarm = (u, v) => u > FZ.u0 && u < FZ.u1 && v > FZ.v0 && v < FZ.v1 && !(Math.abs(u - FZ.barn.u) < 2.7 && Math.abs(v - FZ.barn.v) < 2.6);
@@ -188,7 +188,7 @@ export function populateGarden(ctx, lib, player, G) {
   actor(farmer, () => {
     const [u, v] = farmPt();
     return [{ move: at(19, -4.9) }, act('interact', R2(3, 5), Math.PI), { move: at(u, v), speed: 0.9 }, act('idle', R2(3, 6), R2(-3, 3)), { move: at(22, 0.3), speed: 0.9 }, act('pickup', 2.4, Math.PI), { move: at(17.3, -0.4), speed: 0.9 }, act('talk', R2(4, 7), -Math.PI / 2)];
-  });
+  }).day = true;
   const gardener = mk(4, { top: 0x7a5a3a, bottom: 0x4a5a3a, accent: 0xe8d24a, boot: 0x3a2a1a }, at(4, -20.6), 0);
   gardener.talkRole = 'jardinier';
   const VZ = G.vegZone;
@@ -197,7 +197,7 @@ export function populateGarden(ctx, lib, player, G) {
     for (let r = 0; r < 3; r++) { const v = VZ.v0 + 1 + r * 2 - 0.95, u = R2(VZ.u0 + 1, VZ.u1 - 1); out.push({ move: at(u, v), speed: 0.8 }, act('repair', R2(6, 10), 0)); }
     out.push({ move: at(VZ.u0 - 0.9, VZ.v0 + 2.4), speed: 0.8 }, act('pickup', 2.4, -Math.PI / 2), act('idle', R2(2, 4), Math.PI / 2));
     return out;
-  });
+  }).day = true;
 
   // ---------------------------------------------------------------- parents sur les bancs (aire de jeux)
   const parents = [];
@@ -208,7 +208,7 @@ export function populateGarden(ctx, lib, player, G) {
     const c = mk(i + 2, CASUAL[i % CASUAL.length], b.p, b.yaw);
     c.talkRole = 'parent'; c.play(i % 4 ? 'sit' : 'sitTalk', { fade: 0 }); parents.push(c);
     const n = actor(c, () => [act(Math.random() < 0.6 ? 'sit' : 'sitTalk', R2(10, 25), b.yaw, { keep: true })]);
-    n.seat = b;
+    n.seat = b; n.day = true;
   });
 
   // ---------------------------------------------------------------- enfants
@@ -263,7 +263,7 @@ export function populateGarden(ctx, lib, player, G) {
     const p = playPt();
     const c = mk(i, { ...KIDC[i % KIDC.length], accent: 0xffffff }, p, R2(0, 6), { kid: true, look });
     c.talkRole = 'enfant';
-    kids.push(actor(c, kidPlan, { kid: true, speed: 1.6 }));
+    kids.push(actor(c, kidPlan, { kid: true, speed: 1.6, day: true }));
   }
   // un enfant et son père nourrissent les canards ; ils vont ensuite chercher une glace et reviennent
   const pondSpot = (a, m = 0.9) => { const r = G.pondR(a) + m; return at(G.POND.u + Math.cos(a) * r, G.POND.v + Math.sin(a) * r); };
@@ -287,12 +287,12 @@ export function populateGarden(ctx, lib, player, G) {
       act('idle', R2(4, 7), gl.yaw, { exit: (m) => m.c.hold(cone(), 'cone') }),
       go(Math.atan2(-2, 9), null, 1.1),
       act('idle', 1.5), { fn: (m) => { m.c.hold(null); m.at = null; } },
-    ], { kid: true, speed: 1.1 });
+    ], { kid: true, speed: 1.1, day: true });
     actor(dad, (n) => [
       ...toPond(n, feedP), act('talk', R2(16, 24), faceTo(at(G.POND.u, G.POND.v))), act('idle', 2),
       go('plaza', gl.customer.clone()), act('talk', R2(4, 7), gl.yaw), act('idle', 1.2),
       go(Math.atan2(-2, 9)), act('idle', 1.5), { fn: (m) => { m.at = null; } },
-    ], { speed: 1.05 });
+    ], { speed: 1.05, day: true });
     kids.push(kidN);
   }
 
@@ -318,7 +318,7 @@ export function populateGarden(ctx, lib, player, G) {
     let eating = false;
     const n = actor(c, () => [{ anim: 'sit', keep: true, dur: R2(8, 16), face: st.yaw, enter: (m) => { eating = true; m.c.eat(plateP, null); } },
       { anim: 'sitTalk', dur: R2(6, 12), face: st.yaw, enter: (m) => { if (eating) { m.c.eat(null); eating = false; } } }]);
-    n.seat = st; diners.push(n);
+    n.seat = st; n.day = true; n.food = f; diners.push(n);
   }
   // promeneurs : couples et solitaires sur le grand cercle, haltes au bassin, sur la colline, devant l'enclos et le potager
   const HALTS = [
@@ -475,8 +475,11 @@ export function populateGarden(ctx, lib, player, G) {
     const both = ss.busy[0] && ss.busy[1] && ss.busy[0].saw !== undefined && ss.busy[1].saw !== undefined;
     ss.g.rotation.z = both ? Math.sin(T0 * 1.8) * 0.26 : ss.g.rotation.z * 0.95 + (ss.busy[0] ? 0.26 : ss.busy[1] ? -0.26 : 0.26) * 0.05;
     // personnages
-    const cam = ctx.camera.position;
+    const cam = ctx.camera.position, hr = ctx.time.hour, late = hr >= 21.5 || hr < 7.5;
     for (const n of actors) {
+      // le soir, les familles rentrent ; les marchands suivent leurs horaires
+      if ((n.day && late) || (n.shop && !ctx.time.open(n.shop))) { n.c.root.visible = false; if (n.food) n.food.visible = false; continue; }
+      if (n.food) n.food.visible = true;
       step(n, dt);
       const c = n.c;
       // attaches : balançoire, tourniquet, bascule, échelle, glissade

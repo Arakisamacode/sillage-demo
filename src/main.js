@@ -695,7 +695,7 @@ async function boot() {
   elevators.onEvent = (e, S, carried) => {
     if (e === 'start' || e === 'arrived') audio.blip();
     if (e === 'called') toast('Ascenseur appelé · cabine en approche');
-    if (e === 'arrived' && carried) toast(S.y > 1 ? 'Pont habitat · bar La Comète, infirmerie, cabines · Cour des Saveurs (couloir nord)' : 'Rez-de-chaussée · galerie marchande');
+    if (e === 'arrived' && carried) toast(S.y > 1 ? 'Pont habitat · bar La Comète, infirmerie, cabines · Cour des Saveurs (couloir nord) · Grand Dôme au fond de la Cour' : 'Rez-de-chaussée · galerie marchande');
   };
   for (const S of HB.shafts) {
     for (const y of [0, DECK_Y]) {
@@ -711,7 +711,7 @@ async function boot() {
     audio.blip(); toast(`${CANS[Math.floor(Math.random() * CANS.length)]} · −4 ¤`);
   } });
   for (const tm of ctx.furnish.terminals) interactables.push({ pos: tm.pos, r: 1.4, label: 'E — Borne : plan de la station', fn: () => {
-    audio.blip(); toast('Hangar 07 : est, par le sas · Boutiques : côté nord · Module habitat et ascenseurs : porte ouest · Contrats de fret : quai du hangar');
+    audio.blip(); toast('Hangar 07 : est, par le sas · Boutiques : côté nord · Module habitat et ascenseurs : porte ouest · Contrats de fret : quai du hangar · Grand Dôme (jardins) : pont habitat, Cour des Saveurs, porte est');
   } });
   const F = ctx.furnish;
   interactables.push({ pos: F.diag.pos, r: 1.4, label: 'E — Terminal de diagnostic du Héron', fn: () => {

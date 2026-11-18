@@ -2,7 +2,7 @@
 
 Toutes les ressources tierces sont **CC0 1.0 (domaine public)**. Aucune ressource ni aucun nom
 n'est issu de Star Citizen ou d'un autre jeu. Les noms (station Halden-7, Sillage Orbital Logistics,
-Héron, Mulet H4, Faucon, Navette ST-40, Galerie du Belvédère…) sont inventés pour cette démo.
+Héron, Mulet H4, Faucon, Navette ST-40, Galerie du Belvédère…) sont inventés pour ce jeu.
 
 > Note de provenance : l'environnement de développement n'avait accès qu'à npm et aux dépôts
 > GitHub publics (polyhaven.com, ambientcg.com et quaternius.com étaient bloqués par le proxy).
@@ -45,6 +45,14 @@ Source amont : https://polyhaven.com/hdris — licence : https://polyhaven.com/l
 | `worn_shutter_*` | https://polyhaven.com/a/worn_shutter | CC0 1.0 |
 | `metal_plate_*` | https://polyhaven.com/a/metal_plate | CC0 1.0 |
 | `large_grey_tiles_*` | https://polyhaven.com/a/large_grey_tiles | CC0 1.0 |
+| `park_dirt_*` (chemins du Grand Dôme) | https://polyhaven.com/a/park_dirt | CC0 1.0 |
+| `coast_sand_01_*` (bac à sable) | https://polyhaven.com/a/coast_sand_01 | CC0 1.0 |
+| `bark_brown_02_*` (écorce des arbres) | https://polyhaven.com/a/bark_brown_02 | CC0 1.0 |
+| `raked_dirt_*` (potager, talus) | https://polyhaven.com/a/raked_dirt | CC0 1.0 |
+| `weathered_planks_*` (terrasse, grange, clôtures) | https://polyhaven.com/a/weathered_planks | CC0 1.0 |
+| `roof_planks_*` (toits) | https://polyhaven.com/a/roof_planks | CC0 1.0 |
+| `river_small_rocks_*` (fond du bassin) | https://polyhaven.com/a/river_small_rocks | CC0 1.0 |
+| `lawn_*` (pelouse) | https://polyhaven.com/a/sparse_grass — couleur recalculée en vert pelouse (normale et ARM d'origine) | CC0 1.0 |
 
 Script : `tools/fetch_polyhaven.py` (diffuse, normale OpenGL, ARM), recompressées en JPEG.
 
@@ -64,11 +72,16 @@ Modification : conversion en JPEG.
 | `potted_plant_02`, `potted_plant_04` (plantes des bacs hydroponiques) | CC0 1.0 |
 | `croissant`, `hamburger_buns`, `carrot_cake`, `strawberry_chocolate_cake`, `lemon`, `food_lime_01`, `food_apple_01`, `food_avocado_01`, `food_kiwi_01`, `food_pomegranate_01`, `yellow_onion`, `food_ginger_01` | CC0 1.0 |
 | `wooden_cutting_board`, `wine_bottles_01`, `cardboard_box_01`, `plastic_crate_01` | CC0 1.0 |
+| Grand Dôme (`public/assets/models/garden/*.glb`) : `fern_02`, `shrub_02`, `shrub_04`, `flower_gazania`, `flower_empodium`, `flower_ursinia`, `wild_rooibos_bush`, `wooden_picnic_table`, `painted_wooden_bench`, `wooden_lantern_01`, `wooden_bucket_01`, `barrel_03`, `wooden_crate_02`, `wicker_basket_02`, `watering_can_metal_01`, `rock_moss_set_02`, `namaqualand_boulders_01`, `tree_stump_01`, `garden_gnome`, `rubber_duck_toy`, `planter_box_02` | CC0 1.0 |
 
 Source : https://polyhaven.com/models (page de chaque modèle : https://polyhaven.com/a/<identifiant>) — licence : https://polyhaven.com/license
 Script : `tools/fetch_ph_models.mjs` (glTF 1k, simplification meshoptimizer, textures JPEG 256–1024 px).
 Le mobilier de la Cour (sièges coque, tables, suspensions, banquettes, bacs hydroponiques) et le sol en résine sont des créations
 du projet (`src/world/scififurn.js`, `src/world/foodcourt.js`).
+Au Grand Dôme, les arbres (tronc en écorce scannée, feuillage en cartes dessinées), l'aire de jeux, la grange, le chariot du
+glacier, le kiosque, les lampions, l'eau du bassin et le ciel artificiel sont des créations du projet (`src/world/garden.js`) ;
+les animaux (moutons, chèvres, poules, canards, carpes koï, papillons, hirondelles) sont modélisés et animés dans
+`src/world/gardenlife.js`.
 Les plats sans équivalent CC0 (pizzas, sushis, phở, currys, tacos, burgers…) sont modélisés dans le projet avec des textures
 alimentaires générées (`src/world/foodtex.js`).
 

@@ -175,6 +175,34 @@ await step('ascenseurs (3 cabines, 2 sens)', async () => {
   ok('chaque trajet amène le joueur au bon niveau', r.every(Boolean), JSON.stringify(r));
 });
 
+await step('Grand Dôme (accès, chemins, vie, boutiques)', async () => {
+  const r = await E(() => {
+    const A = window.__app, P = A.player, G = A.garden, out = {};
+    const inp = { move: { x: 0, y: 1 }, keys: new Set(), consumeLook: () => ({ dx: 0, dy: 0 }), consume: () => false, run: false };
+    const walk = (to, sec) => { for (let i = 0; i < sec * 30; i++) { P.yaw = Math.atan2(-(to.x - P.pos.x), -(to.z - P.pos.z)); P.update(1 / 30, inp, [], []); A.simulate(1 / 30, (window.__t += 1 / 30)); if (Math.hypot(to.x - P.pos.x, to.z - P.pos.z) < 0.6) return true; } return false; };
+    // depuis la Cour des Saveurs, par la porte est et la passerelle, jusqu'à la place aux lampions puis la ferme
+    out.avant = { assis: !!P.seated, vol: A.flight.state, actif: A.flight.active, dial: A.dialog.active };
+    P.stand(); P.pos.set(-78, 40.05, 20); P.vel.set(0, 0, 0);
+    const trace = []; const w0 = walk; const walk2 = (to, sec) => { const r = w0(to, sec); trace.push(P.pos.toArray().map((x) => x.toFixed(1)).join(',')); return r; };
+    out.passerelle = walk2(G.W(-21, 0, 15), 14);
+    out.chemin = walk2(G.W(-15.5, 0, 10.6), 8) && walk2(G.W(-12.4, 0, 8.3), 6) && walk2(G.W(-6.2, 0, 5.4), 6);
+    out.anneau = walk2(G.W(0, 0, 15), 12) && walk2(G.W(10.6, 0, 10.6), 10) && walk2(G.W(15, 0, 0), 10) && walk2(G.W(10.6, 0, -10.6), 10) && walk2(G.W(0, 0, -15), 10);
+    out.trace = trace.join(' ');
+    out.dansLeDome = G.inside(P.pos) && Math.abs(P.pos.y - 40 - G.heightAt(P.pos.x - G.C.x, P.pos.z - G.C.z)) < 0.4;
+    window.__sim(30);
+    const L = A.gardenLife;
+    out.vivants = L.actors.every((n) => Number.isFinite(n.pos.x + n.pos.y + n.pos.z));
+    out.enfantsEnJeu = L.kids.filter((n) => n.q.length).length;
+    A.time.setHour(14);
+    out.glaceOuverte = A.time.open('dome_glace') && A.time.open('dome_snack');
+    A.shop.openStore('dome_glace'); out.carte = document.querySelectorAll('.sh-item').length; A.shop.close?.();
+    return out;
+  });
+  ok('passerelle franchie, chemins praticables, sol suivi', r.passerelle && r.chemin && r.anneau && r.dansLeDome, JSON.stringify(r));
+  ok('habitants et enfants actifs, positions valides', r.vivants && r.enfantsEnJeu >= 3, JSON.stringify(r));
+  ok('glacier et snack ouverts et approvisionnés', r.glaceOuverte && r.carte >= 4, JSON.stringify(r));
+});
+
 await step('analyse, codex, briefing, interfaces', async () => {
   const r = await E(() => {
     const A = window.__app;

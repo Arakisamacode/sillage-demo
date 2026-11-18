@@ -11,7 +11,7 @@ Univers original, ressources CC0 ou créées pour le projet (voir [CREDITS.md](C
 | ![Vue haute](docs/screenshots/high.jpg) | ![Ravitaillement](docs/screenshots/fuel.jpg) |
 | ![Galerie](docs/screenshots/gallerylife.jpg) | ![Baie](docs/screenshots/bay.jpg) |
 
-## Lancer la démo
+## Lancer le jeu
 
 Prérequis : Node.js 20 ou plus récent.
 
@@ -214,6 +214,33 @@ bassin miroir et sculpture orbitale animée au centre.
   trajet), font deux ou trois haltes (vitrines, comptoirs, yacht, bar, banquettes face à l'espace), puis redescendent.
 - La coupole repose sur un calice nacré nervuré, bagué de lumière, prolongé par un fût jusqu'au toit du hall du pont
   habitat : la structure est visible depuis l'espace et par la verrière de la Cour des Saveurs.
+
+## Le Grand Dôme (jardins)
+
+Au fond de la Cour des Saveurs, la **porte est** (enseigne verte « LE GRAND DÔME · JARDINS ») ouvre sur une passerelle
+vitrée qui mène sous une **coupole de verre de 56 m de diamètre** posée sur le toit de la galerie, portée par huit piliers
+visibles depuis l'espace.
+
+- **Paysage** : pelouse vallonnée, colline au sud-ouest, seize arbres (écorce scannée, feuillage dense),
+  buissons, fougères et fleurs photoscannées, touffes d'herbe haute, rochers moussus, souche et nain de jardin.
+- **Chemins** de terre battue bordés de pierres : un grand cercle de promenade et ses embranchements (entrée, place,
+  aire de jeux, ferme, potager, colline), lanternes en bois.
+- **Bassin** : eau animée (ondulations, reflets du ciel, éclats du soleil), fond de galets, nénuphars fleuris, roseaux,
+  carpes koï, colverts, canes et leurs canetons qui suivent leur mère ; ils accourent quand un enfant leur lance du pain.
+- **Ferme** : grange rouge, enclos avec portail, abreuvoir, balles de foin ; moutons qui broutent, chèvres, poules qui
+  picorent ; le fermier fait sa tournée. **Potager** : salades, poireaux, tomates sur tuteurs, épouvantail ; la jardinière
+  travaille à genoux entre les rangs.
+- **Aire de jeux** : bac à sable, toboggan (échelle, glissière en U), balançoires, tourniquet, bascule, dôme d'escalade.
+  Les enfants jouent à chat, se balancent, glissent, montent sur le tourniquet et la bascule ; les parents les surveillent
+  depuis les bancs.
+- **Place aux lampions** : terrasse en bois, tables de pique-nique (on peut s'y asseoir), guirlandes de lampions de
+  couleur, **glacier** (chariot à parasol rayé, six parfums) et **snack** (crêpes, gaufres, hot-dogs, limonade) :
+  E au comptoir pour parler au marchand et commander. Des promeneurs y mangent, d'autres font le tour du bassin.
+- **Ciel artificiel** : il suit l'horloge de la station (bleu nuageux le jour, crépuscule orangé à 20 h, étoiles la nuit),
+  soleil au zénith ; les lampions brillent davantage le soir. Familles, enfants et marchands rentrent à la tombée de la nuit.
+- Ambiance sonore : bassin, chants d'oiseaux, rires d'enfants lointains, bêlements. Deux entrées de codex à analyser (C).
+- Tout le monde se parle (E) : enfants (leur propre monde : jeux, secrets du dôme), parents, promeneurs, glacier, snack,
+  fermier, jardinière, dix répliques chacun.
 
 ## Vie de la station (horaires)
 
