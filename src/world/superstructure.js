@@ -20,7 +20,7 @@ function rng(seed) { let s = seed; return () => ((s = (s * 16807) % 2147483647) 
 
 export function buildSuperstructure(ctx) {
   const { mats, scene } = ctx;
-  const B = new Builder(null);
+  const B = new Builder(null); B.cellSize = 1000;   // peu de lots : un appel de rendu par matériau
   const R = rng(4242);
   const hull = mats.paint(0x5d6368, { grime: 0.8, scratch: 0.6, rust: 0.1 });
   const hullD = mats.paint(0x464b50, { grime: 0.9, scratch: 0.7, rust: 0.12 });

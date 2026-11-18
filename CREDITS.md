@@ -78,9 +78,11 @@ Source : https://polyhaven.com/models (page de chaque modèle : https://polyhave
 Script : `tools/fetch_ph_models.mjs` (glTF 1k, simplification meshoptimizer, textures JPEG 256–1024 px).
 Le mobilier de la Cour (sièges coque, tables, suspensions, banquettes, bacs hydroponiques) et le sol en résine sont des créations
 du projet (`src/world/scififurn.js`, `src/world/foodcourt.js`).
+La superstructure extérieure (plateforme, coque, pylônes, liaisons, équipements de toit) est une création du projet
+(`src/world/superstructure.js`).
 Au Grand Dôme, les arbres (tronc en écorce scannée, feuillage en cartes dessinées), l'aire de jeux, la grange, le chariot du
 glacier, le kiosque, les lampions, l'eau du bassin et le ciel artificiel sont des créations du projet (`src/world/garden.js`) ;
-les animaux (moutons, chèvres, poules, canards, carpes koï, papillons, hirondelles) sont modélisés et animés dans
+les animaux (moutons, chèvres, cochons, lapins, poules, canards, carpes koï, papillons, hirondelles) sont modélisés et animés dans
 `src/world/gardenlife.js`.
 Les plats sans équivalent CC0 (pizzas, sushis, phở, currys, tacos, burgers…) sont modélisés dans le projet avec des textures
 alimentaires générées (`src/world/foodtex.js`).

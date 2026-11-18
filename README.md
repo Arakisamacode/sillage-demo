@@ -215,6 +215,21 @@ bassin miroir et sculpture orbitale animée au centre.
 - La coupole repose sur un calice nacré nervuré, bagué de lumière, prolongé par un fût jusqu'au toit du hall du pont
   habitat : la structure est visible depuis l'espace et par la verrière de la Cour des Saveurs.
 
+## Architecture extérieure de la station
+
+Vue de l'espace, Halden-7 forme un ensemble porteur cohérent :
+- **Plateforme blindée** (8 m d'épaisseur) sous tout le pont habitat, à panneaux de blindage de tons variés, membrures,
+  ceintures, hublots éclairés, chanfreins, coursive périphérique balisée et feux de navigation (bâbord rouge, tribord vert).
+- **Coque pressurisée du pont habitat** autour du hall, des cabines et de la Cour des Saveurs, avec ouvertures alignées
+  sur les vitrages intérieurs (baie du hall avec jardinières, vitrage ouest de la Cour, verrière en puits de lumière,
+  passerelle du dôme, ascenseur panoramique) ; toit équipé : radiateurs, échangeurs thermiques, gaines, antennes,
+  parabole, aires de maintenance marquées. Marquages peints « HALDEN-7 » et « PONT HABITAT · H-3 ».
+- **Tour des ascenseurs** (cage vitrée éclairée), **pylônes** sur le toit de la galerie avec croisillons, **poutre-caisson**
+  et **tube pressurisé** jusqu'au corps de la station.
+- **Socle cylindrique du Grand Dôme** (hublots, coursive balisée), posé sur jambes de force et pylônes.
+- **Pylônes d'approche** en treillis (membrures, cadres, croisillons) et bras d'amarrage en poutre Warren balisée,
+  anneau d'amarrage nervuré ; anneaux habités segmentés par des colliers de raidissement.
+
 ## Le Grand Dôme (jardins)
 
 Au fond de la Cour des Saveurs, la **porte est** (enseigne verte « LE GRAND DÔME · JARDINS ») ouvre sur une passerelle
@@ -227,17 +242,19 @@ visibles depuis l'espace.
   aire de jeux, ferme, potager, colline), lanternes en bois.
 - **Bassin** : eau animée (ondulations, reflets du ciel, éclats du soleil), fond de galets, nénuphars fleuris, roseaux,
   carpes koï, colverts, canes et leurs canetons qui suivent leur mère ; ils accourent quand un enfant leur lance du pain.
-- **Ferme** : grange rouge, enclos avec portail, abreuvoir, balles de foin ; moutons qui broutent, chèvres, poules qui
-  picorent ; le fermier fait sa tournée. **Potager** : salades, poireaux, tomates sur tuteurs, épouvantail ; la jardinière
+- **Ferme** : grange rouge, enclos avec portail, abreuvoir, balles de foin, bauge ; moutons qui broutent, chèvres,
+  cochons, poules qui picorent ; le fermier fait sa tournée. **Potager** : salades, poireaux, tomates sur tuteurs, épouvantail ; la jardinière
   travaille à genoux entre les rangs.
 - **Aire de jeux** : bac à sable, toboggan (échelle, glissière en U), balançoires, tourniquet, bascule, dôme d'escalade.
-  Les enfants jouent à chat, se balancent, glissent, montent sur le tourniquet et la bascule ; les parents les surveillent
+  **Enclos à lapins** (clapier, foin, carottes) : les enfants viennent leur tendre des carottes. Les enfants (proportions
+  d'enfant : tête plus grosse, membres plus courts) jouent à chat, se balancent, glissent, montent sur le tourniquet et la bascule ; les parents les surveillent
   depuis les bancs.
 - **Place aux lampions** : terrasse en bois, tables de pique-nique (on peut s'y asseoir), guirlandes de lampions de
   couleur, **glacier** (chariot à parasol rayé, six parfums) et **snack** (crêpes, gaufres, hot-dogs, limonade) :
   E au comptoir pour parler au marchand et commander. Des promeneurs y mangent, d'autres font le tour du bassin.
 - **Ciel artificiel** : il suit l'horloge de la station (bleu nuageux le jour, crépuscule orangé à 20 h, étoiles la nuit),
-  soleil au zénith ; les lampions brillent davantage le soir. Familles, enfants et marchands rentrent à la tombée de la nuit.
+  soleil au zénith ; la nuit, la lumière baisse vraiment sous la coupole (clair de lune bleuté), les lanternes des
+  chemins s'allument et les lampions brillent davantage. Familles, enfants et marchands rentrent à la tombée de la nuit.
 - Ambiance sonore : bassin, chants d'oiseaux, rires d'enfants lointains, bêlements. Deux entrées de codex à analyser (C).
 - Tout le monde se parle (E) : enfants (leur propre monde : jeux, secrets du dôme), parents, promeneurs, glacier, snack,
   fermier, jardinière, dix répliques chacun.
