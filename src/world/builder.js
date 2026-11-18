@@ -43,7 +43,8 @@ export class Builder {
     g.computeBoundingSphere();
     const c = g.boundingSphere.center;
     const cs = this.cellSize || 40;
-    const cell = g.boundingSphere.radius > 30 ? 'big' : Math.floor(c.x / cs) + '_' + Math.floor(c.z / cs);
+    // cellule : position au sol et tranche de hauteur (niveaux de la station dessinés séparément)
+    const cell = g.boundingSphere.radius > 30 ? 'big' + Math.floor(c.y / 25) : Math.floor(c.x / cs) + '_' + Math.floor(c.z / cs) + '_' + Math.floor(c.y / 25);
     const key = mat.uuid + (cast ? 'c' : '') + (receive ? 'r' : '') + cell;
     let grp = this.groups.get(key);
     if (!grp) { grp = { mat, geos: [], cast, receive }; this.groups.set(key, grp); }

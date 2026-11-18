@@ -37,6 +37,7 @@ import { Scanner, nameFor } from './ui/scanner.js';
 import { peopleTree } from './game/chatter.js';
 import { buildBriefRoom, buildMerle } from './world/briefroom.js';
 import { buildNeon } from './world/neon.js';
+import { LightPool, LevelCull, warmShaders } from './core/perf.js';
 import { Wingmen, PILOTS } from './game/wingmen.js';
 import { Briefing } from './ui/briefing.js';
 import { buildLuxury, populateLuxury, LUX_Y } from './world/luxury.js';
@@ -116,7 +117,7 @@ async function boot() {
 
   const scenes = buildScenes(ctx);
   const crowd = new Crowd(ctx, scenes);
-  builder.finalize();
+  const staticMeshes = builder.finalize();
   ctx.fx = buildFX(ctx);
   const player = new Player(ctx, builder.collisionGeometry());
   const flight = new Flight(ctx, ctx.ships.heron);
@@ -423,6 +424,8 @@ async function boot() {
       { move: V(-116, -7) }, { move: V(-116, 13) }, { move: V(-116 + R2(-1.2, 1.2), 20) },
       ...orderSteps(),
     ];
+    // plateaux de chaque cuisine créés une fois (cachés) pour que leurs shaders soient compilés au chargement
+    { const warm = new THREE.Group(); warm.visible = false; for (const k of new Set(Object.values(DISH_OF).flat())) warm.add(trays(k).obj); scene.add(warm); }
     const tops2 = [0x6a4a32, 0x1a2436, 0x5d6168, 0xa89470, 0x2b3036, 0x7a2a24, 0x3a5a4a, 0x8a3a5a, 0xc8a46a, 0x2c4a6e, 0x4a2a5a, 0x9a5a2a];
     const nCust = low ? 10 : 24;
     const custs = [];
@@ -1203,12 +1206,28 @@ async function boot() {
     if (input.consume('codex') && running && !shop.isOpen && !dialog.active && !scanner.codexOpen) openUI(() => scanner.openCodex(() => { input.enabled = true; if (touch) $('touch').classList.remove('hidden'); else $('view').requestPointerLock?.(); }));
     if (scanner.on) scanner.update(dt, camera, scanPeople(), interactables);
     if (dialog.active) dialog.updateCamera(dt, player);
+    ctx.lightPool?.update(camera.position);
     if (quality.name === 'medium') { renderer.three.shadowMap.autoUpdate = false; renderer.three.shadowMap.needsUpdate = (++shadowTick % 2) === 0; }
     renderer.render(dt);
     fpsAcc += dt; fpsN++;
     if (fpsAcc > 0.5) { fpsEl.textContent = `${Math.round(fpsN / fpsAcc)} i/s · ${quality.name}`; fpsAcc = 0; fpsN = 0; }
     requestAnimationFrame(frame);
   }
+  // performances : réserve de lumières à effectif constant, découpage par niveaux, shaders précompilés
+  const lightPool = new LightPool(scene, quality);
+  const levelCull = new LevelCull(staticMeshes);
+  ctx.lightPool = lightPool; ctx.levelCull = levelCull;
+  ctx.updaters.push(() => {
+    const free = flight.active && !ground.onFoot;
+    levelCull.update(player.pos.y, free);
+    const up = !free && player.pos.y > 26;   // foule du rez-de-chaussée masquée depuis les étages
+    if (up !== ctx._crowdUp) { ctx._crowdUp = up; for (const a of crowd.agents) a.char.root.visible = !up && !a.away; }
+  });
+  $('loading').classList.remove('hidden');
+  progress(0.97, 'Préparation des shaders');
+  await tick();
+  await warmShaders(renderer.three, scene, camera, () => renderer.render(1 / 30));
+  $('loading').classList.add('hidden');
   frame();
   window.__app = ctx;
   window.__THREE = THREE;
