@@ -50,13 +50,23 @@ export function buildFoodCourt(ctx) {
   box(C.x1 + 114, C.h, 0.3, wallW, [(C.x1 - 114) / 2, Y + C.h / 2, C.z0 - 0.15], null, true);
   box(4, C.h - 3.2, 0.3, wallW, [-116, Y + 3.2 + (C.h - 3.2) / 2, C.z0 - 0.15]);
   box(W, C.h, 0.3, wallW, [cx, Y + C.h / 2, C.z1 + 0.15], null, true);
-  box(0.3, C.h, D, wallW, [C.x1 + 0.15, Y + C.h / 2, cz], null, true);
+  // mur est percé : passerelle vers le Grand Dôme (z 18,4 → 21,6, hauteur 3,4 m)
+  { const a = 18.4, b = 21.6, hh = 3.4;
+    box(0.3, C.h, a - C.z0, wallW, [C.x1 + 0.15, Y + C.h / 2, (C.z0 + a) / 2], null, true);
+    box(0.3, C.h, C.z1 - b, wallW, [C.x1 + 0.15, Y + C.h / 2, (b + C.z1) / 2], null, true);
+    box(0.3, C.h - hh, b - a, wallW, [C.x1 + 0.15, Y + hh + (C.h - hh) / 2, (a + b) / 2], null, true);
+    const gate = mats.emissive(0x9fffb0, 2.2);
+    box(0.34, 0.06, b - a + 0.2, gate, [C.x1 + 0.12, Y + hh + 0.05, (a + b) / 2]);
+    for (const zz of [a - 0.05, b + 0.05]) box(0.34, hh, 0.06, gate, [C.x1 + 0.12, Y + hh / 2, zz]);
+    const gs = neonTexture('LE GRAND DÔME · JARDINS ▶', '#9fffb0', { size: 80 });
+    const gm = new THREE.Mesh(new THREE.PlaneGeometry(4.2, 4.2 / gs.aspect), neonMaterial(gs.tex, 2.2));
+    gm.position.set(C.x1 - 0.06, Y + hh + 0.6, (a + b) / 2); gm.rotation.y = -Math.PI / 2; scene.add(gm); }
   box(0.3, 0.9, D, wallW, [C.x0 - 0.15, Y + 0.45, cz], null, true);
   box(0.3, C.h - 6.2, D, wallW, [C.x0 - 0.15, Y + 6.2 + (C.h - 6.2) / 2, cz]);
   box(0.06, 5.3, D - 1, mats.glass(0x9fc4dc, 0.14), [C.x0 - 0.15, Y + 0.9 + 2.65, cz], null, true);
   for (let z = C.z0 + 1; z <= C.z1 - 1; z += 4.2) box(0.3, C.h, 0.3, mats.metal(0x5a5048), [C.x0 - 0.1, Y + C.h / 2, z]);
   // lambris bas
-  for (const [x, z, w, d] of [[cx, C.z1 - 0.02, W, 0.04], [C.x1 - 0.02, cz, 0.04, D]]) box(w, 1.1, d, wood, [x, Y + 0.55, z]);
+  for (const [x, z, w, d] of [[cx, C.z1 - 0.02, W, 0.04], [C.x1 - 0.02, (C.z0 + 18.4) / 2, 0.04, 18.4 - C.z0], [C.x1 - 0.02, (21.6 + C.z1) / 2, 0.04, C.z1 - 21.6]]) box(w, 1.1, d, wood, [x, Y + 0.55, z]);
   // plafond avec verrière centrale
   const ceil = mats.paint(0x3a3430, { grime: 0.3 });
   const hx0 = -126, hx1 = -84, hz0 = 23, hz1 = 41;

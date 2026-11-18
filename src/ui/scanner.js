@@ -23,6 +23,8 @@ export const CODEX = {
   sphere: { t: 'Sphère des tendances', cat: 'Culture', x: 'Instrument d\'Iréna Solvay. Chaque point est une trajectoire de vie ; chaque anneau, une équation. Ensemble, ils dessinent l\'avenir probable des foules — jamais celui d\'un individu.' },
   cour: { t: 'Cour des Saveurs', cat: 'Lieux', x: 'Salle de restauration du pont habitat : dix restaurants sous verrière, de la cuisine du Dragon de Jade aux pizzas du Vesuvio. Le cœur social de la station.' },
   breche: { t: 'Les Fils de la Brèche', cat: 'Factions', x: 'Pirates issus d\'équipages ruinés. Ils frappent les routes de fret près de la ceinture d\'Ardent. Certains disent qu\'ils sont payés pour accélérer le déclin des stations.' },
+  dome: { t: 'Le Grand Dôme', cat: 'Lieux', x: 'Jardin public sous coupole de 56 m, bâti sur le toit de la galerie quand la station comptait encore ses enfants par milliers. Pelouse, bassin, ferme pédagogique, potager, aire de jeux. Le ciel artificiel suit l\'horloge de bord ; les habitants disent qu\'on y respire mieux.' },
+  ferme: { t: 'Ferme du Dôme', cat: 'Culture', x: 'Moutons, chèvres et poules descendent des souches embarquées au départ des chantiers. Leur laine, leur lait et leurs œufs sont symboliques ; leur présence ne l\'est pas : la plupart des enfants de Halden-7 n\'ont jamais vu d\'animal ailleurs.' },
   lys: { t: 'Station agricole Lys', cat: 'Lieux', x: 'Serres orbitales et coopérative : Lys nourrit la moitié du secteur. Son vieux relais de communication échappe aux péages.' },
 };
 

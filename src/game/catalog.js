@@ -1,4 +1,4 @@
-import { RESTAURANTS, dishItems } from './food.js';
+import { RESTAURANTS, GARDEN_SHOPS, dishItems } from './food.js';
 
 // Catalogue des biens vendus à bord de Halden-7. Prix en crédits (¤).
 // Les noms de marques et de modèles sont inventés pour ce projet.
@@ -93,7 +93,7 @@ export const STORES = {
   lx_suits: { label: 'Nova Atelier', name: 'NOVA ATELIER · COMBINAISONS', cats: ['armor'], filter: (i) => i.lux, greet: 'Chaque combinaison Nova est ajustée au millimètre. Protection, élégance, aucune concession.' },
   pharma: { label: 'Pharmacie', name: 'PHARMACIE', cats: ['consumable'], filter: (i) => ['medpen', 'medkit', 'ration'].includes(i.id), greet: 'Bonjour. Soins d\'urgence et vivres de bord.' },
   nouilles: { label: 'Nouilles Orbitales', name: 'NOUILLES ORBITALES', cats: ['consumable'], filter: (i) => i.id === 'noodles', greet: '« Un bol ? C\'est le meilleur bouillon de la station ! »' },
-  ...Object.fromEntries(RESTAURANTS.map((r) => [r.id, { label: r.label, name: r.name, cats: ['food'], filter: (i) => i.stall === r.id, greet: r.greet }])),
+  ...Object.fromEntries([...RESTAURANTS, ...GARDEN_SHOPS].map((r) => [r.id, { label: r.label, name: r.name, cats: ['food'], filter: (i) => i.stall === r.id, greet: r.greet }])),
 };
 
 // Minerais (prix au SCU : brut à la vente directe, raffiné après passage à la raffinerie)

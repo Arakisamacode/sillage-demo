@@ -34,10 +34,19 @@ export const RESTAURANTS = [
     dishes: [['Phở bœuf', 17, 'bowl'], ['Bò bún', 16, 'bowl'], ['Rouleaux de printemps (4)', 9, 'plate'], ['Café glacé au lait', 5, 'cup']] },
 ];
 
+/** Grand Dôme : glacier et snack de la place aux lampions. */
+export const GARDEN_SHOPS = [
+  { id: 'dome_glace', name: 'GLACES DU DÔME', label: 'Glacier du Dôme', cuisine: 'glacier', hours: [9, 22], cook: 'Nell',
+    greet: '« Six parfums aujourd\'hui ! La fraise de Lys est arrivée ce matin. »',
+    dishes: [['Cornet deux boules vanille-fraise', 4, 'icecream'], ['Coupe chocolat-pistache', 6, 'icecream'], ['Sorbet citron de serre', 4, 'icecream'], ['Milkshake myrtille', 5, 'cup']] },
+  { id: 'dome_snack', name: 'SNACK DU DÔME', label: 'Snack du Dôme', cuisine: 'snack', hours: [8, 22], cook: 'Bastien',
+    greet: '« Crêpes, gaufres, hot-dogs : tout est fait minute. »',
+    dishes: [['Crêpe sucre-citron', 5, 'crepe'], ['Hot-dog moutarde douce', 7, 'bread'], ['Gaufre au sucre glace', 5, 'crepe'], ['Limonade de Lys', 3, 'cup']] },
+];
 /** Articles de catalogue pour les plats (catégorie « food »). */
 export function dishItems() {
   const out = [];
-  for (const r of RESTAURANTS) r.dishes.forEach(([name, price, icon], i) => out.push({
+  for (const r of [...RESTAURANTS, ...GARDEN_SHOPS]) r.dishes.forEach(([name, price, icon], i) => out.push({
     id: `${r.id}_${i}`, cat: 'food', name, price, desc: `${r.label} · ${r.cuisine}`, eat: true, icon, stall: r.id, heal: Math.min(25, 5 + price),
   }));
   return out;

@@ -1,4 +1,4 @@
-import { RESTAURANTS } from './food.js';
+import { RESTAURANTS, GARDEN_SHOPS } from './food.js';
 
 // Horloge de la station : temps accéléré (1 s réelle = 48 s à bord, une journée = 30 min de jeu).
 // Horaires d'ouverture des boutiques, nuit (galerie vide, éclairage réduit).
@@ -6,7 +6,7 @@ import { RESTAURANTS } from './food.js';
 export const HOURS = {
   nouilles: [7, 24], armes: [9, 21], pieces: [8, 20], pharma: [0, 24], combis: [10, 21],
   kiosque: [6, 23], galerie: [7, 23],
-  ...Object.fromEntries(RESTAURANTS.map((r) => [r.id, r.hours])),
+  ...Object.fromEntries([...RESTAURANTS, ...GARDEN_SHOPS].map((r) => [r.id, r.hours])), dome: [0, 24],
 };
 
 export class StationClock {

@@ -1,6 +1,6 @@
 // Télécharge des modèles 3D photoscannés CC0 de Poly Haven (glTF 1k), les allège (simplification
 // meshoptimizer, textures JPEG redimensionnées) et les écrit en .glb dans public/assets/models/ph/.
-// Usage : node tools/fetch_ph_models.mjs public/assets/models/ph
+// Usage : node tools/fetch_ph_models.mjs public/assets/models/ph   (jardin : SET=garden … public/assets/models/garden)
 import { NodeIO } from '@gltf-transform/core';
 import { weld, simplify, dedup, prune } from '@gltf-transform/functions';
 import { MeshoptSimplifier } from 'meshoptimizer';
@@ -10,7 +10,13 @@ import path from 'path';
 
 const OUT = process.argv[2] || 'public/assets/models/ph';
 // [identifiant Poly Haven, taille des textures (px), nombre de triangles visé (0 = inchangé)]
-export const MODELS = [
+export const MODELS = (process.env.SET === 'garden') ? [
+  ['fern_02', 512, 4000], ['shrub_02', 1024, 6000], ['shrub_04', 512, 4000], ['flower_gazania', 512, 4000], ['flower_empodium', 512, 0],
+  ['flower_ursinia', 512, 4000], ['wild_rooibos_bush', 512, 6000], ['wooden_picnic_table', 1024, 0], ['painted_wooden_bench', 512, 0],
+  ['wooden_lantern_01', 512, 3000], ['wooden_bucket_01', 512, 2500], ['barrel_03', 512, 0], ['wooden_crate_02', 512, 2500],
+  ['wicker_basket_02', 512, 3000], ['watering_can_metal_01', 512, 3000], ['rock_moss_set_02', 1024, 9000], ['namaqualand_boulders_01', 512, 4000],
+  ['tree_stump_01', 512, 4000], ['garden_gnome', 512, 5000], ['rubber_duck_toy', 256, 1500], ['planter_box_02', 512, 4000],
+] : [
   ['croissant', 512, 1200], ['hamburger_buns', 512, 2400], ['carrot_cake', 512, 3000], ['strawberry_chocolate_cake', 512, 4000],
   ['lemon', 256, 700], ['food_lime_01', 256, 700], ['food_apple_01', 256, 800], ['food_avocado_01', 256, 800],
   ['yellow_onion', 256, 700], ['food_ginger_01', 256, 1200], ['food_kiwi_01', 256, 800], ['food_pomegranate_01', 256, 800],

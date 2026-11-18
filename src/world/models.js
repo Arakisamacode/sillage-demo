@@ -10,6 +10,10 @@ export const PH_MODELS = [
   'lemon', 'food_lime_01', 'food_apple_01', 'food_avocado_01', 'yellow_onion', 'food_ginger_01', 'food_kiwi_01', 'food_pomegranate_01',
   'potted_plant_04', 'potted_plant_02', 'wooden_cutting_board', 'wine_bottles_01', 'cardboard_box_01', 'plastic_crate_01',
 ];
+/** dôme-jardin (dossier assets/models/garden) */
+export const GARDEN_MODELS = ['fern_02', 'shrub_02', 'shrub_04', 'flower_gazania', 'flower_empodium', 'flower_ursinia', 'wild_rooibos_bush',
+  'wooden_picnic_table', 'painted_wooden_bench', 'wooden_lantern_01', 'wooden_bucket_01', 'barrel_03', 'wooden_crate_02', 'wicker_basket_02',
+  'watering_can_metal_01', 'rock_moss_set_02', 'namaqualand_boulders_01', 'tree_stump_01', 'garden_gnome', 'rubber_duck_toy', 'planter_box_02'];
 /** variantes allégées (qualité basse) */
 const LO = [];
 
@@ -18,10 +22,10 @@ export class Models {
   async load(base = import.meta.env.BASE_URL + 'assets/models/ph/', onProgress) {
     const loader = new GLTFLoader();
     let done = 0;
-    const list = this.low ? PH_MODELS.filter((id) => !LO.includes(id)).concat(LO.map((id) => id + '_lo')) : PH_MODELS;
+    const list = (this.low ? PH_MODELS.filter((id) => !LO.includes(id)).concat(LO.map((id) => id + '_lo')) : PH_MODELS).concat(GARDEN_MODELS.map((id) => 'garden/' + id));
     await Promise.all(list.map(async (id) => {
       try {
-        const buf = await loadBinary(base + id + '.glb');
+        const buf = await loadBinary(id.startsWith('garden/') ? base.replace('/ph/', '/') + id + '.glb' : base + id + '.glb');
         const gltf = await loader.parseAsync(buf, '');
         const parts = [];
         gltf.scene.updateMatrixWorld(true);
@@ -35,7 +39,7 @@ export class Models {
         });
         const box = new THREE.Box3();
         for (const p of parts) { p.geo.computeBoundingBox(); box.union(p.geo.boundingBox); }
-        this.m[id.replace('_lo', '')] = { parts, box, size: box.getSize(new THREE.Vector3()) };
+        this.m[id.replace('_lo', '').replace('garden/', '')] = { parts, box, size: box.getSize(new THREE.Vector3()) };
       } catch (e) { console.warn('modèle', id, e); }
       onProgress?.(++done / list.length);
     }));

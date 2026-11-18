@@ -246,6 +246,91 @@ const JOBS = {
     'Je mets de côté pour ouvrir une boutique dans la galerie. Une vraie, à moi.',
     'Vous n\'avez rien vu, rien entendu, et vous allez passer une excellente soirée. Règle de la maison.',
   ],
+  // ---------------------------------------------------------------- Grand Dôme
+  enfant: [
+    'On joue à chat ! C\'est Malo qui l\'est, mais il triche, il court trop vite.',
+    'Le toboggan, il est super rapide quand on met les mains en l\'air. Essayez !',
+    'J\'ai donné du pain aux canards. Le gros vert, il a tout mangé, les autres ont rien eu.',
+    'Ma maman dit que le ciel du dôme, c\'est pas un vrai ciel. Moi je le trouve vrai quand même.',
+    'Le mouton tout blanc, il s\'appelle Nuage. C\'est moi qui l\'ai appelé comme ça.',
+    'Vous êtes un vrai pilote ? Avec un vrai vaisseau ? Vous avez déjà vu des pirates ?',
+    'Quand je serai grande, je serai fermière. Ou pilote. Ou les deux, avec des poules dans le vaisseau.',
+    'La glace à la fraise, c\'est la meilleure. La pistache, c\'est pour les grands.',
+    'Il y a des poissons orange dans le bassin. J\'en ai compté huit. Ou neuf. Ils bougent tout le temps.',
+    'Chut ! On fait une cabane derrière la colline. C\'est secret.',
+  ],
+  parent: [
+    'Je viens ici tous les jours après l\'école. C\'est le seul endroit où les enfants peuvent courir sans croiser un chariot élévateur.',
+    'Mon fils n\'a jamais vu de vrai ciel. Alors je l\'emmène sous celui-ci, en attendant.',
+    'Les autres parents, on se connaît tous. Le banc de gauche, c\'est le nôtre, depuis trois ans.',
+    'L\'entretien du dôme coûte une fortune. Chaque année, le Conseil menace de le fermer. Chaque année, on signe la pétition.',
+    'Je surveille ma fille d\'un œil et mes messages de l\'autre. Le quai ne dort jamais.',
+    'Quand j\'étais petit, il y avait trois fois plus d\'enfants ici. Il fallait faire la queue pour le toboggan.',
+    'Le glacier est gentil, il fait des demi-boules pour les petits. Officiellement, ça n\'existe pas.',
+    'On vient ici le dimanche, en famille. Pique-nique, canards, sieste sur la colline. Une vraie journée de planète.',
+    'Faites attention à la bascule, elle pince les doigts. Je l\'ai signalé il y a six mois.',
+    'Ma fille veut un mouton dans la cabine. J\'ai dit non. Elle a dessiné le mouton sur le mur. Il est très réussi.',
+  ],
+  promeneur: [
+    'Je fais le tour du bassin chaque matin. Dix-huit tours, c\'est une lieue. Enfin, c\'est ce que je me dis.',
+    'Ici, on respire. L\'air du dôme passe par les arbres avant d\'arriver dans nos poumons. Ça se sent.',
+    'Je viens lire sur la colline. Le bruit de l\'eau couvre celui des ventilateurs.',
+    'On s\'est rencontrés ici, ma femme et moi. Au bord du bassin, en nourrissant le même canard.',
+    'Le ciel suit l\'horloge de la station. Le coucher de soleil, à vingt heures, ne ratez ça sous aucun prétexte.',
+    'Les arbres ont plus de cent ans. Ils ont été plantés avec la station, avant même les chantiers.',
+    'Je suis à la retraite. Quarante ans de soudure au hangar. Maintenant, je regarde pousser les tomates.',
+    'Les jardiniers font des miracles avec trois fois rien. Les fleurs viennent de graines de Lys.',
+    'Le soir, les lampions s\'allument sur la place. C\'est le plus bel endroit de Halden, et il est gratuit.',
+    'Parfois, je ferme les yeux et j\'oublie qu\'il y a le vide de l\'autre côté de la vitre.',
+  ],
+  glacier: [
+    'Six parfums par jour, pas un de plus. Le lait vient des chèvres de la ferme, la fraise de Lys.',
+    'Je tiens ce chariot depuis quinze ans. Avant moi, c\'était mon père, et avant lui ma grand-mère.',
+    'Le parfum préféré des enfants ? Chocolat. Des pilotes ? Citron. Ils disent que ça réveille.',
+    'Le secret d\'une bonne glace en gravité artificielle : la turbine doit tourner lentement. Très lentement.',
+    'Le chariot a été fabriqué dans un module de fret. Les roues, c\'est celles d\'un vieux tracteur de piste.',
+    'En hiver de station — quand ils baissent le chauffage pour économiser — je vends des gaufres à la place.',
+    'Une boule offerte aux enfants qui ont aidé à la ferme. C\'est la règle. Ils le savent tous.',
+    'Mon parasol a été rapiécé onze fois. Je compte les reprises comme on compte les années.',
+    'Les gens de La Couronne descendent parfois, incognito. Ils prennent toujours la pistache.',
+    'Je ferme quand le ciel devient orange. C\'est le meilleur moment pour vendre, mais je veux le voir, moi aussi.',
+  ],
+  snack: [
+    'Crêpes, gaufres, hot-dogs : tout est fait minute, sur la plaque. Rien de surgelé, promis.',
+    'La pâte à crêpe repose toute la nuit. Les œufs viennent des poules de la ferme, juste à côté.',
+    'Le kiosque, c\'est mon grand-père qui l\'a construit, avec les planches d\'une vieille caisse de semences.',
+    'Le dimanche, je fais trois cents crêpes. Mon poignet le sait. Mon kiné aussi.',
+    'La limonade de Lys, c\'est la vraie. Les citrons poussent dans leurs serres, on les reçoit par caisses.',
+    'Les familles s\'installent aux tables sous les lampions. Le soir, c\'est comme une fête de village.',
+    'Un pilote m\'a dit un jour que mes crêpes valaient le voyage depuis Corvin. Je l\'ai fait encadrer.',
+    'Le hot-dog, c\'est de la protéine de culture, mais avec ma moutarde, personne ne fait la différence.',
+    'Je donne les restes aux poules. Rien ne se perd au dôme, c\'est la première règle.',
+    'Si vous cherchez une table libre, prenez celle près du mât. On y voit tout le jardin.',
+  ],
+  fermier: [
+    'Quatre moutons, deux chèvres, des poules. Ça a l\'air de rien, mais c\'est la seule ferme à cent millions de kilomètres.',
+    'Le mouton blanc, c\'est Nuage. Les enfants l\'ont baptisé. Il se prend pour un chien.',
+    'La laine part à l\'atelier de tissage du pont habitat. Une écharpe par an, tirée au sort entre les familles.',
+    'Les chèvres mangent tout. Même les plans de la grange. Surtout les plans de la grange.',
+    'Je suis né sur une planète agricole. Ici, je refais en petit ce que mon père faisait en grand.',
+    'Les bêtes sentent les variations de la gravité avant les capteurs. Quand elles s\'agitent, j\'appelle la maintenance.',
+    'Les œufs vont au snack et à l\'infirmerie. Le Dr Salek dit que c\'est le meilleur remède du pont.',
+    'Les écoles viennent le mardi. Les enfants caressent les moutons, puis ils dessinent des moutons pendant un mois.',
+    'Le foin vient de Lys, compressé en balles. Le jour où un convoi est attaqué, mes bêtes mangent moins.',
+    'Ne nourrissez pas les chèvres, s\'il vous plaît. Elles ont déjà un problème avec l\'autorité.',
+  ],
+  jardinier: [
+    'Salades, poireaux, tomates. C\'est symbolique, mais les gens repartent avec un légume et un sourire.',
+    'Le sol du dôme a été apporté de Lys, sac par sac, il y a cent ans. On le nourrit comme un vieil ami.',
+    'L\'arrosage est automatique, mais je repasse à l\'arrosoir. Les plantes aiment qu\'on s\'occupe d\'elles.',
+    'Les arbres sont plus vieux que moi, que mon père et que la Couronne. Ils ont tout vu de Halden.',
+    'L\'épouvantail, c\'est pour la forme. Il n\'y a pas d\'oiseaux à faire fuir, juste des enfants.',
+    'Je taille les buissons le matin, avant l\'arrivée des familles. Après, c\'est impossible : on me pose mille questions.',
+    'Le ciel artificiel donne seize heures de lumière. Les tomates adorent, les salades un peu moins.',
+    'Les fleurs jaunes, ce sont des gazanias. Elles s\'ouvrent avec le soleil du dôme et se ferment le soir.',
+    'Un conseil : venez au lever du jour. La rosée sur la pelouse, c\'est ce qui ressemble le plus à une planète.',
+    'Mon rêve serait d\'agrandir le potager. Mais chaque mètre carré du dôme est une bataille au Conseil.',
+  ],
 };
 
 // ------------------------------------------------------------------ histoire personnelle (tirée au sort, stable)
@@ -333,6 +418,8 @@ const RUMORS = [
   'La guilde des équipages recrute des artilleurs. Un Héron avec une tourelle, ça change tout.',
   'On dit que le minage dans la ceinture d\'Ardent rapporte gros, si on a un bon laser.',
   'Le marché de Lys manque d\'électronique. Les contrats de livraison vers là-bas sont bien payés.',
+  'Vous êtes déjà allé au Grand Dôme ? Passez par la Cour des Saveurs, porte est. Il y a des moutons. De vrais moutons.',
+  'Le coucher de soleil du Grand Dôme, à vingt heures. Tout le pont habitat y monte, le dimanche.',
 ];
 
 /** mémoire des répliques déjà entendues, par personne */
@@ -350,10 +437,48 @@ const FEM = [[/Je suis né /g, 'Je suis née '], [/Je suis né,/g, 'Je suis née
 const accord = (t, fem) => (fem ? FEM.reduce((x, [a, b]) => x.replace(a, b), t) : t);
 const fill = (t, p) => t.replace('{shop}', p.shop ? `la boutique « ${p.shop} »` : 'une boutique de la galerie').replace('{resto}', p.resto || 'un des restaurants').replace('{dish}', p.dish || 'plat du jour');
 
+
+// ------------------------------------------------------------------ enfants du dôme : leur propre monde
+const KID_HELLO = ['Bonjour ! T\'es qui, toi ?', 'Salut ! Tu veux jouer avec nous ?', 'Coucou ! T\'as vu le gros canard ?', 'Bonjour monsieur… ou madame ! Vous êtes pilote ?'];
+const KID_BIO = [
+  'J\'ai sept ans et demi. Le demi, c\'est important.',
+  'J\'habite au pont habitat, cabine vingt-deux. Ma fenêtre, elle donne sur un mur. Mais ici il y a le ciel !',
+  'Mon papa répare les vaisseaux au hangar. Il sent l\'huile, mais il fait les meilleurs câlins.',
+  'Quand je serai grand, je veux voir une vraie mer. Avec des vagues et du sel. Ma mamie dit que ça pique les yeux.',
+  'Une fois, j\'ai vu un vaisseau de la marine par la baie panoramique. Il était gros comme toute la galerie !',
+];
+const KID_RUMORS = [
+  'Il paraît que la chèvre noire a mangé le chapeau de l\'épouvantail. Deux fois.',
+  'Le glacier, il donne une boule gratuite si on aide à la ferme. C\'est vrai, je l\'ai fait !',
+  'Mon copain dit qu\'il y a un trésor sous la colline. Moi je crois que c\'est des tuyaux.',
+  'Le nain de jardin, près de la souche, il bouge la nuit. C\'est Zélie qui l\'a vu.',
+  'Si on lance une pièce dans le bassin, les poissons orange exaucent un vœu. Enfin, ils la mangent pas, quoi.',
+];
+function kidTree(person) {
+  const k = person.key || 1, mem = MEM.get(k) || {}; MEM.set(k, mem);
+  const back = [{ t: 'Autre chose…', tone: 'neutre', next: 'again' }, { t: 'Allez, file jouer !', tone: 'calme', next: null }];
+  const menu = (say) => ({ say, choices: [
+    { t: 'Tu joues à quoi ?', tone: 'calme', next: 'job' },
+    { t: 'Raconte-moi un peu de toi.', tone: 'calme', next: 'bio' },
+    { t: 'Tu connais des secrets du dôme ?', tone: 'enquete', next: 'rumor' },
+    { t: 'Où sont tes parents ?', tone: 'neutre', next: 'parents' },
+    { t: 'Au revoir !', tone: 'calme', next: null },
+  ] });
+  return {
+    start: menu(nextOf(KID_HELLO, mem, 'hello', k)),
+    again: () => menu(nextOf(['Quoi ?', 'Oui ?', 'Encore une question ?', 'Dépêche, c\'est à moi de chercher !'], mem, 'again', k)),
+    job: () => ({ say: nextOf(JOBS.enfant, mem, 'job', k), choices: [{ t: 'Et sinon ?', tone: 'calme', next: 'job' }, ...back] }),
+    bio: () => ({ say: accord(nextOf(KID_BIO, mem, 'bio', k), !!person.fem).replace('Quand je serai grand,', person.fem ? 'Quand je serai grande,' : 'Quand je serai grand,'), choices: [{ t: 'Et encore ?', tone: 'calme', next: 'bio' }, ...back] }),
+    rumor: () => ({ say: nextOf(KID_RUMORS, mem, 'rumor', k), choices: [{ t: 'Un autre secret ?', tone: 'enquete', next: 'rumor' }, ...back] }),
+    parents: { say: () => R(['Là-bas, sur le banc. Elle me surveille, elle fait semblant de lire.', 'Papa est au snack. Il a dit « cinq minutes » il y a longtemps.', 'Ils parlent avec les autres parents. Ils parlent tout le temps, les grands.']), choices: back },
+  };
+}
+
 /**
  * person : { name, role (clé de JOBS), key, shop?, resto?, dish?, order? (fonction : ouvrir la carte) }
  */
 export function peopleTree(person, { story }) {
+  if (person.role === 'enfant') return kidTree(person);
   const k = person.key || 1, mood = pickK(MOODS, k, 1);
   const mem = MEM.get(k) || {}; MEM.set(k, mem);
   const jobs = JOBS[person.role] || JOBS.résident;

@@ -65,6 +65,12 @@ export class Materials {
       L(id + '_nor', `ph/${res}/${id}_nor.jpg`, false);
       L(id + '_arm', `ph/${res}/${id}_arm.jpg`, false);
     }
+    // dôme-jardin : herbe, chemins, sable, écorce, potager, planches, toit, galets (1k)
+    for (const id of ['lawn', 'park_dirt', 'coast_sand_01', 'bark_brown_02', 'raked_dirt', 'weathered_planks', 'roof_planks', 'river_small_rocks']) {
+      L(id + '_diff', `ph/1k/${id}_diff.jpg`, true);
+      L(id + '_nor', `ph/1k/${id}_nor.jpg`, false);
+      L(id + '_arm', `ph/1k/${id}_arm.jpg`, false);
+    }
     this.shared.uGrunge.value = this.tex.grunge;
     this.shared.uChips.value = this.tex.chips;
   }

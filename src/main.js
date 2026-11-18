@@ -41,6 +41,8 @@ import { LightPool, LevelCull, warmShaders } from './core/perf.js';
 import { Wingmen, PILOTS } from './game/wingmen.js';
 import { Briefing } from './ui/briefing.js';
 import { buildLuxury, populateLuxury } from './world/luxury.js';
+import { buildGarden } from './world/garden.js';
+import { populateGarden } from './world/gardenlife.js';
 import { RESTAURANTS } from './game/food.js';
 import { Cargo, buildQuai } from './game/cargo.js';
 import { Missions } from './game/missions.js';
@@ -106,6 +108,7 @@ async function boot() {
   ctx.furnish = buildFurnish(ctx);
   ctx.food = buildFoodCourt(ctx);
   ctx.lux = buildLuxury(ctx);
+  ctx.garden = buildGarden(ctx);
   ctx.lights = buildLighting(ctx);
   const lib = new CharacterLibrary(manager, quality);
   const libReady = lib.load(undefined, (p) => progress(0.6 + 0.3 * p, 'Chargement des personnages'));
@@ -464,7 +467,8 @@ async function boot() {
     ctx.updaters.push((dt) => {
       const P = player.pos, here = P.y > DECK_Y - 5 && P.y < DECK_Y + 15 && P.z > -6;
       for (const l of FC.lights) l.visible = here;
-      ctx.audio?.foodCourt?.(here && P.z > 10, dt);
+      ctx.audio?.foodCourt?.(here && P.z > 10 && P.x < -70, dt);
+      ctx.audio?.garden?.(ctx.garden.inside(P), dt, ctx.time.dusk);
       const cam = ctx.camera.position;
       // les ascenseurs avancent aussi quand le joueur est ailleurs (vol, boutique) : les passagers ne restent pas bloqués
       for (const E of [ctx.elevators, ctx.luxLift]) { if (E && !E.ticked) E.update(dt); if (E) E.ticked = false; }
@@ -545,6 +549,8 @@ async function boot() {
   }
   // La Couronne : clientèle, personnel, mannequins
   populateLuxury(ctx, lib, player, ctx.lux);
+  // Grand Dôme : familles, enfants, vendeurs, ferme et animaux
+  ctx.gardenLife = populateGarden(ctx, lib, player, ctx.garden);
   ctx.crowd = crowd; ctx.player = player; ctx.scenes = scenes;
   // ------------------------------------------------------------------ équipage (bureau de recrutement de la galerie)
   const crew = new Crew(ctx, { game, cargo, flight, crowd, missions, player, loadout: heronGear });
@@ -747,6 +753,7 @@ async function boot() {
   } });
   for (const c of ctx.food.chairs) playerSeat(c.p.x, c.p.y, c.p.z, c.yaw, c);
   for (const c of ctx.lux.seats) playerSeat(c.p.x, c.p.y, c.p.z, c.yaw, c);
+  for (const c of [...ctx.garden.seats, ...ctx.garden.benches]) playerSeat(c.p.x, c.p.y, c.p.z, c.yaw, c);
   const OCCUPANTS = { '08': 'un mécanicien de nuit', '10': 'une pilote de convoi', '14': 'un négociant de Corvin' };
   for (const d of HB.cabinDoors) interactables.push({ pos: d.pos, r: 1.3, label: `E — Cabine ${d.num}`, fn: () => {
     audio.blip();
@@ -860,7 +867,7 @@ async function boot() {
   if (shotName) {
     const sim = +(params.get('sim') || 0);
     const s = SHOTS[shotName];
-    if (s) { player.pos.set(s.pos[0], 0, s.pos[2]); }
+    if (s) { player.pos.set(s.pos[0], s.pos[1] > 30 && s.pos[1] < 60 ? 40 : 0, s.pos[2]); }
     if (params.get('player')) {
       player.pos.set(...params.get('player').split(',').map(Number));
       player.yaw = +(params.get('yaw') || 0); player.pitch = +(params.get('pitch') || 0);
@@ -901,6 +908,7 @@ async function boot() {
     for (const n of ctx.deckNpcs || []) if (n.solid) _blk.push({ pos: n.c.root.position });
     for (const c of ctx.habitatPeople || []) if (c.root.visible) _blk.push({ pos: c.root.position });
     for (const c of ctx.luxPeople || []) if (c.root.visible) _blk.push({ pos: c.root.position });
+    for (const c of ctx.gardenPeople || []) if (c.root.visible && !c.kid) _blk.push({ pos: c.root.position });
     return _blk;
   }
   // ------------------------------------------------------------------ conversations cinématiques et récit principal
@@ -953,6 +961,15 @@ async function boot() {
   interactables.push({ pos: HB.clinic, r: 1.6, label: 'E — Parler au Dr Salek', fn: () => talk(NPC.salek, story.withFavors('salek', story.doctorTree())) });
   interactables.push({ pos: ctx.lux.spots.concierge.customer, r: 1.6, label: 'E — Parler à Mira (conciergerie)', fn: () => talk(NPC.mira, story.withFavors('mira', story.conciergeTree())) });
   interactables.push({ pos: ctx.lux.irenaSpot.talk, r: 1.8, label: 'E — Parler à Iréna Solvay', fn: () => talk(NPC.irena, story.irenaTree()) });
+  // Grand Dôme : glacier et snack (au comptoir : conversation, la commande est l'une des réponses)
+  for (const [id, spot, who] of [['dome_glace', ctx.garden.glacier, () => ctx.gardenLife.glacierC], ['dome_snack', ctx.garden.snack, () => ctx.gardenLife.snackC]]) {
+    interactables.push({ pos: spot.customer, r: 1.5, label: `E — ${STORES[id].label} : parler, commander`, fn: () => {
+      const c = who(), key = id === 'dome_glace' ? 551 : 552, fem = /^UF/.test(c.name || '');
+      if (!c.root.visible) return gardenOrder(id)();
+      talk({ c, name: nameFor(key, c), role: STORES[id].label, voice: { pitch: fem ? 1.15 : 0.85, rate: 1.0, idx: key } },
+        peopleTree({ key, fem, name: nameFor(key, c), role: id === 'dome_glace' ? 'glacier' : 'snack', shop: STORES[id].label, order: gardenOrder(id) }, { story, game, toast }));
+    } });
+  }
   // ------------------------------------------------------------------ mode analyse (C) et codex (K)
   const scanner = new Scanner(ctx, { game, toast, audio });
   ctx.scanner = scanner;
@@ -963,16 +980,21 @@ async function boot() {
     scanner.addPoint(ctx.lux.sphere.position.clone(), 'sphere', 'Sphère des tendances');
     scanner.addPoint(ctx.lux.P(0, 0, 11), 'couronne', 'Coupole de La Couronne');
     scanner.addPoint(new THREE.Vector3(-105, DECK_Y + 2.6, 32), 'cour', 'Cour des Saveurs');
+    scanner.addPoint(ctx.garden.W(0, 9, 0), 'dome', 'Le Grand Dôme');
+    scanner.addPoint(ctx.garden.W(21, 3, 1), 'ferme', 'Ferme du Dôme');
     const fo = flight.onEvent; flight.onEvent = (e, pad) => { fo(e, pad); if (e === 'landed' && pad?.outpost?.id === 'lys') scanner.unlock('lys'); };
     const co = combat.onEvent; combat.onEvent = (e, ...a) => { co(e, ...a); if (e === 'kill') scanner.unlock('breche'); };
   }
   const ROLE = { voyageur: 'Voyageur', entretien: 'Agent d\'entretien' };
+  const GDISP = { enfant: 'Enfant · Grand Dôme', parent: 'Parent · aire de jeux', promeneur: 'Promeneur · Grand Dôme', glacier: 'Glacier du Dôme', snack: 'Snack du Dôme', fermier: 'Fermier · Ferme du Dôme', jardinier: 'Jardinière · potager du Dôme' };
+  const gardenOrder = (id) => () => (ctx.time.open(id) ? openUI(() => shop.openStore(id)) : toast(`${STORES[id].label} · fermé · ouvre à ${ctx.time.opensAt(id)}`));
   const scanPeople = () => {
     const L = [];
     for (const a of crowd.agents) if (!a.away && a.char) L.push({ obj: a.char.root, name: nameFor(a.id + 11, a.char), role: ROLE[a.role] || (a.role ? a.role[0].toUpperCase() + a.role.slice(1) : 'Résident') });
     (ctx.deckNpcs || []).forEach((n, i) => L.push({ obj: n.c.root, name: nameFor(n.cook ? 400 + ctx.food.stalls.indexOf(n.stall) : i + 101, n.c), role: n.cook ? 'Cuisinier · Cour des Saveurs' : n.cust ? (n.meal ? 'Client · en train de manger' : 'Client · Cour des Saveurs') : 'Résident' }));
     const named = new Map(Object.values(NPC).map((x) => [x.c, x]));
     (ctx.habitatPeople || []).forEach((c, i) => L.push({ obj: c.root, name: named.get(c)?.name || nameFor(i + 201, c), role: named.get(c)?.role || 'Résident du pont habitat' }));
+    (ctx.gardenPeople || []).forEach((c, i) => L.push({ obj: c.root, name: nameFor(i + 501, c), role: GDISP[c.talkRole] || 'Grand Dôme' }));
     (ctx.luxPeople || []).forEach((c, i) => L.push({ obj: c.root, name: isAldric(c) ? 'Aldric Venn' : named.get(c)?.name || nameFor(i + 301, c), role: isAldric(c) ? 'financier · transferts chiffrés vers Ardent ⚠' : named.get(c)?.role || 'La Couronne' }));
     return L;
   };
@@ -986,6 +1008,7 @@ async function boot() {
     }
     (ctx.deckNpcs || []).forEach((n, i) => { const kk = n.cook ? 400 + ctx.food.stalls.indexOf(n.stall) : i + 101; if (n.c.root.visible) L.push({ c: n.c, key: kk, name: nameFor(kk, n.c), role: n.cook ? 'cuisinier' : 'client · cour', resto: n.stall?.r.name, dish: n.stall?.r.dishes[0][0].toLowerCase(), disp: n.cook ? `Cuisinier · ${n.stall?.r.label}` : 'Client · Cour des Saveurs' }); });
     (ctx.habitatPeople || []).forEach((c, i) => { if (c.root.visible && !named.has(c)) L.push({ c, key: i + 201, name: nameFor(i + 201, c), role: 'résident', disp: 'Résident du pont habitat' }); });
+    (ctx.gardenPeople || []).forEach((c, i) => { if (c.root.visible) L.push({ c, key: i + 501, name: nameFor(i + 501, c), role: c.talkRole || 'promeneur', disp: GDISP[c.talkRole] || 'Grand Dôme', shop: c.shopId ? STORES[c.shopId].label : null, order: c.shopId ? gardenOrder(c.shopId) : null }); });
     (ctx.luxPeople || []).forEach((c, i) => { if (c.root.visible && !named.has(c) && !c.noTalk) L.push(isAldric(c) ? { c, key: 999, name: 'Aldric Venn', role: 'couronne', disp: 'Financier · investissements orbitaux', special: 'aldric' } : { c, key: i + 301, name: nameFor(i + 301, c), role: c.talkRole || 'couronne', disp: c.talkRole === 'personnel' ? 'Personnel de La Couronne' : 'Clientèle de La Couronne' }); });
     return L;
   };

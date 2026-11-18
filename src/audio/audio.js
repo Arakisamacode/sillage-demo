@@ -417,6 +417,49 @@ export class Audio {
     }
   }
 
+  /** Grand Dôme : ruissellement du bassin, chants d'oiseaux synthétiques, rires d'enfants lointains, bêlements. */
+  garden(on, dt = 0.016, night = 0) {
+    if (!this.ac || (!this._gd && !on)) return;
+    const ac = this.ac, t = ac.currentTime;
+    if (!this._gd) {
+      const n = this._src(); const bp = ac.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 2400; bp.Q.value = 0.5;
+      const g = ac.createGain(); g.gain.value = 0; n.connect(bp).connect(g).connect(this.master); n.start(0, Math.random() * 3);
+      const lfo = ac.createOscillator(); lfo.frequency.value = 0.31; const lg = ac.createGain(); lg.gain.value = 0.006; lfo.connect(lg).connect(g.gain); lfo.start();
+      this._gd = { g, acc: 1, kid: 3, baa: 9 };
+    }
+    const D = this._gd, live = on && this.enabled;
+    D.g.gain.setTargetAtTime(live ? 0.022 : 0, t, 0.8);
+    this.rumble?.gain.setTargetAtTime(live ? 0.25 : 0.55, t, 1.0);
+    if (!live) return;
+    D.acc -= dt; D.kid -= dt; D.baa -= dt;
+    const tone = (f0, f1, dur, vol, type = 'sine', at = t) => {
+      const o = ac.createOscillator(); o.type = type; o.frequency.setValueAtTime(f0, at); o.frequency.exponentialRampToValueAtTime(f1, at + dur);
+      const gg = ac.createGain(); gg.gain.setValueAtTime(0.0001, at); gg.gain.exponentialRampToValueAtTime(vol, at + Math.min(0.02, dur / 3)); gg.gain.exponentialRampToValueAtTime(0.0001, at + dur);
+      o.connect(gg).connect(this.master); gg.connect(this.revSend); o.start(at); o.stop(at + dur + 0.02);
+    };
+    if (D.acc <= 0) {
+      // phrase d'oiseau : 3 à 7 notes glissées (moins la nuit)
+      D.acc = (1.2 + Math.random() * 3.5) * (1 + night * 4);
+      const base = 2600 + Math.random() * 1800, n = 3 + Math.floor(Math.random() * 5);
+      for (let i = 0; i < n; i++) { const a = t + i * (0.09 + Math.random() * 0.05); tone(base * (1 + Math.random() * 0.3), base * (0.75 + Math.random() * 0.6), 0.07 + Math.random() * 0.05, 0.012 + Math.random() * 0.01, 'sine', a); }
+    }
+    if (D.kid <= 0 && night < 0.5) {
+      // éclat de rire / cri joyeux lointain (formants glissés)
+      D.kid = 4 + Math.random() * 9;
+      const f = 480 + Math.random() * 260, n = 2 + Math.floor(Math.random() * 4);
+      for (let i = 0; i < n; i++) { const a = t + i * 0.16; tone(f * 1.15, f * 0.9, 0.13, 0.006, 'triangle', a); tone(f * 2.3, f * 1.9, 0.12, 0.003, 'sine', a); }
+    }
+    if (D.baa <= 0) {
+      // bêlement (vibrato)
+      D.baa = 10 + Math.random() * 18;
+      const o = ac.createOscillator(); o.type = 'sawtooth'; o.frequency.value = 230 + Math.random() * 60;
+      const v = ac.createOscillator(); v.frequency.value = 7; const vg = ac.createGain(); vg.gain.value = 14; v.connect(vg).connect(o.frequency);
+      const lp = ac.createBiquadFilter(); lp.type = 'bandpass'; lp.frequency.value = 900; lp.Q.value = 2;
+      const gg = ac.createGain(); gg.gain.setValueAtTime(0.0001, t); gg.gain.exponentialRampToValueAtTime(0.01, t + 0.08); gg.gain.exponentialRampToValueAtTime(0.0001, t + 0.7);
+      o.connect(lp).connect(gg).connect(this.master); o.start(t); v.start(t); o.stop(t + 0.75); v.stop(t + 0.75);
+    }
+  }
+
   /** Tonalité de verrouillage missile. */
   lockTone() {
     if (!this.ac || !this.enabled) return;
