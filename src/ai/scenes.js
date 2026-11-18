@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { makeForklift, makeTug, makeTrailer, makeScissorLift, makeFuelCart, PathDriver } from '../vehicles/vehicles.js';
 import { metricBox } from '../world/materials.js';
-import { HX, Z_BAY, Z_BACK, PADS, STORAGE } from '../world/layout.js';
+import { HX, Z_BACK, PADS } from '../world/layout.js';
 
 // Scènes de travail : ravitaillement (flexible réel), soudure sur nacelle (étincelles),
 // chariot élévateur qui charge le cargo, tracteur + remorque en boucle.

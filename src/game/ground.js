@@ -10,7 +10,7 @@ import { BODIES, HAIRS } from '../characters/characters.js';
 // l'équipage qui descendent et combattent, couverture derrière les caisses du pont, blessures et évacuation.
 
 const HP = 100;
-const fmt = (n) => Math.round(n).toLocaleString('fr-FR').replace(/ /g, ' ');
+const fmt = (n) => Math.round(n).toLocaleString('fr-FR').replace(/\u202f/g, ' ');
 const _v = new THREE.Vector3(), _v2 = new THREE.Vector3(), _ray = new THREE.Ray();
 const ENEMY_GUNS = ['ac7', 'ac7', 'sm3', 'ks9', 'br2', 'sm3'];
 const PIRATE_NAMES = ['Grêlé', 'Vasque', 'Rouille', 'Sarde', 'Coutre', 'Mâchefer', 'Ébarbeur', 'Cendre'];

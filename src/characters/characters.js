@@ -5,7 +5,6 @@ import { Retargeter } from './retarget.js';
 import { loadBinary } from '../core/binary.js';
 import { buildGarment, skinMaterial } from './garment.js';
 import { buildArmor, buildGear } from './armor.js';
-import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 // Bibliothèque de personnages : « Universal Base Characters » de Quaternius (CC0) habillés
 // d'une combinaison peinte en shader selon le rôle, coiffures interchangeables,

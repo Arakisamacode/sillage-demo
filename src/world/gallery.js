@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { Builder } from './builder.js';
 import { metricBox, worldUV } from './materials.js';
 import { AIRLOCK, GALLERY, HX } from './layout.js';
-import { neonTexture, neonMaterial, paintedText, decalMaterial, Screen, FONT, rand, seed, pictogram, canvas } from './signage.js';
+import { neonTexture, neonMaterial, paintedText, decalMaterial, Screen, FONT, rand, seed } from './signage.js';
 import { Local, bench, crate } from './props.js';
 import { shopDecor, shelfProduct } from './shopdecor.js';
 

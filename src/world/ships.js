@@ -170,7 +170,7 @@ function buildHeron(ctx) {
   // -------------------------------------------------- matériaux
   const hull = mats.paint(0xd2cfc7, { grime: 0.75, scratch: 0.6, rust: 0.0, plain: true, rough: 0.45 });
   const hullDS = hull.clone(); hullDS.side = THREE.DoubleSide; hullDS.onBeforeCompile = hull.onBeforeCompile; hullDS.customProgramCacheKey = hull.customProgramCacheKey;
-  const belly = mats.paint(0x34393d, { grime: 0.7 });
+
   const trim = mats.paint(0x1e2226, { grime: 0.5, plain: true, rough: 0.45 });
   const accent = mats.paint(0xc8561e, { grime: 0.4, plain: true, rough: 0.4 });
   const metal = mats.metal(0x55595c);
@@ -482,7 +482,7 @@ function buildMulet(ctx) {
   const pad = PADS.p3;
   const S = new ShipCtx(ctx, pad, 'mulet');
   const { mats } = ctx;
-  const hull = mats.paint(0xa3a88f, { grime: 0.8, scratch: 0.5, rust: 0.3 });
+
   const hull2 = mats.paint(0x5a605a, { grime: 0.8, scratch: 0.4, rust: 0.3 });
   const yellow = mats.paint(0xc89a1e, { grime: 0.9 });
   const metal = mats.metal(0x4d5154);
@@ -581,7 +581,7 @@ function buildFaucon(ctx) {
   const S = new ShipCtx(ctx, pad, 'faucon');
   const { mats } = ctx;
   const hull = mats.paint(0x5a6168, { grime: 0.6, scratch: 0.5, rust: 0.05 });
-  const hull2 = mats.paint(0x22262a);
+
   const red = mats.paint(0x8c1e18, { grime: 0.5 });
   const metal = mats.metal(0x55595c);
   const glass = new THREE.MeshStandardMaterial({ color: 0x1a1408, roughness: 0.05, metalness: 1.0, envMapIntensity: 1.5 });
@@ -601,7 +601,7 @@ function buildFaucon(ctx) {
     { z: 0.5, w: 0.5, h: 0.35, y: 3.15, n: 2.3 },
   ], { radial: 24, steps: 6, arc: [0.03, Math.PI - 0.03] });
   // verrière ouverte (relevée vers l'arrière)
-  const can = S.add(canopy, glass, [0, 0.55, 1.6], [-0.45, 0, 0], { cast: false });
+  S.add(canopy, glass, [0, 0.55, 1.6], [-0.45, 0, 0], { cast: false });
   for (const s of [-1, 1]) {
     const wg = wing([[0, -1.5], [4.8, 4.0], [4.8, 5.6], [0, 6.2]], 0.22);
     wg.applyMatrix4(new THREE.Matrix4().makeScale(s, 1, 1));
@@ -653,7 +653,7 @@ function buildNavette(ctx) {
   const hull2 = mats.paint(0x2f3438);
   const metal = mats.metal(0x55595c);
   const glass = new THREE.MeshStandardMaterial({ color: 0x0a0e12, roughness: 0.05, metalness: 1.0 });
-  const fy = 1.55, iw = 1.9;
+  const fy = 1.55;
   const HMn = hullMats(mats, 0xdcdcd6, 0x1f4f7a);
   S.plated([
     { z: -9.5, w: 0.5, h: 0.4, y: 3.0, n: 2.2 },

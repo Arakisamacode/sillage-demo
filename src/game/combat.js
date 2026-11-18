@@ -19,7 +19,7 @@ const KINDS = {
   rancon: { name: 'Rançonneur', freighter: true, shield: 2600, hull: 5600, speed: 62, turn: 0.35, dmg: 26, rate: 2.5, scale: 1, bounty: [2200, 3200] },
   charognard: { name: 'Charognard', shield: 1400, hull: 2300, speed: 118, turn: 1.05, dmg: 60, rate: 4, scale: 1.35, bounty: [1800, 2800] },
 };
-const fmt = (n) => Math.round(n).toLocaleString('fr-FR').replace(/ /g, ' ');
+const fmt = (n) => Math.round(n).toLocaleString('fr-FR').replace(/\u202f/g, ' ');
 const _v = new THREE.Vector3(), _v2 = new THREE.Vector3(), _v3 = new THREE.Vector3(), _q = new THREE.Quaternion(), _m = new THREE.Matrix4();
 const Z = new THREE.Vector3(0, 0, 1), UP = new THREE.Vector3(0, 1, 0);
 

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { Agent } from './agent.js';
 import { NavGrid } from './nav.js';
-import { HX, Z_BAY, Z_BACK, AIRLOCK, GALLERY, PADS } from '../world/layout.js';
+import { AIRLOCK, GALLERY, PADS } from '../world/layout.js';
 import { SHOPS } from '../world/gallery.js';
 import { HAIRS, HAIR_COLORS } from '../characters/characters.js';
 
@@ -36,7 +36,7 @@ export function worldSpots(ctx, scenes) {
     if (Math.abs(Math.atan2(Math.sin(a - 1.57), Math.cos(a - 1.57))) < 0.45) continue;
     kioskSpots.push({ x: kiosk.x + Math.cos(a) * 2.95, z: kiosk.z + Math.sin(a) * 2.95, taken: null });
   }
-  const navette = ships.navette;
+
   return {
     ctx, scenes,
     airlockH: ga(-29.0, AIRLOCK.z), airlockG: ga(-44.6, AIRLOCK.z), airlockMid: ga(-37, AIRLOCK.z),

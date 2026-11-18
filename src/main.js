@@ -40,7 +40,7 @@ import { buildNeon } from './world/neon.js';
 import { LightPool, LevelCull, warmShaders } from './core/perf.js';
 import { Wingmen, PILOTS } from './game/wingmen.js';
 import { Briefing } from './ui/briefing.js';
-import { buildLuxury, populateLuxury, LUX_Y } from './world/luxury.js';
+import { buildLuxury, populateLuxury } from './world/luxury.js';
 import { RESTAURANTS } from './game/food.js';
 import { Cargo, buildQuai } from './game/cargo.js';
 import { Missions } from './game/missions.js';
@@ -752,8 +752,6 @@ async function boot() {
     audio.blip();
     toast(d.busy ? `Cabine ${d.num} · occupée par ${OCCUPANTS[d.num] || 'un résident'} · « Ne pas déranger »` : `Cabine ${d.num} · libre · location à la nuit 120 ¤ (votre cabine 12 vous attend, porte suivante)`);
   } });
-  const DRINKS = ['Thé fumé de Lys', 'Bière de soute', 'Café serré', 'Eau pétillante recyclée', 'Liqueur d\'aurélite (sans aurélite)'];
-  const GOSSIP = ['« Les cargos pirates passent souvent près de la ceinture d\'Ardent. »', '« Corvin paie bien le cuivre, ces temps-ci. »', '« Lys rachète le titane au prix fort. »', '« Une alerte au hangar 07 ? Ça arrive plus qu\'on ne croit. »', '« Embauchez un artilleur, la tourelle ne se sert pas toute seule. »'];
   // bar La Comète et infirmerie : conversations (voir plus bas, après la création du récit)
   interactables.push({ pos: HB.bunk, r: 2.4, label: 'E — Se reposer dans la cabine 12', fn: () => {
     fadeDo(() => {
@@ -791,10 +789,12 @@ async function boot() {
     onClose: () => {
       input.enabled = true;
       if (touch) $('touch').classList.remove('hidden');
-      else $('view').requestPointerLock?.();
+      else lockPointer();
     },
   });
   ctx.shop = shop;
+  /** Recapture de la souris : refusée par le navigateur sans geste de l'utilisateur (fermeture au clavier) ; sans conséquence. */
+  function lockPointer() { try { const r = $('view').requestPointerLock?.(); r?.catch?.(() => {}); } catch { /* */ } }
   function openUI(fn) {
     input.enabled = false; input.keys.clear(); input.move.x = input.move.y = 0;
     $('touch').classList.add('hidden');
@@ -812,7 +812,7 @@ async function boot() {
     if (touch) $('touch').classList.remove('hidden');
     input.enabled = true;
     running = true;
-    if (!touch) $('view').requestPointerLock?.();
+    if (!touch) lockPointer();
     audio.start($('sound').checked);
     if ($('go').textContent !== 'Reprendre') toast('Boutiques, armurerie, recrutement : galerie marchande, par le sas droit devant vous');
     $('go').textContent = 'Reprendre';
@@ -904,7 +904,7 @@ async function boot() {
     return _blk;
   }
   // ------------------------------------------------------------------ conversations cinématiques et récit principal
-  const dialog = new Dialogue(ctx, { audio, game, onClose: () => { input.enabled = true; if (touch) $('touch').classList.remove('hidden'); else $('view').requestPointerLock?.(); if (ctx.story?.pendingBrief) { ctx.story.pendingBrief = false; setTimeout(() => ctx.openBrief?.(), 150); } } });
+  const dialog = new Dialogue(ctx, { audio, game, onClose: () => { input.enabled = true; if (touch) $('touch').classList.remove('hidden'); else lockPointer(); if (ctx.story?.pendingBrief) { ctx.story.pendingBrief = false; setTimeout(() => ctx.openBrief?.(), 150); } } });
   ctx.dialog = dialog; ctx.toast = toast;
   const story = new Story({ game, audio, dialog, toast, combat, flight, ground, outposts: ctx.outposts });
   buildMerle(ctx, story.merle);
@@ -929,7 +929,7 @@ async function boot() {
     for (const c of briefPeople) { c.root.visible = near; if (near) c.update(dt, ctx.camera.position); }
   });
   const snapPilots = () => { for (const c of briefPeople) if (c.pilot && !wing.portraits[c.pilot.id]) wing.portraits[c.pilot.id] = dialog.snapshot(c); };
-  const briefing = new Briefing({ game, audio, wing, pilots: PILOTS, onClose: () => { input.enabled = true; if (touch) $('touch').classList.remove('hidden'); else $('view').requestPointerLock?.(); } });
+  const briefing = new Briefing({ game, audio, wing, pilots: PILOTS, onClose: () => { input.enabled = true; if (touch) $('touch').classList.remove('hidden'); else lockPointer(); } });
   ctx.briefing = briefing;
   const openBrief = () => { snapPilots(); openUI(() => briefing.show(story.brief())); };
   ctx.openBrief = openBrief;
@@ -1203,7 +1203,7 @@ async function boot() {
     dialog.update(dt); story.update(dt); wing.update(dt);
     if (input.consume('scan') && running && !shop.isOpen && !dialog.active && (!flight.active || ground.onFoot)) scanner.toggle();
     if ((flight.active && !ground.onFoot) || dialog.active) { if (scanner.on) scanner.toggle(false); }
-    if (input.consume('codex') && running && !shop.isOpen && !dialog.active && !scanner.codexOpen) openUI(() => scanner.openCodex(() => { input.enabled = true; if (touch) $('touch').classList.remove('hidden'); else $('view').requestPointerLock?.(); }));
+    if (input.consume('codex') && running && !shop.isOpen && !dialog.active && !scanner.codexOpen) openUI(() => scanner.openCodex(() => { input.enabled = true; if (touch) $('touch').classList.remove('hidden'); else lockPointer(); }));
     if (scanner.on) scanner.update(dt, camera, scanPeople(), interactables);
     if (dialog.active) dialog.updateCamera(dt, player);
     ctx.lightPool?.update(camera.position);
@@ -1226,7 +1226,7 @@ async function boot() {
   $('loading').classList.remove('hidden');
   progress(0.97, 'Préparation des shaders');
   await tick();
-  await warmShaders(renderer.three, scene, camera, () => renderer.render(1 / 30));
+  if (params.get('warm') !== '0') await warmShaders(renderer.three, scene, camera, () => renderer.render(1 / 30));
   $('loading').classList.add('hidden');
   frame();
   window.__app = ctx;

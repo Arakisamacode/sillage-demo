@@ -343,3 +343,13 @@ node tools/perf.mjs       http://localhost:5173/ low,high                       
 
 Régénérer les textures procédurales : `python3 tools/gen_textures.py public/assets/textures/gen`
 (Python 3 + numpy + Pillow).
+
+## Qualité et tests
+
+- `npx eslint src` : analyse statique (variables non définies, code mort, doublons…). État : 0 erreur.
+- `node tools/audit.mjs [url] [qualité]` (serveur Vite lancé) : banc de non-régression qui joue tous les systèmes
+  (boutiques et équipement, contrats, vol et atterrissages, combat spatial et escadrille, raid au sol, récit complet,
+  trois ascenseurs dans les deux sens, interfaces, horaires de nuit, sauvegarde et rechargement, endurance de 10 minutes
+  de jeu) et relève erreurs, positions invalides, dérives d'objets et fuites mémoire.
+- `?warm=0` dans l'adresse désactive la précompilation des shaders au chargement (diagnostic).
+

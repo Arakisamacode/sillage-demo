@@ -16,7 +16,7 @@ const GOODS = [
 ];
 let seq = 1;
 const pick = (a) => a[Math.floor(Math.random() * a.length)];
-const fmt = (n) => n.toLocaleString('fr-FR').replace(/ /g, ' ') + ' ¤';
+const fmt = (n) => n.toLocaleString('fr-FR').replace(/\u202f/g, ' ') + ' ¤';
 
 export class Missions {
   constructor(ctx, cargo, outposts, game, flight) {

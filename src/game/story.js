@@ -144,10 +144,10 @@ export class Story {
     if (k % 2) {
       const dest = Object.keys(dests)[k % 3];
       const what = ['un colis pour ma sœur', 'des pièces de rechange pour mon cousin', 'des médicaments pour mon père', 'un cadeau d\'anniversaire pour ma fille'][k % 4];
-      f = { type: 'parcel', dest, reward: 900 + (k % 7) * 150, say: `J\'ai ${what}, ${dests[dest]}. Le fret coûte une fortune… Si vous passez par là, posez-vous, ils sauront à qui le remettre. Je vous paierai, promis.`, short: `livrer ${what.replace('ma ', 'la ').replace('mon ', 'le ')} de ${person.name} ${dests[dest]} (se poser)` };
+      f = { type: 'parcel', dest, reward: 900 + (k % 7) * 150, say: `J'ai ${what}, ${dests[dest]}. Le fret coûte une fortune… Si vous passez par là, posez-vous, ils sauront à qui le remettre. Je vous paierai, promis.`, short: `livrer ${what.replace('ma ', 'la ').replace('mon ', 'le ')} de ${person.name} ${dests[dest]} (se poser)` };
     } else {
       const to = Object.keys(NPCS)[k % 3], msg = MSG[k % 4];
-      f = { type: 'message', to, reward: 300 + (k % 5) * 80, say: `Vous pourriez dire à ${NPCS[to]} ${msg} ? Je n\'ose pas y aller moi-même.`, short: `porter le message de ${person.name} à ${NPCS[to]}`, msg };
+      f = { type: 'message', to, reward: 300 + (k % 5) * 80, say: `Vous pourriez dire à ${NPCS[to]} ${msg} ? Je n'ose pas y aller moi-même.`, short: `porter le message de ${person.name} à ${NPCS[to]}`, msg };
     }
     Object.assign(f, { id: Date.now() % 1e9 + k, giver: k, giverName: person.name });
     return f;

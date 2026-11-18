@@ -16,7 +16,7 @@ export function buildHangar(ctx) {
   const steel = mats.metal(0x6b6f72);
   const darkSteel = mats.metal(0x34383b, { rough: 0.7 });
   const yellow = mats.paint(0xc89a1e, { grime: 0.8, scratch: 0.9, plain: true, rough: 0.55 });
-  const orange = mats.paint(0xb5531d, { grime: 0.8 });
+
   const pipeMat = mats.smooth(0x8d8f8c, 0.45, 0.85);
   const pipeGreen = mats.smooth(0x3e5b46, 0.55, 0.3);
   const pipeBlue = mats.smooth(0x2f4a63, 0.5, 0.3);
@@ -437,7 +437,7 @@ function wallDetails(B, mats, ctx) {
   const vent = mats.vent();
   const dark = mats.paint(0x2a2f32);
   const box = mats.paint(0x56606a);
-  const orange = mats.paint(0xb5531d);
+
   const cable = mats.rubber();
   for (const side of [-1, 1]) {
     const x = side * HX;

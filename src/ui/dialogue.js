@@ -24,7 +24,7 @@ export class Dialogue {
     addEventListener('keydown', (e) => {
       if (!this.active) return;
       const n = parseInt(e.key, 10);
-      if (n >= 1 && n <= 6) { e.preventDefault(); this.choose(n - 1); }
+      if (n >= 1 && n <= 9) { e.preventDefault(); this.choose(n - 1); }
       if (e.code === 'Space' || e.code === 'Enter') { e.preventDefault(); this._skipType(); }
       if (e.code === 'Escape') this.close();
     });
@@ -67,8 +67,10 @@ export class Dialogue {
     choices.forEach((c, i) => {
       const b = document.createElement('button');
       b.className = 'dlg-opt';
-      const a = (n === 1 ? 0 : -60 + (120 * i) / (n - 1)) * Math.PI / 180;
-      b.style.setProperty('--x', `${Math.cos(a) * 34 - 34}px`); b.style.setProperty('--y', `${Math.sin(a) * 86}px`);
+      // roue : options réparties verticalement (écart adapté au nombre et à la hauteur d'écran), légère courbure
+      const gap = Math.max(30, Math.min(44, (innerHeight * 0.6) / Math.max(n, 1))), y = (i - (n - 1) / 2) * gap;
+      const k = n > 1 ? y / (((n - 1) / 2) * gap) : 0;
+      b.style.setProperty('--x', `${-(1 - k * k) * 30}px`); b.style.setProperty('--y', `${y}px`);
       b.style.setProperty('--c', TONES[c.tone || 'neutre']);
       b.innerHTML = `<i>${i + 1}</i>${c.t}`;
       b.addEventListener('pointerdown', (e) => { e.stopPropagation(); this.choose(i); });

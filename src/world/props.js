@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { Builder } from './builder.js';
 import { metricBox } from './materials.js';
 import { HX, Z_BAY, Z_BACK, PADS, STORAGE, AIRLOCK, COLS } from './layout.js';
-import { paintedText, decalMaterial, Screen, FONT, rand, seed, pictogram, hazardTexture } from './signage.js';
+import { paintedText, decalMaterial, Screen, FONT, rand, seed } from './signage.js';
 
 // Accessoires : conteneurs, caisses, fûts, servantes, établis, bornes, chariots, coin pause.
 

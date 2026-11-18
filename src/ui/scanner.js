@@ -77,12 +77,11 @@ export class Scanner {
       const d = v.distanceTo(P); if (d > 18) continue;
       list.push({ d, w: v.clone(), a: it.label.replace(/^E — /, '').split(' : ')[0].split(' (')[0], b: 'interaction', cls: 'poi' });
     }
-    let unlocked = 0;
     for (const pt of this.points) {
       const d = pt.pos.distanceTo(P); if (d > 40) continue;
       const known = this.game.d.codex.includes(pt.id);
       list.push({ d, w: pt.pos.clone(), a: pt.label, b: known ? 'codex · connu' : 'codex · analyse…', cls: 'codex' });
-      if (!known) { v.copy(pt.pos).project(camera); if (Math.abs(v.x) < 0.35 && Math.abs(v.y) < 0.4 && v.z < 1 && d < 30) { pt.scan = (pt.scan || 0) + dt; if (pt.scan > 1.2) { this.unlock(pt.id); unlocked++; } } }
+      if (!known) { v.copy(pt.pos).project(camera); if (Math.abs(v.x) < 0.35 && Math.abs(v.y) < 0.4 && v.z < 1 && d < 30) { pt.scan = (pt.scan || 0) + dt; if (pt.scan > 1.2) this.unlock(pt.id); } }
     }
     list.sort((a, b) => a.d - b.d);
     let n = 0;

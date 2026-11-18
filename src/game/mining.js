@@ -9,7 +9,7 @@ export const FIELD = { name: 'Ceinture d\'Ardent', center: new THREE.Vector3(275
 export const BIN_CAP = 32;
 const RANGE = 160, EXTRACT_RANGE = 90;
 const _v = new THREE.Vector3(), _d = new THREE.Vector3(), _o = new THREE.Vector3(), _q = new THREE.Quaternion();
-const fmt = (n) => Math.round(n).toLocaleString('fr-FR').replace(/ /g, ' ');
+const fmt = (n) => Math.round(n).toLocaleString('fr-FR').replace(/\u202f/g, ' ');
 
 function rng(seed) { let s = seed % 2147483647; if (s <= 0) s += 2147483646; return () => ((s = (s * 16807) % 2147483647) - 1) / 2147483646; }
 function hash3(x, y, z) { const h = Math.sin(x * 127.1 + y * 311.7 + z * 74.7) * 43758.5453; return h - Math.floor(h); }

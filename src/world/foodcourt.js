@@ -91,7 +91,7 @@ export function buildFoodCourt(ctx) {
   south.forEach((r, i) => out.stalls.push(stall(ctx, r, -105 + i * 10, C.z0 + 6, -1, out)));
 
   // ------------------------------------------------------------------ salle : tables, fontaine, arbres, tables hautes, suspensions
-  const tableM = mats.smooth(0x3a2a20, 0.4, 0.1), chairM = mats.plastic(0x8a5a3a, 0.6), chairM2 = mats.plastic(0x2a4a5a, 0.6), metal = mats.metal(0x2a2a2a);
+  const metal = mats.metal(0x2a2a2a);
   const cols = { A: [-132, -126], B: [-113.5], C: [-98], D: [-84, -78] };
   let n = 0;
   const MD = ctx.models, SF = sciFurniture(ctx);
@@ -101,7 +101,7 @@ export function buildFoodCourt(ctx) {
     // mobilier de station : table à liseré lumineux, sièges coque pivotants
     SF.table(x, Y, z, n, 0.738, 1, hiQ);
     B.colliderBox(1.15, 0.8, 1.15, [x, Y + 0.4, z]);
-    const cm = n++ % 2 ? chairM : chairM2;
+    n++;
     for (const [dx, dz, yaw] of [[0.95, 0, -Math.PI / 2], [-0.95, 0, Math.PI / 2], [0, 0.95, Math.PI], [0, -0.95, 0]]) {
       SF.chair(x + dx * 1.02, Y, z + dz * 1.02, yaw + (((x * 7 + z * 3 + dx * 5 + dz) % 1) - 0.5) * 0.15, n, hiQ);
       out.chairs.push({ p: new THREE.Vector3(x + dx, Y, z + dz), yaw, taken: null, table: new THREE.Vector3(x, Y, z) });
@@ -143,10 +143,8 @@ export function buildFoodCourt(ctx) {
   const K = ctx.foodKit || (ctx.foodKit = foodKit(ctx)), W0 = K.base(0, Y, 0);
   // tables : condiments, serviettes ; places des clients attablés servies (plateau et plat)
   const tableXs = Object.values(cols).flat();
-  let ti = 0;
   for (const x of tableXs) for (const z of [24.5, 30, 35.5, 41]) {
     K.caddy(W0, x - 0.06, z + 0.05, 0.775, 0); K.napkins(W0, x + 0.09, z - 0.07, 0.775, 0.4);
-    ti++;
   }
   // (les plateaux des clients sont désormais mobiles : apportés, mangés et débarrassés par les figurants)
   // îlots de tri (trois bacs, couvercles colorés, panneau)
@@ -474,7 +472,6 @@ function stall(ctx, r, cx, zf, dir, out) {
   };
 }
 
-function wood(mats) { return mats.paint(0x6a4a2a, { plain: true, rough: 0.7 }); }
 
 /** Vapeur (bouffées) et flammes (lueurs vacillantes) des cuisines. */
 function fxUpdater(ctx, list) {

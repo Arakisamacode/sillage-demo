@@ -204,7 +204,7 @@ export class Crew {
 
   /** Tâche de manutention : charger une caisse du quai dans la soute, ou décharger une caisse de collecte. */
   _job(a, m) {
-    const C = this.cargo, S = this.ship(), I = S.interior;
+    const C = this.cargo, S = this.ship();
     const busy = (c) => c.reservedBy && c.reservedBy !== a.id && this.members.some((x) => x.agent.id === c.reservedBy);
     // 1. chargement : caisse d'un contrat de livraison au sol, sur le quai
     let c = C.crates.find((x) => x.where === 'ground' && !busy(x) && x.contract.type === 'out' && C.inQuaiZone(x.mesh.position));

@@ -35,7 +35,7 @@ export class Input {
     addEventListener('blur', () => this.keys.clear());
 
     canvas.addEventListener('click', () => {
-      if (this.enabled && !this.isTouch && !this.locked) canvas.requestPointerLock?.();
+      if (this.enabled && !this.isTouch && !this.locked) { try { canvas.requestPointerLock?.()?.catch?.(() => {}); } catch { /* */ } }
     });
     document.addEventListener('pointerlockchange', () => {
       this.locked = document.pointerLockElement === canvas;

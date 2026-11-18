@@ -4,7 +4,7 @@ import { ORES, REFINE, MARKETS } from '../game/catalog.js';
 import { thumb } from './thumbs.js';
 
 // Interfaces de commerce et d'inventaire (HTML par-dessus la vue 3D).
-const fmt = (n) => n.toLocaleString('fr-FR').replace(/ /g, ' ') + ' ¤';
+const fmt = (n) => n.toLocaleString('fr-FR').replace(/\u202f/g, ' ') + ' ¤';
 const PERSON_SLOTS = [
   { id: 'outfit', name: 'Tenue', cat: 'outfit' },
   { id: 'armor', name: 'Armure', cat: 'armor' },

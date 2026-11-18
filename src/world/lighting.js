@@ -2,13 +2,13 @@ import * as THREE from 'three';
 import { EXRLoader } from 'three/addons/loaders/EXRLoader.js';
 import { loadBinary } from '../core/binary.js';
 import { KEY_DIR } from './sky.js';
-import { HX, Z_BAY, Z_BACK, H, PADS } from './layout.js';
+import { HX, H, PADS } from './layout.js';
 
 // Mise en lumière : lumière froide de la planète par la baie (ombres), éclairage industriel chaud
 // des plafonniers (projecteurs), ambiance par HDRI d'entrepôt (Poly Haven) très atténuée.
 
 export function buildLighting(ctx) {
-  const { scene, renderer, quality, mats, builder: B, manager } = ctx;
+  const { scene, renderer, quality, mats, builder: B } = ctx;
   const out = { spots: [], points: [] };
 
   // ------------------------------------------------------------- environnement HDRI

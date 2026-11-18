@@ -231,18 +231,24 @@ body.is-touch #prompt { top: 21%; }
 #dlg .dlg-rep { font-style: normal; font-size: 11px; letter-spacing: .1em; color: #8a96a2; margin-top: 4px; }
 #dlg .dlg-rep em { font-style: normal; }
 #dlg .dlg-say { position: absolute; left: 6vw; right: 42vw; bottom: calc(11vh + 12px); min-height: 70px; font-size: 18px; line-height: 1.45; color: #f4f1ea; text-shadow: 0 1px 4px #000, 0 0 12px rgba(0,0,0,.6); pointer-events: auto; }
-#dlg .dlg-wheel { position: absolute; right: 8vw; bottom: calc(11vh + 90px); width: 0; height: 0; pointer-events: auto; }
+#dlg .dlg-wheel { position: absolute; right: 8vw; top: 50%; width: 0; height: 0; pointer-events: auto; }
 #dlg .dlg-wheel::before { content: ''; position: absolute; left: -30px; top: -30px; width: 60px; height: 60px; border-radius: 50%; border: 1px solid rgba(242,163,58,.5); box-shadow: 0 0 18px rgba(242,163,58,.25), inset 0 0 10px rgba(242,163,58,.2); }
 #dlg .dlg-opt { position: absolute; right: calc(36px - var(--x)); top: calc(var(--y) - 16px); transform: translateX(0); white-space: nowrap; max-width: 38vw; overflow: hidden; text-overflow: ellipsis;
   background: linear-gradient(90deg, rgba(8,11,15,.85), rgba(8,11,15,.55)); color: #f2ead8; border: 0; border-right: 3px solid var(--c); padding: 8px 14px 8px 10px; font: inherit; font-size: 15px; letter-spacing: .04em; cursor: pointer; text-align: right; }
 #dlg .dlg-opt i { font-style: normal; color: var(--c); font-weight: 700; margin-right: 10px; }
 #dlg .dlg-opt:hover { background: rgba(30,36,44,.92); color: #fff; }
 #hud.cine > *:not(#toast):not(#fade) { visibility: hidden; }
-@media (max-width: 760px) {
-  #dlg .dlg-say { right: 6vw; font-size: 15px; bottom: calc(11vh + 6px); }
-  #dlg .dlg-who { bottom: calc(11vh + 110px); }
-  #dlg .dlg-wheel { right: 4vw; bottom: auto; top: 18vh; }
-  #dlg .dlg-opt { max-width: 70vw; font-size: 13px; }
+@media (max-width: 900px) {
+  #dlg .dlg-say { right: 48vw; font-size: 14px; }
+  #dlg .dlg-who b { font-size: 17px; }
+  #dlg .dlg-wheel { right: 3vw; }
+  #dlg .dlg-opt { max-width: 44vw; font-size: 13px; padding: 6px 10px 6px 8px; }
+}
+@media (max-width: 600px) {   /* portrait : sous-titres en haut, roue au centre, nom en bas */
+  #dlg .dlg-say { left: 5vw; right: 5vw; top: calc(11vh + 8px); bottom: auto; }
+  #dlg .dlg-who { bottom: calc(11vh + 6px); }
+  #dlg .dlg-wheel { top: 56%; }
+  #dlg .dlg-opt { max-width: 86vw; }
 }
 /* ------------------------------------------------------------ transmissions radio */
 #comm { position: fixed; left: 16px; top: 64px; z-index: 6; display: flex; gap: 10px; align-items: flex-start; max-width: min(460px, 80vw); background: rgba(6,12,16,.78); border: 1px solid rgba(111,216,255,.35); padding: 8px; pointer-events: none; box-shadow: 0 0 22px rgba(111,216,255,.12); }
