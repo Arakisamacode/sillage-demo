@@ -162,6 +162,10 @@ et redescendent à la galerie. Le cuisinier vient servir quand un client attend.
 - **Tout le monde parle** : E près de n'importe quelle personne (commerçants, mécaniciens, sécurité, voyageurs,
   cuisiniers, clients de la Cour, résidents, clientèle et personnel de La Couronne). Répliques selon le métier et le
   tempérament (aimable, pressé, méfiant, bavard), rumeurs qui mènent aux quêtes, avis qui changent selon vos choix.
+  Chaque personne a dix répliques propres à son métier, une histoire personnelle stable (origine, situation, rêve,
+  inquiétude, souvenir de la station, accordée au féminin ou au masculin), douze rumeurs et des salutations variées ;
+  une réplique déjà entendue ne revient pas avant les autres. Aux comptoirs de la Cour des Saveurs, E ouvre la
+  conversation avec le cuisinier, et « Je voudrais commander » ouvre la carte.
   La personne s'arrête, se tourne vers vous ; les clients attablés restent assis.
 - **Voix** (réglage « Voix » du menu) : Auto (meilleure voix française du système, sinon voix stylisée), Système,
   Stylisée (voix inventée synthétisée, disponible sur tous les appareils), Sous-titres seuls.

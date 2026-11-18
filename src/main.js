@@ -721,7 +721,15 @@ async function boot() {
   // ------------------------------------------------------------------ Cour des Saveurs : comptoirs, plan, sièges
   for (const st of ctx.food.stalls) {
     const r = st.r;
-    interactables.push({ pos: st.customer, r: 1.5, when: () => ctx.time.open(r.id), label: `E — ${r.label} : commander`, fn: () => openUI(() => shop.openStore(r.id)) });
+    // au comptoir : conversation avec le cuisinier, la commande est l'une des réponses
+    interactables.push({ pos: st.customer, r: 1.5, when: () => ctx.time.open(r.id), label: `E — ${r.label} : parler au cuisinier, commander`, fn: () => {
+      const n = (ctx.deckNpcs || []).find((x) => x.stall === st);
+      const order = () => openUI(() => shop.openStore(r.id));
+      if (!n || !n.c.root.visible) return order();
+      const key = 400 + ctx.food.stalls.indexOf(st), fem = /^UF/.test(n.c.name || '');
+      talk({ c: n.c, name: nameFor(key, n.c), role: `Cuisine · ${r.label}`, voice: { pitch: fem ? 1.15 : 0.85, rate: 1.0, idx: key } },
+        peopleTree({ key, fem, name: nameFor(key, n.c), role: 'cuisinier', resto: r.label, dish: r.dishes[0][0].toLowerCase(), order }, { story, game, toast }));
+    } });
     interactables.push({ pos: st.customer, r: 1.5, when: () => !ctx.time.open(r.id), label: `${r.label} · fermé · ouvre à ${ctx.time.opensAt(r.id)}`, fn: () => null });
   }
   interactables.push({ pos: ctx.food.directory, r: 1.4, label: 'E — Plan de la Cour des Saveurs', fn: () => {
@@ -924,7 +932,7 @@ async function boot() {
   const scanPeople = () => {
     const L = [];
     for (const a of crowd.agents) if (!a.away && a.char) L.push({ obj: a.char.root, name: nameFor(a.id + 11, a.char), role: ROLE[a.role] || (a.role ? a.role[0].toUpperCase() + a.role.slice(1) : 'Résident') });
-    (ctx.deckNpcs || []).forEach((n, i) => L.push({ obj: n.c.root, name: nameFor(i + 101, n.c), role: n.cook ? 'Cuisinier · Cour des Saveurs' : n.cust ? (n.meal ? 'Client · en train de manger' : 'Client · Cour des Saveurs') : 'Résident' }));
+    (ctx.deckNpcs || []).forEach((n, i) => L.push({ obj: n.c.root, name: nameFor(n.cook ? 400 + ctx.food.stalls.indexOf(n.stall) : i + 101, n.c), role: n.cook ? 'Cuisinier · Cour des Saveurs' : n.cust ? (n.meal ? 'Client · en train de manger' : 'Client · Cour des Saveurs') : 'Résident' }));
     const named = new Map(Object.values(NPC).map((x) => [x.c, x]));
     (ctx.habitatPeople || []).forEach((c, i) => L.push({ obj: c.root, name: named.get(c)?.name || nameFor(i + 201, c), role: named.get(c)?.role || 'Résident du pont habitat' }));
     (ctx.luxPeople || []).forEach((c, i) => L.push({ obj: c.root, name: isAldric(c) ? 'Aldric Venn' : named.get(c)?.name || nameFor(i + 301, c), role: isAldric(c) ? 'financier · transferts chiffrés vers Ardent ⚠' : named.get(c)?.role || 'La Couronne' }));
@@ -938,7 +946,7 @@ async function boot() {
       const sid = a.role === 'commerçant' ? shopOf(a.pos) : null;
       L.push({ c: a.char, key: a.id + 11, name: sid && VENDORS[sid] ? VENDORS[sid] : nameFor(a.id + 11, a.char), role: a.role, shop: sid ? STORES[sid].label : null, disp: sid ? `${STORES[sid].label}` : ROLE[a.role] || a.role });
     }
-    (ctx.deckNpcs || []).forEach((n, i) => { if (n.c.root.visible) L.push({ c: n.c, key: i + 101, name: nameFor(i + 101, n.c), role: n.cook ? 'cuisinier' : 'client · cour', resto: n.stall?.r.name, dish: n.stall?.r.dishes[0][0].toLowerCase(), disp: n.cook ? `Cuisinier · ${n.stall?.r.label}` : 'Client · Cour des Saveurs' }); });
+    (ctx.deckNpcs || []).forEach((n, i) => { const kk = n.cook ? 400 + ctx.food.stalls.indexOf(n.stall) : i + 101; if (n.c.root.visible) L.push({ c: n.c, key: kk, name: nameFor(kk, n.c), role: n.cook ? 'cuisinier' : 'client · cour', resto: n.stall?.r.name, dish: n.stall?.r.dishes[0][0].toLowerCase(), disp: n.cook ? `Cuisinier · ${n.stall?.r.label}` : 'Client · Cour des Saveurs' }); });
     (ctx.habitatPeople || []).forEach((c, i) => { if (c.root.visible && !named.has(c)) L.push({ c, key: i + 201, name: nameFor(i + 201, c), role: 'résident', disp: 'Résident du pont habitat' }); });
     (ctx.luxPeople || []).forEach((c, i) => { if (c.root.visible && !named.has(c) && !c.noTalk) L.push(isAldric(c) ? { c, key: 999, name: 'Aldric Venn', role: 'couronne', disp: 'Financier · investissements orbitaux', special: 'aldric' } : { c, key: i + 301, name: nameFor(i + 301, c), role: c.talkRole || 'couronne', disp: c.talkRole === 'personnel' ? 'Personnel de La Couronne' : 'Clientèle de La Couronne' }); });
     return L;
@@ -946,7 +954,7 @@ async function boot() {
   const talkAny = { pos: new THREE.Vector3(), r: 2.2, label: '', target: null, when: () => !!talkAny.target, fn: () => {
     const T = talkAny.target; if (!T) return;
     const fem = /^UF/.test(T.c.name || '');
-    talk({ c: T.c, name: T.name, role: T.disp, voice: { pitch: fem ? 1.15 : 0.85, rate: 1.0, idx: T.key } }, T.special === 'aldric' ? story.aldricTree() : peopleTree(T, { story, game, toast }));
+    talk({ c: T.c, name: T.name, role: T.disp, voice: { pitch: fem ? 1.15 : 0.85, rate: 1.0, idx: T.key } }, T.special === 'aldric' ? story.aldricTree() : peopleTree({ ...T, fem }, { story, game, toast }));
   } };
   let talkAcc = 0;
   ctx.updaters.push((dt) => {
@@ -964,6 +972,7 @@ async function boot() {
     if (talkAny.target) { talkAny.pos.copy(P); talkAny.label = `E — Parler à ${talkAny.target.name} (${talkAny.target.disp})`; }
   });
   interactables.push(talkAny); ctx.talkAny = talkAny;
+  ctx.peopleTreeDebug = (p) => peopleTree({ ...p }, { story, game, toast });
   let inShop = null;
   const VENDORS = { nouilles: 'Mei', armes: 'Bastien Kestrel', pieces: 'Oriane', pharma: 'Dr Salek', combis: 'Ines Vega' };
   function shopGreeting() {
