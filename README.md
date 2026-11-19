@@ -228,7 +228,13 @@ Vue de l'espace, Halden-7 forme un ensemble porteur cohérent :
   et **tube pressurisé** jusqu'au corps de la station.
 - **Socle cylindrique du Grand Dôme** (hublots, coursive balisée), posé sur jambes de force et pylônes.
 - **Pylônes d'approche** en treillis (membrures, cadres, croisillons) et bras d'amarrage en poutre Warren balisée,
-  anneau d'amarrage nervuré ; anneaux habités segmentés par des colliers de raidissement.
+  anneau d'amarrage nervuré.
+- **Anneaux habités** à section profilée (plancher extérieur, flancs à deux rangées de hublots, verrière intérieure tournée
+  vers le moyeu), 48 cloisons étanches, moyeux autour du corps, six rayons pressurisés par anneau (ascenseur vitré
+  éclairé, colliers, treillis de reprise).
+- **Corps cylindrique** : tôles de teintes différentes, ceintures sombres, hublots posés sur la coque, rampes de
+  balisage, conduites longitudinales, mâts d'antennes ; ailes de radiateurs entre les anneaux ; à l'arrière, module
+  réacteur, mât et quatre ailes solaires.
 
 ## Le Grand Dôme (jardins)
 
