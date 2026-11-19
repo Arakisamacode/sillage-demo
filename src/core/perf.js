@@ -102,3 +102,36 @@ export async function warmShaders(renderer, scene, camera, renderFull) {
   for (const o of culled) o.frustumCulled = true;
   for (const o of hidden) o.visible = false;
 }
+
+/**
+ * Mémoire graphique (qualité basse, téléphones) : réduit la définition des textures chargées depuis des fichiers
+ * (les canevas animés — écrans, enseignes — sont laissés intacts), puis libère la copie côté processeur une fois la
+ * texture envoyée à la carte graphique. maxModel s'applique aux textures des petits objets photoscannés.
+ */
+export function shrinkTextures(scene, { max = 512, maxModel = 256, modelTextures = new Set() } = {}) {
+  const done = new WeakSet();
+  let saved = 0;
+  const KEYS = ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'aoMap', 'emissiveMap', 'alphaMap', 'bumpMap', 'specularMap', 'clearcoatNormalMap'];
+  const shrink = (tex) => {
+    if (!tex || !tex.isTexture || tex.isCanvasTexture || tex.isRenderTargetTexture || tex.isDataTexture || tex.isCompressedTexture) return;
+    const src = tex.source; if (!src || done.has(src)) return;
+    const img = src.data;
+    if (!img || !(img instanceof HTMLImageElement || (typeof ImageBitmap !== 'undefined' && img instanceof ImageBitmap))) return;
+    done.add(src);
+    const lim = modelTextures.has(src) ? maxModel : max, w = img.width, h = img.height;
+    if (!w || !h) return;
+    const k = Math.min(1, lim / Math.max(w, h));
+    const c = document.createElement('canvas'); c.width = Math.max(1, Math.round(w * k)); c.height = Math.max(1, Math.round(h * k));
+    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+    saved += (w * h - c.width * c.height) * 4;
+    if (img.close) img.close();
+    src.data = c; tex.needsUpdate = true;
+    // après envoi à la carte graphique, la copie processeur n'est plus utile (textures statiques)
+    tex.onUpdate = () => { c.width = c.height = 1; tex.onUpdate = null; };
+  };
+  scene.traverse((o) => {
+    const ms = Array.isArray(o.material) ? o.material : o.material ? [o.material] : [];
+    for (const m of ms) for (const k of KEYS) shrink(m[k]);
+  });
+  return Math.round(saved / 1e6);
+}

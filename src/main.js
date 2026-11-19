@@ -37,7 +37,7 @@ import { Scanner, nameFor } from './ui/scanner.js';
 import { peopleTree } from './game/chatter.js';
 import { buildBriefRoom, buildMerle } from './world/briefroom.js';
 import { buildNeon } from './world/neon.js';
-import { LightPool, LevelCull, warmShaders } from './core/perf.js';
+import { LightPool, LevelCull, warmShaders, shrinkTextures } from './core/perf.js';
 import { Wingmen, PILOTS } from './game/wingmen.js';
 import { Briefing } from './ui/briefing.js';
 import { buildLuxury, populateLuxury } from './world/luxury.js';
@@ -126,6 +126,8 @@ async function boot() {
   ctx.fx = buildFX(ctx);
   const player = new Player(ctx, builder.collisionGeometry());
   const flight = new Flight(ctx, ctx.ships.heron);
+  // collisions déjà extraites (joueur, vol) : on ne garde que les positions des boîtes de collision
+  for (const g of builder.colliders) for (const k of Object.keys(g.attributes)) if (k !== 'position') g.deleteAttribute(k);
   ctx.flight = flight;
   for (const o of ctx.outposts) flight.addPad(o.pad);
   flight.onEvent = (e, pad) => {
@@ -1251,6 +1253,12 @@ async function boot() {
   $('loading').classList.remove('hidden');
   progress(0.97, 'Préparation des shaders');
   await tick();
+  // téléphones et qualité basse : textures allégées (mémoire graphique limitée, sinon la page est fermée par le système)
+  if (quality.name === 'low') {
+    const modelTextures = new Set();
+    for (const M of Object.values(ctx.models?.m || {})) for (const p of M.parts) for (const v of Object.values(p.mat)) if (v?.isTexture) modelTextures.add(v.source);
+    shrinkTextures(scene, { max: touch ? 512 : 1024, maxModel: touch ? 256 : 512, modelTextures });
+  }
   if (params.get('warm') !== '0') await warmShaders(renderer.three, scene, camera, () => renderer.render(1 / 30));
   $('loading').classList.add('hidden');
   frame();

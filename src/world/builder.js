@@ -12,6 +12,8 @@ const _p = new THREE.Vector3();
  * Regroupe la géométrie statique par matériau puis la fusionne (peu d'appels de rendu),
  * et collecte la géométrie de collision du joueur et des PNJ.
  */
+function releaseArray() { this.array = null; }
+
 export class Builder {
   constructor(scene) {
     this.scene = scene;
@@ -143,6 +145,9 @@ export class Builder {
       const merged = mergeGeometries(grp.geos, false);
       merged.computeBoundingSphere();
       merged.computeBoundingBox();
+      // mémoire : une fois envoyés à la carte graphique, les tableaux de sommets ne sont plus utiles côté JavaScript
+      // (boîtes englobantes déjà calculées ; les collisions ont leurs propres copies)
+      for (const a of Object.values(merged.attributes)) a.onUpload(releaseArray);
       const mesh = new THREE.Mesh(merged, grp.mat);
       mesh.castShadow = grp.cast;
       mesh.receiveShadow = grp.receive;
