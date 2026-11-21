@@ -5,7 +5,8 @@ import * as THREE from 'three';
 // puis on la lie au même squelette. Les couleurs sont calculées en shader à partir de la position de repos.
 
 /** zones : { neck, wrist, hip } en mètres (pose de repos en T). */
-export function buildGarment(body, zones) {
+/** Corps soudé (sans coutures UV) : positions, normales lissées, triangles, influences du squelette. */
+export function weldBody(body) {
   const src = body.geometry;
   const P = src.attributes.position, SI = src.attributes.skinIndex, SW = src.attributes.skinWeight;
   // 1) soudure par position (supprime les coutures UV)
@@ -36,19 +37,26 @@ export function buildGarment(body, zones) {
     for (const i of [i0, i1, i2]) { nrm[i * 3] += cb.x; nrm[i * 3 + 1] += cb.y; nrm[i * 3 + 2] += cb.z; }
   }
   for (let i = 0; i < n; i++) { a.fromArray(nrm, i * 3).normalize(); a.toArray(nrm, i * 3); }
+  return { pos, nrm, tris, sIdx, sW, n };
+}
+
+export function buildGarment(body, zones) {
+  const { pos, nrm, tris, sIdx, sW, n } = weldBody(body);
   // 3) zones et épaisseurs
   const inSuit = new Uint8Array(n), off = new Float32Array(n);
   for (let i = 0; i < n; i++) {
     const x = Math.abs(pos[i * 3]), y = pos[i * 3 + 1];
     if (y > zones.neck || x > zones.wrist) continue;
+    if (y < 0.1) continue;                                    // pieds : chaussures rigides articulées (characters.js)
     inSuit[i] = 1;
     let o;
-    if (y < 0.34) o = 0.03;                                   // bottes
-    else if (y < zones.hip - 0.1) o = 0.024;                  // pantalon
-    else if (x > 0.24) o = 0.028;                             // manches
-    else o = 0.04;                                            // veste
-    if (x > zones.wrist - 0.06) o = 0.014;                    // poignets resserrés
-    if (y > zones.neck - 0.05) o = 0.03;                      // col
+    // tissu technique ajusté : quelques millimètres au-dessus de la peau (plus d'effet doudoune)
+    if (y < 0.34) o = 0.016;                                  // tige des bottes
+    else if (y < zones.hip - 0.1) o = 0.011;                  // pantalon
+    else if (x > 0.24) o = 0.01;                              // manches
+    else o = 0.014;                                           // veste
+    if (x > zones.wrist - 0.06) o = 0.007;                    // poignets resserrés
+    if (y > zones.neck - 0.05) o = 0.014;                     // col
     off[i] = o;
   }
   const keep = [];

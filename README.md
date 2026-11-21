@@ -215,6 +215,17 @@ bassin miroir et sculpture orbitale animée au centre.
 - La coupole repose sur un calice nacré nervuré, bagué de lumière, prolongé par un fût jusqu'au toit du hall du pont
   habitat : la structure est visible depuis l'espace et par la verrière de la Cour des Saveurs.
 
+## Silhouettes, tenues et armures
+
+- **Silhouettes affinées** : le corps de base (très musclé) est aminci le long de chaque os (torse, épaules, bras, jambes),
+  sans changer la taille ni la longueur des membres ; un peu moins pour les silhouettes féminines.
+- **Tenues ajustées** : tissu technique à quelques millimètres de la peau (fini l'effet doudoune), col et poignets resserrés.
+- **Chaussures montantes** articulées (talon lié au pied, avant-pied aux orteils) : semelle, tige, coque de pointe.
+- **Armures de combinaison** : plaques fines générées à partir du corps, qui l'épousent et se déforment avec lui
+  (plastron, dos, épaulières, bras, avant-bras, coudières, cuissards, genouillères, tibias selon le niveau), bords découpés
+  nets avec épaisseur visible, joints creusés, chanfreins, liserés de couleur, voyants, usure ; module dorsal plat, col et
+  ceinture fins. Trois niveaux : léger, moyen, lourd.
+
 ## Architecture extérieure de la station
 
 Vue de l'espace, Halden-7 forme un ensemble porteur cohérent :

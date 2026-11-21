@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { Retargeter } from './retarget.js';
 import { loadBinary } from '../core/binary.js';
 import { buildGarment, skinMaterial } from './garment.js';
@@ -151,7 +153,8 @@ export class CharacterLibrary {
       m.envMapIntensity = 0.7;
       if (/Superhero/.test(m.name)) { o.name = 'body'; skinMaterial(m, zones); bodyMesh = o; }
     });
-    // vêtement généré (veste, pantalon, bottes) lié au même squelette
+    // silhouette affinée (le modèle de base est très musclé), puis vêtement généré lié au même squelette
+    if (bodyMesh) slimBody(bodyMesh, name.startsWith('UF'));
     if (bodyMesh) {
       const garment = buildGarment(bodyMesh, zones);
       garment.castShadow = !!this.q.npcShadows; garment.receiveShadow = true;
@@ -161,7 +164,7 @@ export class CharacterLibrary {
     const height = head.getWorldPosition(new THREE.Vector3()).y + 0.13;
     // matrice monde -> repère de l'os de tête (pour y accrocher les coiffures)
     const headInv = new THREE.Matrix4().copy(head.matrixWorld).invert();
-    this.templates[name] = { scene, height, skel: name.slice(0, 2), headInv, zones };
+    this.templates[name] = { scene, height, skel: name.slice(0, 2), headInv, zones, body: bodyMesh, boots: bodyMesh ? buildBoots(bones, bodyMesh) : null };
   }
 
   /** Pièces d'armure (géométries en repère d'os), mises en cache par corps et par couleurs. */
@@ -173,7 +176,7 @@ export class CharacterLibrary {
       t.scene.updateMatrixWorld(true);
       const bones = {};
       t.scene.traverse((o) => { if (o.isBone) bones[o.name] = o; });
-      this._armor[key] = buildArmor(bones, colors);
+      this._armor[key] = buildArmor(t.body, bones, t.zones, colors);
     }
     return this._armor[key];
   }
@@ -194,6 +197,81 @@ export class CharacterLibrary {
   create(name, opts = {}) {
     return new Character(this, name, opts);
   }
+}
+
+/**
+ * Affine le corps : chaque sommet est rapproché de l'axe des os qui l'animent (torse, bras, jambes), sans changer
+ * la longueur des membres ni la taille. Coefficients < 1 : plus fin. Mélange selon les poids de peau.
+ */
+const SLIM = { pelvis: 0.93, spine_01: 0.86, spine_02: 0.83, spine_03: 0.82, neck_01: 0.86, clavicle_l: 0.8, clavicle_r: 0.8,
+  upperarm_l: 0.74, upperarm_r: 0.74, lowerarm_l: 0.8, lowerarm_r: 0.8, thigh_l: 0.85, thigh_r: 0.85, calf_l: 0.87, calf_r: 0.87 };
+const SLIM_NEXT = { pelvis: 'spine_01', spine_01: 'spine_02', spine_02: 'spine_03', spine_03: 'neck_01', neck_01: 'Head',
+  clavicle_l: 'upperarm_l', clavicle_r: 'upperarm_r', upperarm_l: 'lowerarm_l', upperarm_r: 'lowerarm_r', lowerarm_l: 'hand_l', lowerarm_r: 'hand_r',
+  thigh_l: 'calf_l', thigh_r: 'calf_r', calf_l: 'foot_l', calf_r: 'foot_r' };
+/** Chaussures montantes : semelle crantée, tige, coque de pointe ; talon lié à l'os du pied, avant-pied à l'os des orteils. */
+function buildBoots(bones, bodyMesh) {
+  const out = [], skel = bodyMesh.skeleton;
+  for (const side of ['l', 'r']) {
+    const foot = bones[`foot_${side}`], ball = bones[`ball_${side}`];
+    if (!foot || !ball) continue;
+    const a = foot.getWorldPosition(new THREE.Vector3()), b = ball.getWorldPosition(new THREE.Vector3());
+    const x = (a.x + b.x) / 2, w = 0.098, zH = a.z - 0.055, zB = b.z, zT = b.z + 0.075;
+    const parts = { foot: [], ball: [] };
+    const put = (k, geo, px, py, pz, m) => { geo.translate(px, py, pz); parts[k].push([geo, m]); };
+    const RBG = (sx, sy, sz, r) => new RoundedBoxGeometry(sx, sy, sz, 3, r);
+    // tige (jusqu'au-dessus de la cheville), talon, semelle arrière
+    put('foot', RBG(w, a.y + 0.07, zB - zH + 0.01, 0.03), x, (a.y + 0.07) / 2 + 0.012, (zH + zB) / 2, 'upper');
+    put('foot', RBG(w + 0.01, 0.026, zB - zH + 0.02, 0.008), x, 0.013, (zH + zB) / 2, 'sole');
+    put('foot', new THREE.TorusGeometry(0.058, 0.007, 6, 20).rotateX(Math.PI / 2).scale(0.85, 1, 1.05), x, a.y + 0.075, a.z - 0.005, 'trim');
+    // avant-pied : coque de pointe arrondie et semelle avant
+    put('ball', RBG(w, 0.062, zT - zB + 0.012, 0.028), x, 0.043, (zB + zT) / 2 - 0.004, 'upper');
+    put('ball', RBG(w + 0.01, 0.026, zT - zB + 0.018, 0.009), x, 0.013, (zB + zT) / 2, 'sole');
+    put('ball', RBG(w * 0.8, 0.012, 0.035, 0.005), x, 0.07, zB + 0.01, 'trim');
+    for (const [k, bone] of [['foot', foot], ['ball', ball]]) {
+      const bi = skel.bones.indexOf(bone);
+      for (const [geo0, role] of parts[k]) {
+        const g = geo0.index ? geo0.toNonIndexed() : geo0;
+        for (const at of Object.keys(g.attributes)) if (!['position', 'normal'].includes(at)) g.deleteAttribute(at);
+        const n = g.attributes.position.count, shade = role === 'upper' ? 1 : role === 'sole' ? 0.18 : 0.45;
+        g.setAttribute('color', new THREE.Float32BufferAttribute(new Float32Array(n * 3).fill(shade), 3));
+        g.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(new Uint16Array(n * 4).map((_, i) => (i % 4 ? 0 : bi)), 4));
+        g.setAttribute('skinWeight', new THREE.Float32BufferAttribute(new Float32Array(n * 4).map((_, i) => (i % 4 ? 0 : 1)), 4));
+        out.push(g);
+      }
+    }
+  }
+  if (!out.length) return null;
+  const g = mergeGeometries(out, false);
+  // repère du maillage du corps (identique au repère de repos du modèle)
+  g.applyMatrix4(new THREE.Matrix4().copy(bodyMesh.matrixWorld).invert());
+  g.computeBoundingSphere();
+  return g;
+}
+
+function slimBody(mesh, fem = false) {
+  const g = mesh.geometry, P = g.attributes.position, SI = g.attributes.skinIndex, SW = g.attributes.skinWeight;
+  const bones = mesh.skeleton.bones, idx = Object.fromEntries(bones.map((b, i) => [b.name, i]));
+  mesh.updateMatrixWorld(true);
+  const M = mesh.matrixWorld, Mi = M.clone().invert();
+  const seg = bones.map((b) => {
+    const f0 = SLIM[b.name], nx = bones[idx[SLIM_NEXT[b.name]]], f = f0 && (fem ? 1 - (1 - f0) * 0.55 : f0);
+    if (!f || !nx) return null;
+    const a = b.getWorldPosition(new THREE.Vector3()), d = nx.getWorldPosition(new THREE.Vector3()).sub(a);
+    return { a, d, l2: Math.max(1e-6, d.lengthSq()), f };
+  });
+  const v = new THREE.Vector3(), q = new THREE.Vector3(), acc = new THREE.Vector3();
+  for (let i = 0; i < P.count; i++) {
+    v.fromBufferAttribute(P, i).applyMatrix4(M); acc.set(0, 0, 0);
+    for (let c = 0; c < 4; c++) {
+      const w = SW.getComponent(i, c), s = seg[SI.getComponent(i, c)];
+      if (!s || w <= 0) continue;
+      const t = THREE.MathUtils.clamp(q.subVectors(v, s.a).dot(s.d) / s.l2, 0, 1);
+      q.copy(s.a).addScaledVector(s.d, t);                         // point de l'axe de l'os le plus proche
+      acc.addScaledVector(q.subVectors(v, q), w * (s.f - 1));
+    }
+    v.add(acc).applyMatrix4(Mi); P.setXYZ(i, v.x, v.y, v.z);
+  }
+  P.needsUpdate = true; g.computeBoundingSphere();
 }
 
 const _v = new THREE.Vector3(), _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _m = new THREE.Matrix4();
@@ -234,6 +312,16 @@ export class Character {
     this.lib = lib; this.opts = opts;
     this.setOutfit(opts.outfit || {});
     this.bones.Neck = this.bones.neck_01;
+    // chaussures (matériaux propres au personnage : couleur des bottes de la tenue)
+    this.bootMat = new THREE.MeshStandardMaterial({ color: 0x15130f, roughness: 0.45, metalness: 0.05, vertexColors: true });
+    if (t.boots && this.body) {
+      const bm = new THREE.SkinnedMesh(t.boots, this.bootMat);
+      bm.bind(this.body.skeleton, this.body.bindMatrix);
+      bm.boundingSphere = t.boots.boundingSphere.clone(); bm.boundingSphere.radius *= 1.5;
+      bm.castShadow = !!lib.q.npcShadows; bm.receiveShadow = true;
+      this.body.parent.add(bm);
+    }
+    if (this._suits[0]) this.bootMat.color.copy(this._suits[0].uBoot.value).multiplyScalar(1.3);
     this.setArmor(opts.armor);
     this.handR = this.bones.hand_r;
     // coiffure accrochée à l'os de tête
@@ -479,6 +567,7 @@ export class Character {
       if (f.top !== undefined) u.uTop.value.set(f.top);
       if (f.bottom !== undefined) u.uBottom.value.set(f.bottom); else if (f.top !== undefined) u.uBottom.value.set(f.top);
       if (f.boot !== undefined) u.uBoot.value.set(f.boot);
+      if (f.boot !== undefined && this.bootMat) this.bootMat.color.set(f.boot).multiplyScalar(1.3);
       if (f.accent !== undefined) u.uAccent.value.set(f.accent);
       u.uZones.value.w = f.gloves ? 1 : 0;
       u.uOpts.value.set(f.hivis ? 1 : 0, f.belt === false ? 0 : 1, f.zip === false ? 0 : 1, 0);
@@ -490,7 +579,18 @@ export class Character {
     for (const m of this._armor) m.parent?.remove(m);
     this._armor = [];
     if (!colors) return;
-    for (const p of this.lib.armorFor(this.name, colors)) {
+    const A = this.lib.armorFor(this.name, colors);
+    // coques skinnées : liées au squelette de ce personnage (elles suivent les membres)
+    for (const p of A.skinned) {
+      if (!this.body) break;
+      const m = new THREE.SkinnedMesh(p.geo, p.mat);
+      m.bind(this.body.skeleton, this.body.bindMatrix);
+      m.castShadow = this.opts.armorShadows ?? true; m.receiveShadow = true;
+      m.boundingSphere = (p.geo.boundingSphere || (p.geo.computeBoundingSphere(), p.geo.boundingSphere)).clone(); m.boundingSphere.radius *= 1.35;
+      this.body.parent.add(m);
+      this._armor.push(m);
+    }
+    for (const p of A.rigid) {
       const m = new THREE.Mesh(p.mesh.geometry, p.mesh.material);
       m.castShadow = this.opts.armorShadows ?? true; m.receiveShadow = true;
       this.bones[p.bone].add(m);
