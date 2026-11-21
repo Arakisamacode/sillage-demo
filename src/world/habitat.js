@@ -253,17 +253,36 @@ export class Elevators {
     S.from = S.y; S.to = to; S.k = 0; S.moving = true; S.carry = carry; S.closeT = 1.3; S.hold = 0;
     this.onEvent('start', S);
   }
-  call(S, y) { if (S.moving) return; if (this._inside(S) && !this.isAt(S, y)) return;   // le joueur est dans la cabine : on attend qu'il en sorte
-    if (this.isAt(S, y)) { S.hold = 3; return; } this._start(S, y, false); this.onEvent('called', S); }
+  /**
+   * Appel depuis un palier. Le joueur est prioritaire : si la cabine roule (figurants), son appel est mis en file et
+   * servi dès l'arrivée (les figurants ne peuvent plus la renvoyer ailleurs entre-temps). who : 'player' | 'npc'.
+   */
+  call(S, y, who = 'player') {
+    if (this._inside(S) && !this.isAt(S, y)) return;   // le joueur est dans la cabine : on attend qu'il en sorte
+    // figurants : jamais avant l'appel du joueur, ni pendant que les portes sont ouvertes ailleurs
+    if (who === 'npc' && ((S.pending !== undefined && S.pending !== y) || (S.hold > 0 && !this.isAt(S, y)))) return;
+    if (S.moving) { if (who === 'player' && S.to !== y) { S.pending = y; this.onEvent('queued', S); } return; }
+    if (this.isAt(S, y)) { S.hold = Math.max(S.hold, 3); if (who === 'player') S.pending = undefined; return; }
+    this._start(S, y, false); if (who === 'player') S.pending = undefined; this.onEvent('called', S);
+  }
   ride(S) { if (S.moving) return; const [a, b] = S.levels || [0, DECK_Y]; this._start(S, Math.abs(S.y - a) < 1 ? b : a, true); }
   /** Départ demandé par un passager non joueur (figurant) vers le niveau y. */
-  send(S, y) { if (S.moving || this.isAt(S, y) || this._inside(S)) return; this._start(S, y, false); }
+  send(S, y) {
+    if (S.moving || this.isAt(S, y) || this._inside(S) || S.hold > 0) return;      // portes ouvertes : on laisse monter
+    if (S.pending !== undefined && S.pending !== y) return;                          // appel du joueur prioritaire
+    this._start(S, y, false);
+  }
   /** À appeler avant la mise à jour du joueur : déplace les cabines et le joueur embarqué. */
   update(dt) {
     this.ticked = true;
     this.t += dt;
     for (const S of this.shafts) {
       S.hold -= dt;
+      // appel du joueur en file : servi dès que les portes ont laissé sortir les passagers
+      if (!S.moving && S.pending !== undefined) {
+        if (Math.abs(S.y - S.pending) < 0.05) S.pending = undefined;
+        else if (S.hold < 2 && !this._inside(S)) { const y = S.pending; S.pending = undefined; this._start(S, y, false); this.onEvent('called', S); }
+      }
       if (!S.moving) continue;
       if (S.closeT > 0) S.closeT -= dt;
       else {

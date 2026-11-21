@@ -220,11 +220,21 @@ bassin miroir et sculpture orbitale animée au centre.
 - **Silhouettes affinées** : le corps de base (très musclé) est aminci le long de chaque os (torse, épaules, bras, jambes),
   sans changer la taille ni la longueur des membres ; un peu moins pour les silhouettes féminines.
 - **Tenues ajustées** : tissu technique à quelques millimètres de la peau (fini l'effet doudoune), col et poignets resserrés.
-- **Chaussures montantes** articulées (talon lié au pied, avant-pied aux orteils) : semelle, tige, coque de pointe.
+- **Chaussures montantes** profilées et articulées (talon lié au pied, avant-pied aux orteils) : tige, empeigne arrondie,
+  semelle fine.
+- **Bords nets** : col, poignets et chevilles du vêtement découpés le long d'un contour, avec ourlet.
+- **Mains détendues** : l'animation de repos serrait les poings ; les doigts sont ramenés vers une main naturelle
+  (sauf en tenant une arme ou en mangeant).
+- **Peau** : teinte moins orangée, teint propre à chaque personnage, légère rougeur, diffusion sous-cutanée approchée.
 - **Armures de combinaison** : plaques fines générées à partir du corps, qui l'épousent et se déforment avec lui
   (plastron, dos, épaulières, bras, avant-bras, coudières, cuissards, genouillères, tibias selon le niveau), bords découpés
   nets avec épaisseur visible, joints creusés, chanfreins, liserés de couleur, voyants, usure ; module dorsal plat, col et
   ceinture fins. Trois niveaux : léger, moyen, lourd.
+
+## Ascenseurs : priorité au joueur
+
+L'appel du joueur est mis en file si la cabine roule et servi dès son arrivée : les figurants ne peuvent plus la
+renvoyer ailleurs entre-temps (portes ouvertes quelques secondes pour laisser monter). Ils reprennent ensuite leur trafic.
 
 ## Architecture extérieure de la station
 

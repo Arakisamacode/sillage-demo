@@ -43,12 +43,12 @@ export function weldBody(body) {
 export function buildGarment(body, zones) {
   const { pos, nrm, tris, sIdx, sW, n } = weldBody(body);
   // 3) zones et épaisseurs
-  const inSuit = new Uint8Array(n), off = new Float32Array(n);
+  // champ signé (> 0 sur le vêtement) : les bords (col, poignets, chevilles) sont découpés le long de F = 0, donc nets
+  const inSuit = new Uint8Array(n), off = new Float32Array(n), F = new Float32Array(n);
   for (let i = 0; i < n; i++) {
     const x = Math.abs(pos[i * 3]), y = pos[i * 3 + 1];
-    if (y > zones.neck || x > zones.wrist) continue;
-    if (y < 0.1) continue;                                    // pieds : chaussures rigides articulées (characters.js)
-    inSuit[i] = 1;
+    F[i] = Math.min(zones.neck - y, zones.wrist - x, y - 0.1);   // pieds : chaussures articulées (characters.js)
+    inSuit[i] = F[i] > -0.04 ? 1 : 0;
     let o;
     // tissu technique ajusté : quelques millimètres au-dessus de la peau (plus d'effet doudoune)
     if (y < 0.34) o = 0.016;                                  // tige des bottes
@@ -60,7 +60,7 @@ export function buildGarment(body, zones) {
     off[i] = o;
   }
   const keep = [];
-  for (let t = 0; t < tris.length; t += 3) if (inSuit[tris[t]] && inSuit[tris[t + 1]] && inSuit[tris[t + 2]]) keep.push(tris[t], tris[t + 1], tris[t + 2]);
+  for (let t = 0; t < tris.length; t += 3) if (inSuit[tris[t]] || inSuit[tris[t + 1]] || inSuit[tris[t + 2]]) keep.push(tris[t], tris[t + 1], tris[t + 2]);
   const q = new Float32Array(n * 3);
   for (let i = 0; i < n; i++) for (let k = 0; k < 3; k++) q[i * 3 + k] = pos[i * 3 + k] + nrm[i * 3 + k] * off[i];
   // 4) lissage de Taubin (λ / μ) sur la surface du vêtement : supprime abdos et reliefs sans rétrécir
@@ -92,17 +92,32 @@ export function buildGarment(body, zones) {
     const min = off[i] * 0.55;
     if (d < min) for (let k = 0; k < 3; k++) q[i * 3 + k] += nrm[i * 3 + k] * (min - d);
   }
-  // 5) géométrie compacte
-  const used = new Int32Array(n).fill(-1);
-  const P2 = [], S2 = [], W2 = [], I2 = [];
-  for (const i of keep) {
-    if (used[i] < 0) {
-      used[i] = P2.length / 3;
-      P2.push(q[i * 3], q[i * 3 + 1], q[i * 3 + 2]);
-      for (let k = 0; k < 4; k++) { S2.push(sIdx[i * 4 + k]); W2.push(sW[i * 4 + k]); }
+  // 5) géométrie : triangles découpés le long du bord, ourlet (petite tranche repliée vers la peau)
+  const P2 = [], S2 = [], W2 = [], I2 = [], outer = new Map(), inner = new Map();
+  const emit = (p, si) => { P2.push(p[0], p[1], p[2]); for (let k = 0; k < 4; k++) { S2.push(sIdx[si * 4 + k]); W2.push(sW[si * 4 + k]); } return P2.length / 3 - 1; };
+  const base = (i, inn) => [0, 1, 2].map((k) => (inn ? pos[i * 3 + k] + nrm[i * 3 + k] * 0.002 : q[i * 3 + k]));
+  const V = (i) => { if (!outer.has(i)) outer.set(i, emit(base(i, false), i)); return outer.get(i); };
+  const C = (a, b, inn = false) => {
+    const k = (inn ? 'i' : 'o') + (a < b ? a + ',' + b : b + ',' + a), M = inn ? inner : outer;
+    if (M.has(k)) return M.get(k);
+    const t = F[a] / (F[a] - F[b]), pa = base(a, inn), pb = base(b, inn);
+    const id = emit(pa.map((v, j) => v + (pb[j] - v) * t), t < 0.5 ? a : b); M.set(k, id); return id;
+  };
+  const rim = [];
+  for (let t = 0; t < keep.length; t += 3) {
+    const T = [keep[t], keep[t + 1], keep[t + 2]], sg = T.map((i) => F[i] >= 0), nIn = sg.filter(Boolean).length;
+    if (!nIn) continue;
+    if (nIn === 3) { I2.push(V(T[0]), V(T[1]), V(T[2])); continue; }
+    const poly = [], polyI = [], cut = [];
+    for (let e = 0; e < 3; e++) {
+      const a = T[e], b = T[(e + 1) % 3];
+      if (sg[e]) { poly.push(V(a)); polyI.push(null); }
+      if (sg[e] !== sg[(e + 1) % 3]) { poly.push(C(a, b)); polyI.push(C(a, b, true)); cut.push(poly.length - 1); }
     }
-    I2.push(used[i]);
+    for (let k = 1; k < poly.length - 1; k++) I2.push(poly[0], poly[k], poly[k + 1]);
+    if (cut.length === 2) rim.push([poly[cut[0]], poly[cut[1]], polyI[cut[0]], polyI[cut[1]]]);
   }
+  for (const [a, b, ai, bi] of rim) I2.push(a, ai, b, b, ai, bi, a, b, ai, b, bi, ai);
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(P2, 3));
   g.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(S2, 4));
@@ -124,11 +139,12 @@ export function outfitUniforms(zones) {
     uBoot: { value: new THREE.Color(0x15130f) }, uAccent: { value: new THREE.Color(0xd8e04a) },
     uZones: { value: new THREE.Vector4(zones.neck, zones.wrist, zones.hip, 0) }, // cou, poignet, hanches, gants
     uOpts: { value: new THREE.Vector4(0, 1, 1, 0) },                          // bandes réfléchissantes, ceinture, fermeture
+    uTone: { value: new THREE.Vector4(1, 1, 1, 1) },                          // teint (multiplicateur de la peau)
   };
 }
 
 const HEAD = /* glsl */`
-  varying vec3 vRest; uniform vec3 uTop, uBottom, uBoot, uAccent; uniform vec4 uZones, uOpts;
+  varying vec3 vRest; uniform vec3 uTop, uBottom, uBoot, uAccent; uniform vec4 uZones, uOpts, uTone;
   float h3(vec3 p){ return fract(sin(dot(p, vec3(12.9898, 78.233, 37.719))) * 43758.5453); }
   float vn(vec3 p){ vec3 i = floor(p), f = fract(p); f = f*f*(3.0-2.0*f);
     return mix(mix(mix(h3(i), h3(i+vec3(1,0,0)), f.x), mix(h3(i+vec3(0,1,0)), h3(i+vec3(1,1,0)), f.x), f.y),
@@ -201,9 +217,18 @@ export function skinMaterial(mat, zones) {
         if (vRest.y < uZones.x - 0.06 && abs(vRest.x) < uZones.y - 0.07) discard;`)
       .replace('#include <map_fragment>', `#include <map_fragment>
         float gloveS = step(uZones.y - 0.07, abs(vRest.x)) * uZones.w;
-        diffuseColor.rgb = mix(diffuseColor.rgb, uBoot * 1.3 * (0.8 + 0.4 * diffuseColor.r), gloveS);`)
+        // peau : teinte moins orangée, teint propre au personnage, rougeur légère (joues, nez, oreilles, doigts)
+        vec3 sk = diffuseColor.rgb;
+        float lumS = dot(sk, vec3(0.3, 0.59, 0.11));
+        sk = mix(sk, vec3(lumS) * vec3(1.06, 0.98, 0.92), 0.22) * uTone.rgb;
+        float blush = vn(vRest * 38.0) * 0.5 + 0.5 * vn(vRest * 9.0);
+        sk *= mix(vec3(1.0), vec3(1.04, 0.95, 0.93), blush * 0.6);
+        diffuseColor.rgb = mix(sk, uBoot * 1.3 * (0.8 + 0.4 * diffuseColor.r), gloveS);`)
       .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
-        roughnessFactor = mix(roughnessFactor, 0.45, gloveS);`);
+        roughnessFactor = mix(0.5 + 0.12 * vn(vRest * 120.0), 0.45, gloveS);`)
+      .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+        // diffusion sous la peau (approximation) : un peu de lumière chaude dans les zones d'ombre
+        totalEmissiveRadiance += diffuseColor.rgb * vec3(0.075, 0.03, 0.022) * (1.0 - gloveS);`);
   };
   mat.customProgramCacheKey = () => 'skin';
 }

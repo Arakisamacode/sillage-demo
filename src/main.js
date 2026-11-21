@@ -288,7 +288,7 @@ async function boot() {
         { anim: 'idle', face: -Math.PI / 2, until: () => {
           const E = ctx.elevators; if (!E) return false;
           if (E.isAt(S, fromY)) { S.hold = Math.max(S.hold, 1.2); return S.doors[fromY].open > 0.85; }
-          if (!S.moving) E.call(S, fromY);
+          if (!S.moving) E.call(S, fromY, 'npc');
           return false;
         } },
         { fn: (n) => { S.waiting.delete(n); S.boarding.add(n); inner = P3(S.x0 + 0.55 + Math.random() * 1.1, fromY, S.c + (Math.random() - 0.5) * 1.4); } },
@@ -681,12 +681,12 @@ async function boot() {
   luxLift.onEvent = (e, S, carried) => {
     if (e === 'start' || e === 'arrived') audio.blip();
     if (e === 'called') toast('Ascenseur panoramique appelé');
+    if (e === 'queued') toast('Cabine en route · votre appel est prioritaire, elle viendra vous chercher');
     if (e === 'arrived' && carried) toast(S.y > DECK_Y + 1 ? 'La Couronne · Maison Élysée, Nova Atelier, Aérodyne, salon Le Zénith' : 'Pont habitat · bar La Comète, infirmerie, cabines · Cour des Saveurs');
   };
   for (const S of ctx.lux.shafts) for (const y of S.levels) {
     interactables.push({ pos: S.inside(y), r: 1.2, when: () => luxLift.isAt(S, y), label: y === DECK_Y ? 'E — Ascenseur panoramique : monter à La Couronne' : 'E — Ascenseur panoramique : descendre au pont habitat', fn: () => luxLift.ride(S) });
-    interactables.push({ pos: new THREE.Vector3(S.x1 + 1.3, y, S.c), r: 1.3, when: () => !luxLift.isAt(S, y) && !S.moving, label: 'E — Appeler l\'ascenseur panoramique', fn: () => luxLift.call(S, y) });
-    interactables.push({ pos: new THREE.Vector3(S.x1 + 1.3, y, S.c), r: 1.3, when: () => S.moving, label: 'Ascenseur en mouvement…', fn: () => null });
+    interactables.push({ pos: new THREE.Vector3(S.x1 + 1.3, y, S.c), r: 1.3, when: () => !luxLift.isAt(S, y), label: 'E — Appeler l\'ascenseur panoramique', fn: () => luxLift.call(S, y) });
   }
   {
     const LS = ctx.lux.spots;
@@ -699,14 +699,14 @@ async function boot() {
   elevators.onEvent = (e, S, carried) => {
     if (e === 'start' || e === 'arrived') audio.blip();
     if (e === 'called') toast('Ascenseur appelé · cabine en approche');
+    if (e === 'queued') toast('Cabine en route · votre appel est prioritaire, elle viendra vous chercher');
     if (e === 'arrived' && carried) toast(S.y > 1 ? 'Pont habitat · bar La Comète, infirmerie, cabines · Cour des Saveurs (couloir nord) · Grand Dôme au fond de la Cour' : 'Rez-de-chaussée · galerie marchande');
   };
   for (const S of HB.shafts) {
     for (const y of [0, DECK_Y]) {
       interactables.push({ pos: S.inside(y), r: 1.2, when: () => elevators.isAt(S, y), label: y === 0 ? 'E — Ascenseur : monter au pont habitat' : 'E — Ascenseur : descendre à la galerie', fn: () => elevators.ride(S) });
-      interactables.push({ pos: new THREE.Vector3(S.x1 + 1.3, y, S.c), r: 1.3, when: () => !elevators.isAt(S, y) && !S.moving, label: 'E — Appeler l\'ascenseur', fn: () => elevators.call(S, y) });
-      interactables.push({ pos: new THREE.Vector3(S.x1 + 1.3, y, S.c), r: 1.3, when: () => S.moving, label: 'Ascenseur en mouvement…', fn: () => null });
-    }
+      interactables.push({ pos: new THREE.Vector3(S.x1 + 1.3, y, S.c), r: 1.3, when: () => !elevators.isAt(S, y), label: 'E — Appeler l\'ascenseur', fn: () => elevators.call(S, y) });
+      }
   }
   // ------------------------------------------------------------------ mobilier interactif : distributeurs, borne, sièges
   const CANS = ['Soda d\'agrumes', 'Thé glacé de Lys', 'Boisson énergisante « Postcombustion »', 'Eau minérale de comète'];

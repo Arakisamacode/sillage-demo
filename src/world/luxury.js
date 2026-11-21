@@ -553,7 +553,7 @@ export function populateLuxury(ctx, lib, player, L) {
       { anim: 'idle', face: -Math.PI / 2, until: () => {
         const E = ctx.luxLift; if (!E) return false;
         if (E.isAt(Sh, fromY)) { Sh.hold = Math.max(Sh.hold, 1.2); return Sh.doors[fromY].open > 0.85; }
-        if (!Sh.moving) E.call(Sh, fromY);
+        if (!Sh.moving) E.call(Sh, fromY, 'npc');
         return false;
       } },
       { fn: (n) => { Sh.waiting.delete(n); Sh.boarding.add(n); inner = new THREE.Vector3(Sh.x0 + 0.7 + Math.random() * 0.9, fromY, Sh.c + (Math.random() - 0.5) * 1.1); } },

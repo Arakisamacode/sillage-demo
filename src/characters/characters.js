@@ -219,14 +219,16 @@ function buildBoots(bones, bodyMesh) {
     const parts = { foot: [], ball: [] };
     const put = (k, geo, px, py, pz, m) => { geo.translate(px, py, pz); parts[k].push([geo, m]); };
     const RBG = (sx, sy, sz, r) => new RoundedBoxGeometry(sx, sy, sz, 3, r);
-    // tige (jusqu'au-dessus de la cheville), talon, semelle arrière
-    put('foot', RBG(w, a.y + 0.07, zB - zH + 0.01, 0.03), x, (a.y + 0.07) / 2 + 0.012, (zH + zB) / 2, 'upper');
-    put('foot', RBG(w + 0.01, 0.026, zB - zH + 0.02, 0.008), x, 0.013, (zH + zB) / 2, 'sole');
-    put('foot', new THREE.TorusGeometry(0.058, 0.007, 6, 20).rotateX(Math.PI / 2).scale(0.85, 1, 1.05), x, a.y + 0.075, a.z - 0.005, 'trim');
-    // avant-pied : coque de pointe arrondie et semelle avant
-    put('ball', RBG(w, 0.062, zT - zB + 0.012, 0.028), x, 0.043, (zB + zT) / 2 - 0.004, 'upper');
-    put('ball', RBG(w + 0.01, 0.026, zT - zB + 0.018, 0.009), x, 0.013, (zB + zT) / 2, 'sole');
-    put('ball', RBG(w * 0.8, 0.012, 0.035, 0.005), x, 0.07, zB + 0.01, 'trim');
+    // chaussure montante profilée : tige cylindrique, empeigne arrondie (capsules), semelle fine débordante
+    const L1 = zB - zH, L2 = zT - zB, hw = w / 2;
+    const cap = (r, len, sx, sy) => new THREE.CapsuleGeometry(r, Math.max(0.001, len), 6, 16).rotateX(Math.PI / 2).scale(sx, sy, 1);
+    put('foot', new THREE.CylinderGeometry(0.047, 0.052, a.y + 0.05 - 0.045, 18, 1, true), x, (a.y + 0.05 + 0.045) / 2, a.z - 0.006, 'upper');
+    put('foot', cap(hw * 0.95, L1 - hw * 1.6, 1, 0.78), x, 0.05, (zH + zB) / 2 + 0.004, 'upper');
+    put('foot', cap(hw * 0.97, L1 - hw * 1.6, 1.0, 0.16), x, 0.009, (zH + zB) / 2 + 0.004, 'sole');
+    put('foot', new THREE.TorusGeometry(0.05, 0.006, 6, 24).rotateX(Math.PI / 2), x, a.y + 0.05, a.z - 0.006, 'trim');
+    put('ball', cap(hw * 0.9, L2 - hw * 0.9, 0.98, 0.62), x, 0.038, (zB + zT) / 2 - 0.006, 'upper');
+    put('ball', cap(hw * 0.92, L2 - hw * 0.95, 0.98, 0.16), x, 0.009, (zB + zT) / 2 - 0.008, 'sole');
+    put('ball', new THREE.BoxGeometry(w * 0.55, 0.004, 0.05), x, 0.062, zB + 0.012, 'trim');
     for (const [k, bone] of [['foot', foot], ['ball', ball]]) {
       const bi = skel.bones.indexOf(bone);
       for (const [geo0, role] of parts[k]) {
@@ -358,6 +360,12 @@ export class Character {
     this.lookYaw = 0; this.lookPitch = 0;
     this.lodSkip = 0;
     this.acc = 0;
+    // doigts : l'animation de repos serre les poings ; on les détend vers la pose de repos (main naturelle, mi-fermée)
+    this._fingers = [];
+    for (const [k, b] of Object.entries(this.bones)) if (/^(index|middle|ring|pinky|thumb)_0[1-3]_[lr]$/.test(k)) this._fingers.push([b, b.quaternion.clone(), /^thumb/.test(k) ? 0.3 : 0.5]);
+    // teint propre à chaque personnage (légères variations naturelles)
+    const tone = opts.skinTone ?? [0.94 + Math.random() * 0.1, 0.9 + Math.random() * 0.1, 0.86 + Math.random() * 0.12];
+    for (const u of this._suits) u.uTone?.value.set(tone[0], tone[1], tone[2], 1);
     // élimination hors champ : sphère englobante de la pose de liaison, élargie (gestes, position assise)
     this.model.traverse((o) => {
       if (!o.isSkinnedMesh) return;
@@ -623,6 +631,7 @@ export class Character {
     const step = this.acc; this.acc = 0;
     this._locomotion();
     this.mixer.update(step);
+    if (!this.held && !this.upperRole && !this.meal) for (const [b, q, k] of this._fingers) b.quaternion.slerp(q, k);
     this._applyLook(step);
     if (this.held) this._placeHeld();
     if (this.carry) this._carryPose();

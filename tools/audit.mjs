@@ -164,8 +164,9 @@ await step('ascenseurs (3 cabines, 2 sens)', async () => {
     const lifts = [...A.habitat.shafts.map((S) => [A.elevators, S]), [A.luxLift, A.lux.shafts[0]]];
     for (const [E, S] of lifts) for (const from of S.levels || [0, 40]) {
       const to = (S.levels || [0, 40]).find((y) => y !== from);
-      P.pos.copy(S.inside(from)); P.vel.set(0, 0, 0);
-      E.call(S, from); for (let i = 0; i < 30 * 20 && !E.isAt(S, from); i++) { E.update(1 / 30); A.simulate(1 / 30, (window.__t += 1 / 30)); }
+      // appel depuis le palier (comme un joueur), renouvelé tant que la cabine est occupée par des figurants
+      P.pos.set(S.x1 + 1.3, from, S.c); P.vel.set(0, 0, 0);
+      for (let i = 0; i < 30 * 40 && !E.isAt(S, from); i++) { if (i % 15 === 0) E.call(S, from); E.update(1 / 30); A.simulate(1 / 30, (window.__t += 1 / 30)); P.pos.set(S.x1 + 1.3, from, S.c); }
       P.pos.copy(S.inside(from)); E.ride(S);
       for (let i = 0; i < 30 * 14 && (S.moving || Math.abs(S.y - to) > 0.05); i++) { E.update(1 / 30); A.simulate(1 / 30, (window.__t += 1 / 30)); }
       out.push(Math.abs(P.pos.y - to) < 0.3);
