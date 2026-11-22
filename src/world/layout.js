@@ -8,6 +8,8 @@ export const COLS = [-45, -37, -29, -21, -13, -5, 3, 11, 19, 27, 30];
 
 // Sas : dans le mur ouest, débouche sur la galerie marchande
 export const AIRLOCK = { z: -2, w: 4.2, h: 4.2, x0: -32, x1: -42 };
+// Sas 3 : dans le mur est, vers le tube d'abordage de la frégate Atalante amarrée le long de la station
+export const SHIPLOCK = { z: -9, w: 4.2, h: 4.2 };
 export const GALLERY = { x0: -102, x1: -42, z0: -24, z1: 10, h: 10 };
 
 export const PADS = {

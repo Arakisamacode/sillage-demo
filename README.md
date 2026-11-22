@@ -268,6 +268,24 @@ Vue de l'espace, Halden-7 forme un ensemble porteur cohérent :
   balisage, conduites longitudinales, mâts d'antennes ; ailes de radiateurs entre les anneaux ; à l'arrière, module
   réacteur, mât et quatre ailes solaires.
 
+## Frégate Atalante (vaisseau à trois ponts, visitable)
+
+Amarrée au sas 3 du hangar (côté tribord), reliée par une passerelle d'embarquement pressurisée. Coque de 110 m,
+entièrement parcourable à pied, portes coulissantes automatiques, escalier entre les trois ponts :
+
+- **Pont A (machines et logistique)** : sas d'entrée, vestiaire, atelier, armurerie, support vie, garage avec rover,
+  soute à double hauteur (conteneurs, portique, passerelle), salle des machines et réacteur à l'arrière.
+- **Pont B (équipage)** : infirmerie, quatre cabines (coin nuit, douche, lavabo), réfectoire et cuisine face aux
+  baies, salon d'observation, coursive au-dessus de la soute.
+- **Pont C (commandement)** : passerelle vitrée (pupitres, fauteuil de commandement, table holographique),
+  cabine du capitaine, salle de briefing, salon panoramique.
+
+Équipage animé : la capitaine Ilse Varga, deux pilotes assis aux pupitres, un mécanicien au réacteur, une
+cuisinière et un médecin (personnages Rocketbox), un manutentionnaire, des membres d'équipage au réfectoire et
+au salon, deux rondes dans les coursives. Tous parlent (touche E) et apparaissent au mode analyse ; l'entrée
+« Frégate Atalante » se débloque au codex. Création entièrement originale (géométrie procédurale,
+`src/world/bigship.js`).
+
 ## Le Grand Dôme (jardins)
 
 Au fond de la Cour des Saveurs, la **porte est** (enseigne verte « LE GRAND DÔME · JARDINS ») ouvre sur une passerelle

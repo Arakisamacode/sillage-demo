@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { Builder } from './builder.js';
 import { metricBox, worldUV } from './materials.js';
-import { HX, Z_BAY, Z_BACK, H, CAT_Y, COLS, AIRLOCK, PADS, STORAGE } from './layout.js';
+import { HX, Z_BAY, Z_BACK, H, CAT_Y, COLS, AIRLOCK, SHIPLOCK, PADS, STORAGE } from './layout.js';
 import { canvas, erode, rand, seed, FONT, paintedText, decalMaterial, hazardTexture, pictogram } from './signage.js';
 
 // Coque du hangar : sol, murs, poteaux, fermes de toiture, baie vitrée, passerelles, réseaux.
@@ -56,10 +56,11 @@ export function buildHangar(ctx) {
     for (let i = 0; i < COLS.length - 1; i++) {
       const z0 = COLS[i], z1 = COLS[i + 1];
       const zc = (z0 + z1) / 2, len = z1 - z0;
-      const hasDoor = side === -1 && AIRLOCK.z > z0 && AIRLOCK.z < z1;
+      const LK = side === -1 ? AIRLOCK : SHIPLOCK;
+      const hasDoor = LK.z > z0 && LK.z < z1;
       // soubassement sombre 0-3 m, panneaux clairs au-dessus, bande haute
       if (hasDoor) {
-        const dz0 = AIRLOCK.z - AIRLOCK.w / 2 - 0.6, dz1 = AIRLOCK.z + AIRLOCK.w / 2 + 0.6;
+        const dz0 = LK.z - LK.w / 2 - 0.6, dz1 = LK.z + LK.w / 2 + 0.6;
         const a = dz0 - z0, b = z1 - dz1;
         B.box(0.6, 3, a, wallLow, [x + side * 0.3, 1.5, z0 + a / 2], null, { collide: true, tex: 7 });
         B.box(0.6, 3, b, wallLow, [x + side * 0.3, 1.5, dz1 + b / 2], null, { collide: true, tex: 7 });

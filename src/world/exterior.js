@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { platedHull } from './hullkit.js';
 import { Builder } from './builder.js';
-import { HX, Z_BAY, Z_BACK, H, GALLERY, AIRLOCK } from './layout.js';
+import { HX, Z_BAY, Z_BACK, H, GALLERY, AIRLOCK, SHIPLOCK } from './layout.js';
 
 // Extérieur de la station Halden-7 (visible en vol) : enveloppe blindée du hangar et de la galerie,
 // corps cylindrique de 400 m, deux anneaux habités reliés par des rayons, hublots et balises.
@@ -23,13 +23,12 @@ export function buildExterior(ctx) {
   // ---------------------------------------------------------------- enveloppe du hangar
   const zc = (Z_BAY + Z_BACK) / 2, L = Z_BACK - Z_BAY + 4;
   B.box(HX * 2 + 7, 3.5, L, shell, [0, H + 2.2, zc], null, { tex: 8, cast: false });
-  // flanc est plein ; flanc ouest percé au droit du sas vers la galerie (le passage reste dégagé)
-  B.box(3.4, H + 8, L, shell, [HX + 2.3, H / 2, zc], null, { tex: 8, cast: false });
-  {
-    const x = -(HX + 2.3), z0 = zc - L / 2, z1 = zc + L / 2, ha = AIRLOCK.z - AIRLOCK.w / 2 - 1.4, hb = AIRLOCK.z + AIRLOCK.w / 2 + 1.4, top = AIRLOCK.h + 1.6;
+  // flancs percés au droit des sas : ouest vers la galerie, est vers le tube d'abordage de la frégate
+  for (const [x, LK] of [[-(HX + 2.3), AIRLOCK], [HX + 2.3, SHIPLOCK]]) {
+    const z0 = zc - L / 2, z1 = zc + L / 2, ha = LK.z - LK.w / 2 - 1.4, hb = LK.z + LK.w / 2 + 1.4, top = LK.h + 1.6;
     B.box(3.4, H + 8, ha - z0, shell, [x, H / 2, (z0 + ha) / 2], null, { tex: 8, cast: false });
     B.box(3.4, H + 8, z1 - hb, shell, [x, H / 2, (hb + z1) / 2], null, { tex: 8, cast: false });
-    B.box(3.4, H + 8 - (top + 4), hb - ha, shell, [x, top + (H + 8 - (top + 4)) / 2, AIRLOCK.z], null, { tex: 8, cast: false });
+    B.box(3.4, H + 8 - (top + 4), hb - ha, shell, [x, top + (H + 8 - (top + 4)) / 2, LK.z], null, { tex: 8, cast: false });
   }
   B.box(HX * 2 + 7, H + 8, 3.4, shell, [0, H / 2, Z_BACK + 2.2], null, { tex: 8, cast: false });
   B.box(HX * 2 + 7, 5, L + 16, dark, [0, -3, zc - 8], null, { tex: 8, cast: false });

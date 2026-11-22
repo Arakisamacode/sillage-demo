@@ -27,7 +27,7 @@ for (const s of shots) {
   try {
     await page.waitForFunction(() => window.__shotReady === true, null, { timeout: 400000, polling: 500 });
   } catch (e) { console.log('timeout', s); }
-  await page.screenshot({ path: `${out}/${s}.png` });
+  await page.screenshot({ path: `${out}/${s}.png`, timeout: 300000 });
   console.log(`${s}: ${((Date.now() - t0) / 1000).toFixed(1)} s`);
 }
 const uniq = [...new Set(logs)].filter((l) => !l.includes('GPU stall') && !l.includes('[verbose]'));

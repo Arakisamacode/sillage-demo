@@ -331,6 +331,30 @@ const JOBS = {
     'Un conseil : venez au lever du jour. La rosée sur la pelouse, c\'est ce qui ressemble le plus à une planète.',
     'Mon rêve serait d\'agrandir le potager. Mais chaque mètre carré du dôme est une bataille au Conseil.',
   ],
+  équipage: [
+    'L\'Atalante sort rarement. Elle attend un contrat d\'escorte longue durée, alors on astique les coursives.',
+    'Trois ponts, quarante-deux pièces, et je me perds encore entre la soute et l\'atelier.',
+    'Le réfectoire est au pont B. La cuisine est bonne, mais ne demandez jamais ce qu\'il y a dans le ragoût.',
+    'Mon quart commence à six heures. Pont A, salle des machines, puis ronde des sas.',
+    'La capitaine Varga a servi dans la flotte de Corvin. Elle n\'en parle jamais, mais ça se voit à sa façon de marcher.',
+    'Le réacteur ronronne comme un chat quand tout va bien. Quand il se tait, on court.',
+    'Ma cabine fait six mètres carrés. Sur une station, j\'aurais une fenêtre. Ici, j\'ai un hublot sur les étoiles.',
+    'Le salon panoramique du pont C, c\'est l\'endroit le plus calme de la frégate. Allez-y au changement de quart.',
+    'On a remplacé le rover de la soute le mois dernier. L\'ancien a fini contre une cloison, ne demandez pas comment.',
+    'Si les pirates d\'Ardent continuent, l\'Atalante reprendra du service. Et nous avec.',
+  ],
+  capitaine: [
+    'Bienvenue à bord de l\'Atalante. Frégate de classe Médée, cent dix mètres, vingt-deux âmes quand elle est au complet.',
+    'Elle a trente ans et pas une ride. Enfin, quelques-unes. Mais ce sont des cicatrices honorables.',
+    'Le pont de commandement est au niveau C. D\'ici, je vois la baie, le hangar et toute la route vers Lys.',
+    'Le Conseil veut la vendre pour payer les baies de la galerie. Tant que je commande, elle reste à quai, prête.',
+    'Mon équipage connaît chaque boulon. C\'est la seule richesse qu\'on ne peut pas nous saisir.',
+    'Les Fils de la Brèche nous connaissent. Ils évitent les convois quand l\'Atalante est dans les parages.',
+    'Si vous cherchez du travail, passez par le bureau de recrutement. Je prends les pilotes qui reviennent.',
+    'La table holographique montre le secteur en temps réel. Chaque point rouge est un problème à venir.',
+    'Le réacteur est au pont A, à l\'arrière. Ne touchez à rien, mon mécanicien mord.',
+    'Le café du réfectoire est meilleur que celui de la station. C\'est un secret militaire.',
+  ],
 };
 
 // ------------------------------------------------------------------ histoire personnelle (tirée au sort, stable)

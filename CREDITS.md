@@ -118,6 +118,7 @@ alimentaires générées (`src/world/foodtex.js`).
   (dessinés en canvas à l'exécution, `src/world/signage.js`, `src/world/hangar.js`).
 - Planète, atmosphère, nuages, étoiles, faisceaux lumineux, poussière, étincelles (shaders).
 - Vaisseaux, véhicules, nacelle, mobilier et accessoires (géométrie procédurale).
+- Frégate Atalante (coque, trois ponts intérieurs, passerelle d'embarquement, mobilier ; `src/world/bigship.js`).
 - Tous les sons et la musique (synthèse Web Audio en temps réel, `src/audio/audio.js`) ;
   les annonces utilisent la synthèse vocale du navigateur (Web Speech API).
 

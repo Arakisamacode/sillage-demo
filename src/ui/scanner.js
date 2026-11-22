@@ -25,6 +25,7 @@ export const CODEX = {
   breche: { t: 'Les Fils de la Brèche', cat: 'Factions', x: 'Pirates issus d\'équipages ruinés. Ils frappent les routes de fret près de la ceinture d\'Ardent. Certains disent qu\'ils sont payés pour accélérer le déclin des stations.' },
   dome: { t: 'Le Grand Dôme', cat: 'Lieux', x: 'Jardin public sous coupole de 56 m, bâti sur le toit de la galerie quand la station comptait encore ses enfants par milliers. Pelouse, bassin, ferme pédagogique, potager, aire de jeux. Le ciel artificiel suit l\'horloge de bord ; les habitants disent qu\'on y respire mieux.' },
   ferme: { t: 'Ferme du Dôme', cat: 'Culture', x: 'Moutons, chèvres et poules descendent des souches embarquées au départ des chantiers. Leur laine, leur lait et leurs œufs sont symboliques ; leur présence ne l\'est pas : la plupart des enfants de Halden-7 n\'ont jamais vu d\'animal ailleurs.' },
+  atalante: { t: 'Frégate Atalante', cat: 'Vaisseaux', x: 'Frégate d\'escorte de classe Médée, 110 m, amarrée au sas 3 du hangar. Trois ponts : machines, soute et garage au pont A ; cabines, infirmerie et réfectoire au pont B ; passerelle, salle de briefing et salon panoramique au pont C. Le Conseil voudrait la vendre ; sa capitaine refuse.' },
   lys: { t: 'Station agricole Lys', cat: 'Lieux', x: 'Serres orbitales et coopérative : Lys nourrit la moitié du secteur. Son vieux relais de communication échappe aux péages.' },
 };
 

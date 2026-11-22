@@ -43,6 +43,7 @@ import { Briefing } from './ui/briefing.js';
 import { buildLuxury, populateLuxury } from './world/luxury.js';
 import { buildGarden } from './world/garden.js';
 import { buildSuperstructure } from './world/superstructure.js';
+import { buildBigShip, populateBigShip } from './world/bigship.js';
 import { populateGarden } from './world/gardenlife.js';
 import { RESTAURANTS } from './game/food.js';
 import { Cargo, buildQuai } from './game/cargo.js';
@@ -111,6 +112,7 @@ async function boot() {
   ctx.lux = buildLuxury(ctx);
   ctx.garden = buildGarden(ctx);
   ctx.superstructure = buildSuperstructure(ctx);
+  ctx.bigship = buildBigShip(ctx);
   ctx.lights = buildLighting(ctx);
   const lib = new CharacterLibrary(manager, quality);
   const libReady = lib.load(undefined, (p) => progress(0.6 + 0.3 * p, 'Chargement des personnages'));
@@ -555,6 +557,8 @@ async function boot() {
   populateLuxury(ctx, lib, player, ctx.lux);
   // Grand Dôme : familles, enfants, vendeurs, ferme et animaux
   ctx.gardenLife = populateGarden(ctx, lib, player, ctx.garden);
+  // Frégate Atalante : équipage à bord
+  ctx.shipLife = populateBigShip(ctx, lib, player, ctx.bigship);
   ctx.crowd = crowd; ctx.player = player; ctx.scenes = scenes;
   // ------------------------------------------------------------------ équipage (bureau de recrutement de la galerie)
   const crew = new Crew(ctx, { game, cargo, flight, crowd, missions, player, loadout: heronGear });
@@ -858,7 +862,8 @@ async function boot() {
     ctx.cargo?.update(player);
     sky.update(dt, t, camera);
     const c = camera.position, insideStation = (c.x > -HX_ && c.x < HX_ && c.z > -46 && c.z < 31 && c.y < 25) || (c.x < -40 && c.x > -103 && c.z > -25 && c.z < 11);
-    scene.fog.density += ((insideStation ? 0.0042 : 0.0) - scene.fog.density) * Math.min(1, dt * 3);
+    const inShip = ctx.bigship?.inside(c);   // intérieur de la frégate : air clair (pas de voile de hangar)
+    scene.fog.density += ((inShip ? 0.0008 : insideStation ? 0.0042 : 0.0) - scene.fog.density) * Math.min(1, dt * 3);
   }
 
   ctx.simulate = simulate;
@@ -913,6 +918,7 @@ async function boot() {
     for (const c of ctx.habitatPeople || []) if (c.root.visible) _blk.push({ pos: c.root.position });
     for (const c of ctx.luxPeople || []) if (c.root.visible) _blk.push({ pos: c.root.position });
     for (const c of ctx.gardenPeople || []) if (c.root.visible && !c.kid) _blk.push({ pos: c.root.position });
+    for (const c of ctx.shipPeople || []) if (c.root.visible) _blk.push({ pos: c.root.position });
     return _blk;
   }
   // ------------------------------------------------------------------ conversations cinématiques et récit principal
@@ -986,11 +992,13 @@ async function boot() {
     scanner.addPoint(new THREE.Vector3(-105, DECK_Y + 2.6, 32), 'cour', 'Cour des Saveurs');
     scanner.addPoint(ctx.garden.W(0, 9, 0), 'dome', 'Le Grand Dôme');
     scanner.addPoint(ctx.garden.W(21, 3, 1), 'ferme', 'Ferme du Dôme');
+    scanner.addPoint(ctx.bigship.spots.bridge.clone().add(new THREE.Vector3(0, 1.6, 0)), 'atalante', 'Frégate Atalante');
     const fo = flight.onEvent; flight.onEvent = (e, pad) => { fo(e, pad); if (e === 'landed' && pad?.outpost?.id === 'lys') scanner.unlock('lys'); };
     const co = combat.onEvent; combat.onEvent = (e, ...a) => { co(e, ...a); if (e === 'kill') scanner.unlock('breche'); };
   }
   const ROLE = { voyageur: 'Voyageur', entretien: 'Agent d\'entretien' };
   const GDISP = { enfant: 'Enfant · Grand Dôme', parent: 'Parent · aire de jeux', promeneur: 'Promeneur · Grand Dôme', glacier: 'Glacier du Dôme', snack: 'Snack du Dôme', fermier: 'Fermier · Ferme du Dôme', jardinier: 'Jardinière · potager du Dôme' };
+  const SDISP = { capitaine: 'Capitaine · frégate Atalante', équipage: 'Équipage · frégate Atalante', cuisinier: 'Cuisinière · réfectoire de l\'Atalante' };
   const gardenOrder = (id) => () => (ctx.time.open(id) ? openUI(() => shop.openStore(id)) : toast(`${STORES[id].label} · fermé · ouvre à ${ctx.time.opensAt(id)}`));
   const scanPeople = () => {
     const L = [];
@@ -999,6 +1007,7 @@ async function boot() {
     const named = new Map(Object.values(NPC).map((x) => [x.c, x]));
     (ctx.habitatPeople || []).forEach((c, i) => L.push({ obj: c.root, name: named.get(c)?.name || nameFor(i + 201, c), role: named.get(c)?.role || 'Résident du pont habitat' }));
     (ctx.gardenPeople || []).forEach((c, i) => L.push({ obj: c.root, name: nameFor(i + 501, c), role: GDISP[c.talkRole] || 'Grand Dôme' }));
+    (ctx.shipPeople || []).forEach((c, i) => L.push({ obj: c.root, name: c.shipName || nameFor(i + 601, c), role: SDISP[c.talkRole] || 'Équipage · Atalante' }));
     (ctx.luxPeople || []).forEach((c, i) => L.push({ obj: c.root, name: isAldric(c) ? 'Aldric Venn' : named.get(c)?.name || nameFor(i + 301, c), role: isAldric(c) ? 'financier · transferts chiffrés vers Ardent ⚠' : named.get(c)?.role || 'La Couronne' }));
     return L;
   };
@@ -1013,6 +1022,7 @@ async function boot() {
     (ctx.deckNpcs || []).forEach((n, i) => { const kk = n.cook ? 400 + ctx.food.stalls.indexOf(n.stall) : i + 101; if (n.c.root.visible) L.push({ c: n.c, key: kk, name: nameFor(kk, n.c), role: n.cook ? 'cuisinier' : 'client · cour', resto: n.stall?.r.name, dish: n.stall?.r.dishes[0][0].toLowerCase(), disp: n.cook ? `Cuisinier · ${n.stall?.r.label}` : 'Client · Cour des Saveurs' }); });
     (ctx.habitatPeople || []).forEach((c, i) => { if (c.root.visible && !named.has(c)) L.push({ c, key: i + 201, name: nameFor(i + 201, c), role: 'résident', disp: 'Résident du pont habitat' }); });
     (ctx.gardenPeople || []).forEach((c, i) => { if (c.root.visible) L.push({ c, key: i + 501, name: nameFor(i + 501, c), role: c.talkRole || 'promeneur', disp: GDISP[c.talkRole] || 'Grand Dôme', shop: c.shopId ? STORES[c.shopId].label : null, order: c.shopId ? gardenOrder(c.shopId) : null }); });
+    (ctx.shipPeople || []).forEach((c, i) => { if (c.root.visible) L.push({ c, key: i + 601, name: c.shipName || nameFor(i + 601, c), role: c.talkRole, disp: SDISP[c.talkRole] || 'Équipage · Atalante', resto: 'le réfectoire de l\'Atalante', dish: 'ragoût du bord' }); });
     (ctx.luxPeople || []).forEach((c, i) => { if (c.root.visible && !named.has(c) && !c.noTalk) L.push(isAldric(c) ? { c, key: 999, name: 'Aldric Venn', role: 'couronne', disp: 'Financier · investissements orbitaux', special: 'aldric' } : { c, key: i + 301, name: nameFor(i + 301, c), role: c.talkRole || 'couronne', disp: c.talkRole === 'personnel' ? 'Personnel de La Couronne' : 'Clientèle de La Couronne' }); });
     return L;
   };
@@ -1201,7 +1211,7 @@ async function boot() {
         elevators.update(dt); luxLift.update(dt);
         if (elevators.riding || luxLift.riding) input.move.x = input.move.y = 0;
         if (ground.dead) input.move.x = input.move.y = 0;
-        player.update(dt, input, ground.onFoot ? ground.units.filter((u) => !u.down) : player.pos.y > DECK_Y - 5 ? deckBlockers() : [...crowd.agents.filter((a) => !a.attached && !a.away), ...ground.units.filter((u) => !u.down), ...(ctx.groundNpcBlockers?.() || [])], ground.onFoot ? [] : [...ctx.doors, ...cargo.blockers()]);
+        player.update(dt, input, ground.onFoot ? ground.units.filter((u) => !u.down) : player.pos.y > DECK_Y - 5 ? deckBlockers() : [...crowd.agents.filter((a) => !a.attached && !a.away), ...ground.units.filter((u) => !u.down), ...(ctx.groundNpcBlockers?.() || []), ...(ctx.shipBlockers?.() || [])], ground.onFoot ? [] : [...ctx.doors, ...cargo.blockers()]);
         let near = null;
         if (ground.onFoot) near = ground.nearBoard() && !ground.dead ? { label: `E — Remonter à bord du Héron${ground.raid && !ground.raid.done ? ' (le raid continue)' : ''}`, fn: () => ground.reboard() } : null;
         else if (player.seated === seat) near = { label: touch ? 'DÉCOL. — Décoller · LEVER — Se lever' : 'ESPACE — Décoller · E — Se lever', fn: () => player.stand() };

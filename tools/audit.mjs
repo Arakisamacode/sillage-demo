@@ -225,6 +225,26 @@ await step('nuit, sommeil, horaires', async () => {
   ok('fermetures de nuit', r.open.every((x) => !x), JSON.stringify(r.open));
 });
 
+await step('frégate Atalante (sas, trois ponts, passerelle, équipage)', async () => {
+  const r = await E(() => {
+    const A = window.__app, P = A.player; let t = 0;
+    const inp = { move: { x: 0, y: 1 }, keys: new Set(), consumeLook: () => ({ dx: 0, dy: 0 }), consume: () => false };
+    const walk = (x, z, sec = 15) => { for (let i = 0; i < sec * 30; i++) { P.yaw = Math.atan2(-(x - P.pos.x), -(z - P.pos.z)); P.update(1 / 30, inp, [], A.doors); A.simulate(1 / 30, (t += 1 / 30)); if (Math.hypot(x - P.pos.x, z - P.pos.z) < 0.5) break; } return P.pos.clone(); };
+    P.pos.set(26, 0.05, -9); P.vel.set(0, 0, 0);
+    walk(64, -9, 20); const sas = walk(70, -9); walk(82, -9); walk(82, -18.9); walk(75.6, -19);
+    const deckB = walk(75.6, -27.5, 12); walk(78.4, -28.5); walk(78.4, -18.5, 12); walk(78.4, -18); walk(82, -18);
+    const bridge = walk(82, -32);
+    for (let i = 0; i < 90; i++) A.simulate(1 / 30, (t += 1 / 30));
+    const crew = (A.shipPeople || []).filter((c) => c.root.visible).length, anim = (A.shipPeople || []).some((c) => c.mixer.time > 0);
+    return { sas: sas.x, deckB: deckB.y, bridge: [bridge.y, bridge.z], crew, anim, nan: window.__nan() };
+  });
+  ok('passerelle d\'embarquement et sas franchis', r.sas > 68, `x ${r.sas.toFixed(1)}`);
+  ok('escalier vers le pont B', r.deckB > 4, `y ${r.deckB.toFixed(1)}`);
+  ok('passerelle de commandement atteinte (pont C)', r.bridge[0] > 9 && r.bridge[1] < -30, r.bridge.map((v) => v.toFixed(1)).join(', '));
+  ok('équipage visible et animé', r.crew >= 5 && r.anim, `${r.crew} visibles`);
+  ok('aucune position NaN à bord', r.nan.length === 0, r.nan.join(','));
+});
+
 await step('sauvegarde et rechargement', async () => {
   await E(() => { const A = window.__app; A.game.d.credits = 123456; A.game.save(); A.missions.persist(); });
   scen = 'rechargement';
