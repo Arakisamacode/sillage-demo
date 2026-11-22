@@ -501,6 +501,7 @@ export class Crowd {
       outfit: opts.outfit ?? outfitFor(role),
       hair: pick(HAIRS[g]), hairColor: pick(HAIR_COLORS),
       formal: role === 'commerçant',
+      civil: !UNIFORMS[role] && role !== 'sécurité',   // voyageurs, clients : personnages réalistes
       armor: role === 'sécurité' ? { plate: 0x2a3138, under: 0x16191c, accent: 0x3e5a7a, light: 0x6fb8ff } : null,
       armorShadows: !!this.ctx.quality.npcShadows,
     });

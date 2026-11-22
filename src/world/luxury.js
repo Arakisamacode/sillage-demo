@@ -451,6 +451,7 @@ export function populateLuxury(ctx, lib, player, L) {
   const people = [], spin = [], walkers = [];
   const looks = [['UF_light', 'Hair_Buns'], ['UM_dark', 'Hair_SimpleParted'], ['UF_dark', 'Hair_Long'], ['UM_light', 'Hair_Beard'], ['UF_light', 'Hair_Long'], ['UM_dark', 'Hair_Buzzed']];
   const mk = (i, outfit, p, yaw, anim, extra = {}) => {
+    if (outfit && RICH.includes(outfit) && !extra.armor) extra = { civil: 'business', ...extra };
     const [model, hair] = looks[i % looks.length];
     const c = lib.create(model, { height: model.startsWith('UF') ? 1.72 : 1.84, hair, hairColor: [0x1a120c, 0xd8c098, 0x3a2414, 0x0a0a0a][i % 4], ...extra });
     c.setOutfit(outfit); c.root.position.copy(p); c.root.rotation.y = yaw;
@@ -459,7 +460,7 @@ export function populateLuxury(ctx, lib, player, L) {
     c.root.visible = false; scene.add(c.root); people.push(c); return c;
   };
   // mannequins vivants sur podiums tournants (Maison Élysée)
-  for (const m of L.mannequins) { const c = mk(m.k * 2, RICH[m.k], m.p.clone().setY(LUX_Y + 0.22), m.face, null); c.noTalk = true; spin.push({ c, sp: 0.18 }); }
+  for (const m of L.mannequins) { const c = mk(m.k * 2, RICH[m.k], m.p.clone().setY(LUX_Y + 0.22), m.face, null, { civil: false }); c.noTalk = true; spin.push({ c, sp: 0.18 }); }
   // combinaisons de haute technologie dans les vitrines (Nova Atelier)
   for (const s of L.suits) { const c = mk(s.k + 1, { top: 0x1a1c20, bottom: 0x1a1c20, boot: 0x0a0a0a, accent: LUX_SUITS[s.k].accent, gloves: true }, s.p, s.face, null, { armor: LUX_SUITS[s.k], armorShadows: false }); c.noTalk = true; spin.push({ c, sp: -0.25 }); }
   // ---------------------------------------------------------------- moteur de routines (déplacements, actions, attentes)

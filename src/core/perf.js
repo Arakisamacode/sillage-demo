@@ -108,7 +108,7 @@ export async function warmShaders(renderer, scene, camera, renderFull) {
  * (les canevas animés — écrans, enseignes — sont laissés intacts), puis libère la copie côté processeur une fois la
  * texture envoyée à la carte graphique. maxModel s'applique aux textures des petits objets photoscannés.
  */
-export function shrinkTextures(scene, { max = 512, maxModel = 256, modelTextures = new Set() } = {}) {
+export function shrinkTextures(scene, { max = 512, maxModel = 256, modelTextures = new Set(), faceTextures = new Set(), maxFace = 512 } = {}) {
   const done = new WeakSet();
   let saved = 0;
   const KEYS = ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'aoMap', 'emissiveMap', 'alphaMap', 'bumpMap', 'specularMap', 'clearcoatNormalMap'];
@@ -118,7 +118,7 @@ export function shrinkTextures(scene, { max = 512, maxModel = 256, modelTextures
     const img = src.data;
     if (!img || !(img instanceof HTMLImageElement || (typeof ImageBitmap !== 'undefined' && img instanceof ImageBitmap))) return;
     done.add(src);
-    const lim = modelTextures.has(src) ? maxModel : max, w = img.width, h = img.height;
+    const lim = faceTextures.has(src) ? maxFace : modelTextures.has(src) ? maxModel : max, w = img.width, h = img.height;
     if (!w || !h) return;
     const k = Math.min(1, lim / Math.max(w, h));
     const c = document.createElement('canvas'); c.width = Math.max(1, Math.round(w * k)); c.height = Math.max(1, Math.round(h * k));

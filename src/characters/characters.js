@@ -31,6 +31,21 @@ const UPPER_ROLES = ['aim', 'aimHold', 'shoot', 'reload'];
 const GAIT = { walk: 1.35, walkFormal: 1.25, jog: 3.1, run: 5.6 };
 
 export const BODIES = ['UM_light', 'UM_dark', 'UF_light', 'UF_dark'];
+/**
+ * Personnages réalistes Microsoft Rocketbox (licence MIT), convertis par tools/convert/rocketbox.mjs.
+ * Clés « UF:… » / « UM:… » : le préfixe garde la convention du sexe utilisée partout dans le jeu.
+ */
+export const RB = {
+  f: ['Female_Adult_01', 'Female_Adult_03', 'Female_Adult_05', 'Female_Adult_08', 'Female_Adult_11', 'Female_Adult_14'],
+  m: ['Male_Adult_02', 'Male_Adult_05', 'Male_Adult_08', 'Male_Adult_11', 'Male_Adult_14', 'Male_Adult_18'],
+  fb: ['Business_Female_02'], mb: ['Business_Male_03'],
+  fc: ['Female_Child_01', 'Female_Child_02'], mc: ['Male_Child_01', 'Male_Child_02'],
+  special: ['Chef_Female_01', 'Gardener_Male_01', 'Medical_Male_01'],
+};
+/** Animaux réalistes Rocketbox (Grand Dôme). */
+export const RB_ANIMALS = ['Sheep_White_01', 'Goat_White_01', 'Goat_Brown_01', 'Pig_Pink_01', 'Bird_Chicken_Brown_01', 'Bird_Chicken_White_01', 'Bird_Rooster_Brown_01', 'Bird_Duck_Male_01', 'Bird_Duck_Female_01'];
+const rbKey = (id) => (/^(Female|Business_Female|Chef_Female)/.test(id) ? 'UF:' : 'UM:') + id;
+const rbGroup = (id) => (/Child/.test(id) ? 'RBc' : /Female/.test(id) ? 'RBf' : 'RBm');
 export const HAIRS = {
   M: ['Hair_Buzzed', 'Hair_SimpleParted', 'Hair_Buzzed', 'Hair_SimpleParted', 'Hair_Beard'],
   F: ['Hair_Long', 'Hair_Buns', 'Hair_BuzzedFemale'],
@@ -96,6 +111,25 @@ export class CharacterLibrary {
   }
 
   async load(names = BODIES, onProgress) {
+    // personnages réalistes : chargés en parallèle, sans bloquer si un fichier manque
+    // téléphones : sous-ensemble (mémoire graphique limitée), variété conservée
+    const touch = matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
+    const sub = (a, n) => (touch ? a.slice(0, n) : a);
+    const rbIds = [...new Set([...sub(RB.f, 3), ...sub(RB.m, 3), ...RB.fb, ...RB.mb, ...sub(RB.fc, 1), ...sub(RB.mc, 1), ...(touch ? ['Gardener_Male_01'] : RB.special)])];
+    this.animals = {};
+    const animalsReady = Promise.all(RB_ANIMALS.map(async (id) => {
+      try {
+        const g = await this.loader.parseAsync(await loadBinary(BASE + `characters/rb/${id}.glb`), '');
+        g.scene.traverse((o) => { if (o.isMesh) { o.material.envMapIntensity = 0.5; o.material.roughness = 0.9; } });
+        this.animals[id] = g.scene;
+      } catch (e) { console.warn('Rocketbox', id, e); }
+    }));
+    const rbReady = Promise.all(rbIds.map(async (id) => {
+      try {
+        const g = await this.loader.parseAsync(await loadBinary(BASE + `characters/rb/${id}.glb`), '');
+        this._prepRB(rbKey(id), g.scene, rbGroup(id));
+      } catch (e) { console.warn('Rocketbox', id, e); }
+    }));
     const anim = await this.loader.parseAsync(await loadBinary(BASE + 'anim/ual.glb'), '');
     this.srcScene = anim.scene;
     this.srcClips = anim.animations;
@@ -118,8 +152,9 @@ export class CharacterLibrary {
         onProgress && onProgress(++k / total);
       }),
     ]);
-    // cuisson des clips par squelette (homme / femme)
-    for (const n of names) {
+    await rbReady; await animalsReady;
+    // cuisson des clips par squelette (homme / femme, puis groupes Rocketbox : femmes, hommes, enfants)
+    for (const n of [...names, ...Object.keys(this.templates).filter((k) => this.templates[k].rb)]) {
       const skel = this.templates[n].skel;
       if (this.clipsBySkel[skel]) continue;
       const tgt = SkeletonUtils.clone(this.templates[n].scene);
@@ -167,6 +202,31 @@ export class CharacterLibrary {
     this.templates[name] = { scene, height, skel: name.slice(0, 2), headInv, zones, body: bodyMesh, boots: bodyMesh ? buildBoots(bones, bodyMesh) : null };
   }
 
+  _prepRB(key, scene, group) {
+    scene.updateMatrixWorld(true);
+    let top = 0;
+    scene.traverse((o) => {
+      if (!o.isMesh) return;
+      o.castShadow = !!this.q.npcShadows; o.receiveShadow = true;
+      for (const m of Array.isArray(o.material) ? o.material : [o.material]) {
+        m.envMapIntensity = 0.55;
+        if (m.map) m.map.anisotropy = 4;
+        if (m.name === 'rb_hair') { m.alphaToCoverage = true; m.alphaTest = 0.5; }
+      }
+      o.geometry.computeBoundingBox();
+      const b = o.geometry.boundingBox.clone().applyMatrix4(o.matrixWorld); top = Math.max(top, b.max.y);
+    });
+    this.templates[key] = { scene, height: top, skel: group, rb: true, headInv: new THREE.Matrix4(), zones: null, body: null, boots: null };
+    (this.rbKeys ||= {})[key] = group;
+  }
+  /** Gabarit Rocketbox pour un rôle : pool 'f' | 'm' | 'fb' | 'mb' | 'fc' | 'mc', tour à tour (variété maximale). */
+  rbPick(pool) {
+    const ids = (RB[pool] || []).filter((id) => this.templates[rbKey(id)]);
+    if (!ids.length) return null;
+    this._rbI ||= {}; const i = (this._rbI[pool] = ((this._rbI[pool] ?? Math.floor(Math.random() * ids.length)) + 1) % ids.length);
+    return rbKey(ids[i]);
+  }
+
   /** Pièces d'armure (géométries en repère d'os), mises en cache par corps et par couleurs. */
   armorFor(name, colors) {
     const key = name + JSON.stringify(colors);
@@ -194,7 +254,17 @@ export class CharacterLibrary {
     return this._gear[key];
   }
 
+  /**
+   * opts.civil : true | 'business' -> personnage réaliste Rocketbox du même sexe (vêtements et visage propres) ;
+   * opts.kid : enfant ; opts.rb : identifiant Rocketbox imposé (ex. 'Chef_Female_01'). Sans armure uniquement.
+   */
   create(name, opts = {}) {
+    if (!opts.armor && (opts.civil || opts.rb)) {
+      const fem = /^UF/.test(name);
+      const key = opts.rb ? (this.templates[rbKey(opts.rb)] ? rbKey(opts.rb) : null)
+        : this.rbPick(opts.kid ? (fem ? 'fc' : 'mc') : opts.civil === 'business' && Math.random() < 0.6 ? (fem ? 'fb' : 'mb') : fem ? 'f' : 'm');
+      if (key) return new Character(this, key, { ...opts, hair: null });
+    }
     return new Character(this, name, opts);
   }
 }
@@ -311,7 +381,7 @@ export class Character {
       this._suits.push(u);
       if (o.name === 'body') this.body = o;
     });
-    this.lib = lib; this.opts = opts;
+    this.lib = lib; this.opts = opts; this.rb = !!t.rb;
     this.setOutfit(opts.outfit || {});
     this.bones.Neck = this.bones.neck_01;
     // chaussures (matériaux propres au personnage : couleur des bottes de la tenue)

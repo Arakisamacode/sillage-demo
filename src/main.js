@@ -223,7 +223,7 @@ async function boot() {
     const tops = [0x6a4a32, 0x1a2436, 0x5d6168, 0xa89470, 0x2b3036, 0x7a2a24, 0x3a5a4a, 0x8a3a5a, 0xc8a46a, 0x2c4a6e];
     const mk = (i, outfit) => {
       const [model, hair] = looks[i % looks.length];
-      const c = lib.create(model, { height: model.startsWith('UF') ? 1.66 + (i % 3) * 0.03 : 1.76 + (i % 3) * 0.04, hair, hairColor: [0x1a120c, 0x3a2414, 0x6a5040, 0x2a1d14][i % 4] });
+      const c = lib.create(model, { height: model.startsWith('UF') ? 1.66 + (i % 3) * 0.03 : 1.76 + (i % 3) * 0.04, hair, hairColor: [0x1a120c, 0x3a2414, 0x6a5040, 0x2a1d14][i % 4], civil: !outfit });
       c.setOutfit(outfit || { top: tops[i % tops.length], bottom: [0x26282c, 0x2f3a4e, 0x4a4036][i % 3], accent: 0xc8b48a, belt: true });
       c.root.visible = false; c.root.traverse((o) => { o.castShadow = false; }); scene.add(c.root); people.push(c); return c;
     };
@@ -511,8 +511,8 @@ async function boot() {
     const looks = [['UM_light', 'Hair_SimpleParted'], ['UF_dark', 'Hair_Long'], ['UM_dark', 'Hair_Buzzed'], ['UF_light', 'Hair_BuzzedFemale'], ['UM_light', 'Hair_Beard'], ['UF_dark', 'Hair_Buns']];
     const tops = [0x6a4a32, 0x1a2436, 0x5d6168, 0xa89470, 0x2b3036, 0x7a2a24];
     seats.forEach((st) => { st.taken = true; });
-    seats.forEach((st, i) => put(looks[i][0], { height: looks[i][0].startsWith('UF') ? 1.68 : 1.8, hair: looks[i][1] }, st.p, st.yaw, i % 2 ? 'sitTalk' : 'sit', { top: tops[i], accent: 0xc8b48a, belt: true }));
-    put('UM_light', { height: 1.78, hair: 'Hair_Buzzed' }, HB.stools[2].clone().add(new THREE.Vector3(-0.3, 0, 0)), Math.PI / 2, 'talk', { top: 0x3a4a2a, accent: 0xd0a040 });
+    seats.forEach((st, i) => put(looks[i][0], { height: looks[i][0].startsWith('UF') ? 1.68 : 1.8, hair: looks[i][1], civil: true }, st.p, st.yaw, i % 2 ? 'sitTalk' : 'sit', { top: tops[i], accent: 0xc8b48a, belt: true }));
+    put('UM_light', { height: 1.78, hair: 'Hair_Buzzed', civil: true }, HB.stools[2].clone().add(new THREE.Vector3(-0.3, 0, 0)), Math.PI / 2, 'talk', { top: 0x3a4a2a, accent: 0xd0a040 });
     // habitants qui circulent : serveur, couple en promenade le long de la baie, résident qui rentre en cabine
     const Y40 = DECK_Y, V = (x, z) => new THREE.Vector3(x, Y40, z);
     const walkers = [];
@@ -521,8 +521,8 @@ async function boot() {
       { p: V(-87, -17), wait: 4, anim: 'idle', face: Math.PI / 2 }, { p: V(-97, -15), wait: 3, anim: 'talk', face: Math.PI / 2 },
       { p: V(-97, -3), wait: 0 }, { p: V(-103, -3), wait: 3, anim: 'talk', face: Math.PI }, { p: V(-89, -2), wait: 0 }]);
     const stroll = (dx) => [{ p: V(-109 + dx, -20), wait: 6, anim: 'talk', face: Math.PI }, { p: V(-96 + dx, -20), wait: 5, anim: 'idle', face: Math.PI }, { p: V(-84 + dx, -20), wait: 6, anim: 'talk', face: Math.PI }, { p: V(-96 + dx, -19.4), wait: 0 }];
-    walker(put('UM_light', { height: 1.8, hair: 'Hair_SimpleParted' }, V(-109, -20), 0, null, { top: 0x6a4a32, accent: 0xc8b48a, belt: true }), stroll(0));
-    walker(put('UF_light', { height: 1.66, hair: 'Hair_Long' }, V(-108.3, -20), 0, null, { top: 0x1a2436, accent: 0x3e8ad8 }), stroll(0.75));
+    walker(put('UM_light', { height: 1.8, hair: 'Hair_SimpleParted', civil: true }, V(-109, -20), 0, null, { top: 0x6a4a32, accent: 0xc8b48a, belt: true }), stroll(0));
+    walker(put('UF_light', { height: 1.66, hair: 'Hair_Long', civil: true }, V(-108.3, -20), 0, null, { top: 0x1a2436, accent: 0x3e8ad8 }), stroll(0.75));
     walker(put('UM_dark', { height: 1.82, hair: 'Hair_Buzzed' }, V(-114, -11), 0, null, { top: 0x5d6168, bottom: 0x3a3d42, accent: 0xe8762a, hivis: true }), [
       { p: V(-114, -11), wait: 6, anim: 'idle', face: -Math.PI / 2 }, { p: V(-109, -4), wait: 0 }, { p: V(-98.5, 0.6), wait: 4, anim: 'idle', face: 0 }, { p: V(-104, -2), wait: 0 }]);
     const stepWalkers = (dt) => {
@@ -1257,7 +1257,11 @@ async function boot() {
   if (quality.name === 'low') {
     const modelTextures = new Set();
     for (const M of Object.values(ctx.models?.m || {})) for (const p of M.parts) for (const v of Object.values(p.mat)) if (v?.isTexture) modelTextures.add(v.source);
-    shrinkTextures(scene, { max: touch ? 512 : 1024, maxModel: touch ? 256 : 512, modelTextures });
+    // personnages et animaux réalistes : visages en 512, vêtements et pelages en 256 sur téléphone
+    const faceTextures = new Set();
+    const rbScenes = [...Object.values(lib.templates).filter((t) => t.rb).map((t) => t.scene), ...Object.values(lib.animals || {})];
+    for (const sc of rbScenes) sc.traverse((o) => { if (!o.isMesh) return; for (const m of [].concat(o.material)) for (const v of Object.values(m)) if (v?.isTexture) (m.name === 'rb_head' && v === m.map ? faceTextures : modelTextures).add(v.source); });
+    shrinkTextures(scene, { max: touch ? 512 : 1024, maxModel: touch ? 256 : 512, modelTextures, faceTextures, maxFace: touch ? 512 : 1024 });
   }
   if (params.get('warm') !== '0') await warmShaders(renderer.three, scene, camera, () => renderer.render(1 / 30));
   $('loading').classList.add('hidden');

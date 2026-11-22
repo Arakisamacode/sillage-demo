@@ -215,6 +215,17 @@ bassin miroir et sculpture orbitale animée au centre.
 - La coupole repose sur un calice nacré nervuré, bagué de lumière, prolongé par un fût jusqu'au toit du hall du pont
   habitat : la structure est visible depuis l'espace et par la verrière de la Cour des Saveurs.
 
+## Personnages réalistes (Microsoft Rocketbox)
+
+Les civils sont des personnages réalistes de la bibliothèque Microsoft Rocketbox (licence MIT) : vrais vêtements,
+visages, cheveux, et quatre enfants. Ils remplacent les figurants de la galerie (voyageurs, clients), les clients de
+la Cour des Saveurs, les résidents du pont habitat, la clientèle de La Couronne (tenues d'affaires) et toute la
+population du Grand Dôme (le fermier porte la tenue de jardinier). Animations du jeu reciblées automatiquement
+(os renommés à la conversion). Les rôles en uniforme ou en armure (sécurité, cuisiniers, pilotes, équipage, joueur)
+gardent le corps paramétrable (tenues et armures en shader). Ferme et bassin : mouton, chèvres, cochon, poules, coq,
+colverts réalistes, animés par le code (pattes en diagonale, broutage, picorage, flottaison). Sur téléphone : un
+sous-ensemble de personnages et des textures allégées.
+
 ## Silhouettes, tenues et armures
 
 - **Silhouettes affinées** : le corps de base (très musclé) est aminci le long de chaque os (torse, épaules, bras, jambes),

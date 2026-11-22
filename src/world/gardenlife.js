@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import { DECK_Y } from './habitat.js';
+import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 
 // Vie du Grand Dôme : enfants (chat, balançoires, toboggan, tourniquet, bascule, canards), parents sur les bancs,
 // glacier et snack, clients aux tables, promeneurs, fermier et jardinière ; animaux en instances (un appel de rendu
@@ -115,6 +116,45 @@ class Parts {
   commit() { this.m.instanceMatrix.needsUpdate = true; }
 }
 
+// ------------------------------------------------------------------ animaux réalistes (Microsoft Rocketbox, MIT)
+// Pas d'animations fournies : les os sont pilotés directement (pattes en diagonale, tête qui broute ou picore,
+// queue, oreilles). Les rotations sont exprimées autour de l'axe latéral de l'animal puis ramenées dans le repère
+// de chaque os, à partir de la pose de repos.
+const AX = new THREE.Vector3(1, 0, 0);
+class RBAnimal {
+  constructor(src) {
+    this.g = new THREE.Group();
+    this.obj = SkeletonUtils.clone(src); this.g.add(this.obj);
+    this.obj.traverse((o) => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = true; o.frustumCulled = false; } });
+    this.g.updateMatrixWorld(true);
+    const B = {}; this.obj.traverse((o) => { if (o.isBone) B[o.name.replace(/^[a-z]+_/, '')] = o; });
+    const gq = this.g.getWorldQuaternion(new THREE.Quaternion()).invert();
+    const prep = (b) => { if (!b) return null; const P = b.parent.getWorldQuaternion(new THREE.Quaternion()).premultiply(gq); return { b, q0: b.quaternion.clone(), P, Pi: P.clone().invert() }; };
+    this.legs = [['L_Thigh', 0], ['R_Thigh', Math.PI], ['L_UpperArm', Math.PI], ['R_UpperArm', 0]].map(([n, ph]) => B[n] && { ...prep(B[n]), ph, front: /Arm/.test(n) }).filter(Boolean);
+    this.necks = ['Neck', 'Neck1', 'Neck2', 'Neck3'].map((n) => prep(B[n])).filter(Boolean);
+    this.head = prep(B.Head); this.tail = prep(B.Tail); this.ears = [prep(B.Ear_L), prep(B.Ear_R)].filter(Boolean);
+    // sens de la marche (la tête est-elle vers +z ?) et hauteur du sol
+    const hz = B.Head ? B.Head.getWorldPosition(new THREE.Vector3()).z : 1, pz = B.Pelvis ? B.Pelvis.getWorldPosition(new THREE.Vector3()).z : 0;
+    this.face = hz >= pz ? 1 : -1; this.yawOff = this.face > 0 ? 0 : Math.PI;
+    const box = new THREE.Box3().setFromObject(this.obj); this.lift = -box.min.y;
+  }
+  _rot(j, ang, axis = AX) {
+    const R = new THREE.Quaternion().setFromAxisAngle(axis, ang * this.face);
+    j.b.quaternion.copy(j.Pi).multiply(R).multiply(j.P).multiply(j.q0);
+  }
+  /** pos (monde), yaw, ph (phase de marche), moving (m/s), head (0 = droite, 1 = au sol), t (temps), roll */
+  pose(pos, yaw, ph, moving, head, t, opts = {}) {
+    this.g.position.copy(pos); this.g.position.y += this.lift * this.g.scale.y; this.g.rotation.set(0, yaw + this.yawOff, opts.roll || 0);
+    const amp = Math.min(1, moving * 2) * (opts.legAmp ?? 0.5);
+    for (const L of this.legs) this._rot(L, Math.sin(ph + L.ph) * amp * (L.front ? 0.9 : 1));
+    const nn = Math.max(1, this.necks.length);
+    for (const N of this.necks) this._rot(N, head * (opts.neckBend ?? 1.1) / nn);
+    if (this.head) this._rot(this.head, head * 0.25 + Math.sin(t * 0.9) * 0.05);
+    if (this.tail) this._rot(this.tail, Math.sin(t * 6 + ph) * 0.25, new THREE.Vector3(0, 1, 0));
+    for (const [k, E] of this.ears.entries()) this._rot(E, Math.max(0, Math.sin(t * 0.7 + k * 2.1)) ** 8 * 0.6, new THREE.Vector3(0, 0, 1));
+  }
+}
+
 export function populateGarden(ctx, lib, player, G) {
   const { scene } = ctx;
   const low = ctx.quality.name === 'low';
@@ -131,18 +171,18 @@ export function populateGarden(ctx, lib, player, G) {
     const [model, hair] = opt.look || ADULT[i % ADULT.length];
     const kid = !!opt.kid;
     const hgt = kid ? R2(1.14, 1.38) : model.startsWith('UF') ? R2(1.62, 1.74) : R2(1.74, 1.88);
-    const c = lib.create(model, { height: hgt, hair, hairColor: [0x2a1d14, 0xd8c098, 0x4a3020, 0x16110d, 0x8a5a30][i % 5] });
+    const c = lib.create(model, { height: hgt, civil: true, kid, rb: opt.rb, hair, hairColor: [0x2a1d14, 0xd8c098, 0x4a3020, 0x16110d, 0x8a5a30][i % 5] });
     c.setOutfit({ boot: 0x1a1a1a, accent: 0xf2f2ee, zip: false, belt: !kid, ...outfit });
     c.root.position.copy(p); c.root.rotation.y = yaw;
     c.root.traverse((o) => { o.castShadow = false; });
     c.kid = kid; c.root.visible = false; scene.add(c.root); people.push(c);
-    if (kid) c.model.position.y = -0.056 * hgt;   // jambes raccourcies : les pieds restent au sol
+    if (kid && !c.rb) c.model.position.y = -0.056 * hgt;   // jambes raccourcies : les pieds restent au sol
     return c;
   };
   // proportions d'enfant : tête plus grosse (os de tête, la coiffure suit)
   // proportions d'enfant : tête plus grosse, jambes et bras plus courts (os redimensionnés après l'animation)
   const kidLook = (c) => {
-    if (!c.kid) return;
+    if (!c.kid || c.rb) return;     // les enfants Rocketbox ont déjà de vraies proportions d'enfant
     const b = c.bones;
     b.Head?.scale.setScalar(1.3); b.neck_01?.scale.setScalar(0.92);
     for (const k of ['thigh_l', 'thigh_r']) b[k]?.scale.setScalar(0.88);
@@ -220,7 +260,7 @@ export function populateGarden(ctx, lib, player, G) {
   // ---------------------------------------------------------------- fermier : abreuvoir, grange, enclos ; jardinière : potager
   const FZ = G.farmZone, inFarm = (u, v) => u > FZ.u0 && u < FZ.u1 && v > FZ.v0 && v < FZ.v1 && !(Math.abs(u - FZ.barn.u) < 2.7 && Math.abs(v - FZ.barn.v) < 2.6);
   const farmPt = () => { for (let k = 0; k < 30; k++) { const u = R2(FZ.u0, FZ.u1), v = R2(FZ.v0, FZ.v1); if (inFarm(u, v)) return [u, v]; } return [18, -3]; };
-  const farmer = mk(3, { top: 0x5a6a3a, bottom: 0x3a4a6a, accent: 0xd8c890, boot: 0x3a2a1a }, at(19.5, -4.6), Math.PI);
+  const farmer = mk(3, { top: 0x5a6a3a, bottom: 0x3a4a6a, accent: 0xd8c890, boot: 0x3a2a1a }, at(19.5, -4.6), Math.PI, { rb: 'Gardener_Male_01' });
   farmer.talkRole = 'fermier';
   actor(farmer, () => {
     const [u, v] = farmPt();
@@ -391,10 +431,16 @@ export function populateGarden(ctx, lib, player, G) {
   const animMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.92, metalness: 0 });
   const wingMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6, side: THREE.DoubleSide, emissive: 0x000000 });
   const herd = (sp, n, region, opts = {}) => {
-    const g = S[sp], parts = { body: new Parts(scene, g.body, n, animMat), head: new Parts(scene, g.head, n, animMat) };
-    if (g.leg) parts.leg = new Parts(scene, g.leg, n * g.hips.length, animMat);
-    const list = [];
+    const g = S[sp], list = [];
     for (let i = 0; i < n; i++) { const [u, v] = region.pt(); list.push({ u, v, yaw: R2(0, 6.28), tu: u, tv: v, state: 'idle', t: R2(0, 4), ph: R2(0, 6), head: 0, sp: opts.speed || 0.6, s: opts.scale?.(i) ?? 1 }); }
+    // modèles réalistes si disponibles (sinon : maquettes instanciées)
+    const ids = opts.rb?.filter((id) => lib.animals?.[id]);
+    if (ids?.length) {
+      const rb = list.map((a, i) => { const A2 = new RBAnimal(lib.animals[ids[i % ids.length]]); A2.g.scale.setScalar(a.s * (opts.rbScale ?? 1)); A2.g.visible = false; scene.add(A2.g); return A2; });
+      return { sp, g, parts: {}, rb, list, region, opts };
+    }
+    const parts = { body: new Parts(scene, g.body, n, animMat), head: new Parts(scene, g.head, n, animMat) };
+    if (g.leg) parts.leg = new Parts(scene, g.leg, n * g.hips.length, animMat);
     return { sp, g, parts, list, region, opts };
   };
   const farmRegion = { pt: farmPt, ok: inFarm };
@@ -403,13 +449,13 @@ export function populateGarden(ctx, lib, player, G) {
   const pondOk = (u, v) => G.inPond(u, v, -0.9);
   const pondRegion = { pt: () => { for (let k = 0; k < 40; k++) { const u = G.POND.u + R2(-5, 5), v = G.POND.v + R2(-5, 5); if (pondOk(u, v)) return [u, v]; } return [G.POND.u, G.POND.v]; }, ok: pondOk };
   const herds = [
-    herd('sheep', 4, farmRegion, { speed: 0.45, scale: (i) => (i === 3 ? 0.7 : 1) }),
-    herd('goat', 2, farmRegion, { speed: 0.6 }),
-    herd('hen', low ? 4 : 7, farmRegion, { speed: 0.9, peck: true }),
-    herd('drake', 2, pondRegion, { speed: 0.35, swim: true }),
-    herd('duck', 2, pondRegion, { speed: 0.35, swim: true }),
+    herd('sheep', 4, farmRegion, { speed: 0.45, scale: (i) => (i === 3 ? 0.7 : 1), rb: ['Sheep_White_01'], rbScale: 0.85 }),
+    herd('goat', 2, farmRegion, { speed: 0.6, rb: ['Goat_White_01', 'Goat_Brown_01'], rbScale: 0.8 }),
+    herd('hen', low ? 4 : 7, farmRegion, { speed: 0.9, peck: true, rb: ['Bird_Chicken_Brown_01', 'Bird_Chicken_White_01', 'Bird_Rooster_Brown_01'] }),
+    herd('drake', 2, pondRegion, { speed: 0.35, swim: true, rb: ['Bird_Duck_Male_01'] }),
+    herd('duck', 2, pondRegion, { speed: 0.35, swim: true, rb: ['Bird_Duck_Female_01'] }),
     herd('duckling', low ? 2 : 4, pondRegion, { speed: 0.4, swim: true, follow: true }),
-    herd('pig', 2, farmRegion, { speed: 0.35, scale: (i) => (i ? 0.8 : 1) }),
+    herd('pig', 2, farmRegion, { speed: 0.35, scale: (i) => (i ? 0.8 : 1), rb: ['Pig_Pink_01'] }),
     herd('bunny', 2, penRegion, { speed: 1.1, hop: true }),
     herd('bunnyW', low ? 1 : 2, penRegion, { speed: 1.1, hop: true }),
     herd('bunnyD', 1, penRegion, { speed: 1.1, hop: true }),
@@ -443,6 +489,14 @@ export function populateGarden(ctx, lib, player, G) {
       a.head += (tgtHead - a.head) * (1 - Math.exp(-dt * (opts.peck ? 18 : 4)));
       const y = opts.swim ? Y - 0.3 + Math.sin(T0 * 1.6 + i) * 0.008 : Y + H(a.u, a.v);
       const bob = opts.swim ? 0 : opts.hop ? Math.abs(Math.sin(a.ph * 0.5)) * 0.13 * (moving > 0 ? 1 : 0) : Math.abs(Math.sin(a.ph)) * 0.015 * (moving > 0 ? 1 : 0);
+      if (h.rb) {
+        const A2 = h.rb[i];
+        // canards : seule la moitié haute dépasse de l'eau ; poules et canards : cou plus mobile
+        const p = _V.copy(W(a.u, 0, a.v)).setY(opts.swim ? Y - 0.28 - 0.12 * A2.g.scale.y - A2.lift * A2.g.scale.y + Math.sin(T0 * 1.6 + i) * 0.008 : y + bob);
+        A2.pose(p, a.yaw, a.ph, moving, opts.swim ? a.head * 0.4 : a.head, T0 + i, { legAmp: opts.swim ? 0.7 : opts.peck ? 0.6 : 0.45, neckBend: opts.peck ? 1.4 : 1.1, roll: opts.swim ? Math.sin(T0 * 1.3 + i) * 0.04 : 0 });
+        if (opts.swim) A2.g.position.y = Y - 0.28 - 0.1 + Math.sin(T0 * 1.6 + i) * 0.008;
+        return;
+      }
       _P.compose(_V.copy(W(a.u, 0, a.v)).setY(y + bob), _Q.setFromEuler(_E.set(opts.swim ? 0 : -0.04 * Math.sin(a.ph), a.yaw, opts.swim ? Math.sin(T0 * 1.3 + i) * 0.04 : 0)), _S.setScalar(a.s));
       parts.body.set(i, _P);
       _M.compose(_O.copy(g.neck), _Q.setFromEuler(_E.set(a.head, Math.sin(T0 * 0.5 + i * 3) * 0.3 * (a.state === 'idle' ? 1 : 0.2), 0)), _S.setScalar(1));
@@ -509,6 +563,7 @@ export function populateGarden(ctx, lib, player, G) {
   const upd = (dt) => {
     const near = G.near(player.pos), inside = G.inside(player.pos);
     for (const m of animalMeshes) m.visible = near;
+    for (const h of herds) if (h.rb) for (const A2 of h.rb) A2.g.visible = near;
     for (const o of G.dyn) o.visible = near;
     G.water.visible = near;
     // ciel : jour, crépuscule, nuit étoilée ; lampions plus forts le soir

@@ -1,17 +1,62 @@
 <!doctype html><meta charset="utf-8"><title>conversion FBX</title>
 <script type="module">
+// Conversion des personnages et animaux Microsoft Rocketbox (MIT) : FBX -> GLB pour le jeu.
+// Os 3ds Max « Bip0x_* » renommés selon la convention du moteur (pelvis, spine_01, hand_l…), matériaux PBR,
+// textures allégées (produites par rb_textures.py), échelle en mètres, sans l'animation d'exemple.
 import * as THREE from 'three';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 import { TGALoader } from 'three/addons/loaders/TGALoader.js';
-window.loadFBX = async (url) => {
+import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
+
+const FINGER = { 0: 'thumb', 1: 'index', 2: 'middle', 3: 'ring', 4: 'pinky' };
+export function engineName(n) {
+  const m = n.match(/^Bip0\d(?:_(.+))?$/);
+  if (!m) return n;
+  const s = m[1];
+  if (!s) return 'root';
+  const T = { Pelvis: 'pelvis', Spine: 'spine_01', Spine1: 'spine_02', Spine2: 'spine_03', Neck: 'neck_01', Head: 'Head' };
+  if (T[s]) return T[s];
+  let r = s.match(/^([LR])_(Clavicle|UpperArm|Forearm|Hand|Thigh|Calf|Foot|Toe0)$/);
+  if (r) return { Clavicle: 'clavicle', UpperArm: 'upperarm', Forearm: 'lowerarm', Hand: 'hand', Thigh: 'thigh', Calf: 'calf', Foot: 'foot', Toe0: 'ball' }[r[2]] + '_' + r[1].toLowerCase();
+  r = s.match(/^([LR])_Finger(\d)(\d?)$/);
+  if (r) return `${FINGER[r[2]]}_0${r[3] === '' ? 1 : +r[3] + 1}_${r[1].toLowerCase()}`;
+  return s;   // os du visage (yeux, mâchoire, sourcils…) : on garde le nom sans préfixe
+}
+
+const loadTex = (url, srgb) => new Promise((res) => new THREE.TextureLoader().load(url, (t) => { if (srgb) t.colorSpace = THREE.SRGBColorSpace; t.userData.mimeType = url.endsWith('.png') ? 'image/png' : 'image/jpeg'; res(t); }, undefined, () => res(null)));
+
+window.convert = async (fbxUrl, texBase, kind) => {
   const mgr = new THREE.LoadingManager(); mgr.addHandler(/\.tga$/i, new TGALoader(mgr));
-  const o = await new FBXLoader(mgr).loadAsync(url);
-  await new Promise((r) => { if (!mgr.itemsLoading) r(); mgr.onLoad = r; setTimeout(r, 15000); });
-  const info = { meshes: [], bones: [], anims: o.animations.length };
+  mgr.setURLModifier((u) => (/\.tga$/i.test(u) ? 'data:,' : u));   // les TGA d'origine sont remplacées plus bas
+  const o = await new FBXLoader(mgr).loadAsync(fbxUrl);
+  o.animations = [];
+  const T = {};
+  for (const k of ['body_color.jpg', 'body_normal.jpg', 'head_color.jpg', 'head_normal.jpg', 'opacity_color.png', 'color.jpg', 'normal.jpg']) T[k] = await loadTex(texBase + k, /color/.test(k));
+  const mat = (name) => {
+    const n = name.toLowerCase();
+    if (n.includes('opacity')) return new THREE.MeshStandardMaterial({ name: 'rb_hair', map: T['opacity_color.png'], alphaTest: 0.45, side: THREE.DoubleSide, roughness: 0.6 });
+    if (n.includes('head')) return new THREE.MeshStandardMaterial({ name: 'rb_head', map: T['head_color.jpg'], normalMap: T['head_normal.jpg'], roughness: 0.55 });
+    if (n.includes('body')) return new THREE.MeshStandardMaterial({ name: 'rb_body', map: T['body_color.jpg'], normalMap: T['body_normal.jpg'], roughness: 0.72 });
+    return new THREE.MeshStandardMaterial({ name: 'rb_' + kind, map: T['color.jpg'], normalMap: T['normal.jpg'], roughness: 0.85 });
+  };
+  const info = { meshes: 0, renamed: 0 };
+  o.traverse((c) => {
+    if (c.isBone) { const nn = engineName(c.name); if (nn !== c.name) info.renamed++; c.name = nn; }
+    if (c.isMesh) {
+      info.meshes++;
+      c.material = Array.isArray(c.material) ? c.material.map((m) => mat(m.name)) : mat(c.material.name);
+      c.name = kind === 'human' ? 'rb_body' : 'rb_' + kind;
+      for (const k of Object.keys(c.geometry.attributes)) if (!['position', 'normal', 'uv', 'skinIndex', 'skinWeight'].includes(k)) c.geometry.deleteAttribute(k);
+    }
+  });
+  o.scale.multiplyScalar(0.01);
   o.updateMatrixWorld(true);
-  o.traverse((c) => { if (c.isMesh) info.meshes.push([c.name, c.type, c.geometry.attributes.position.count, (Array.isArray(c.material) ? c.material : [c.material]).map((m) => m.name + ':' + (m.map?.image?.width || 0)).join('|')]); if (c.isBone) info.bones.push(c.name); });
-  const b = new THREE.Box3().setFromObject(o); info.size = b.getSize(new THREE.Vector3()).toArray().map((v) => +v.toFixed(2));
-  window.__obj = o; return info;
+  const box = new THREE.Box3().setFromObject(o); info.size = box.getSize(new THREE.Vector3()).toArray().map((v) => +v.toFixed(3));
+  const glb = await new GLTFExporter().parseAsync(o, { binary: true, animations: [], onlyVisible: false });
+  const bytes = new Uint8Array(glb); let s = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+  info.b64 = btoa(s);
+  return info;
 };
 window.ready = true;
 </script>
