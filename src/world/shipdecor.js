@@ -337,6 +337,153 @@ export function shipDecor(ctx, B) {
     },
     /** plante en pot (modèle photoscanné) */
     plant(x, y, z, h = 1.0, id = 'potted_plant_04', ry = 0) { ctx.models?.place(B, id, x, y, z, { fit: ['y', h], ry }); },
+    /** cloison ajourée en lames de bois (séparation de pièce) entre x0 et x1 (axe x) ou z0 et z1 (axe z) */
+    slats(axis, a0, a1, c, y, h = 2.6, col = 0x6a4a30, step = 0.12) {
+      const len = a1 - a0, n = Math.floor(len / step), wm = M.wood(col);
+      const b = frame(0, y, 0, 0);
+      const at = (u, yy) => (axis === 'x' ? L(a0 + u, yy, c) : L(c, yy, a0 + u));
+      for (let i = 0; i <= n; i++) put(b, axis === 'x' ? rbox(0.045, h, 0.09, 0.012) : rbox(0.09, h, 0.045, 0.012), wm, at(i * (len / n), h / 2));
+      put(b, axis === 'x' ? rbox(len + 0.06, 0.06, 0.14, 0.015) : rbox(0.14, 0.06, len + 0.06, 0.015), wm, at(len / 2, h + 0.03));
+      put(b, axis === 'x' ? rbox(len + 0.06, 0.08, 0.16, 0.015) : rbox(0.16, 0.08, len + 0.06, 0.015), M.dark(), at(len / 2, 0.04));
+      // collision : une seule boîte pleine
+      put(b, axis === 'x' ? new THREE.BoxGeometry(len, h, 0.1) : new THREE.BoxGeometry(0.1, h, len), memo('inv', () => new THREE.MeshBasicMaterial({ visible: false })), at(len / 2, h / 2), true);
+    },
+    /** cloison intérieure habillée (lambris bois en bas, tissu en haut, deux faces) ; axis 'z' : mur le long de z en x = c.
+     *  holes : [[début, fin, hauteur]] (passages, avec chambranle) */
+    partition(axis, a0, a1, c, y, h, holes = [], t = 0.12, wain = 0x6a4a34) {
+      const b = frame(0, y, 0, 0), wm = M.wood(wain), fm = M.fabric(0xb8ae9e), inv = memo('inv', () => new THREE.MeshBasicMaterial({ visible: false }));
+      const seg = (u0, u1, y0, y1, m, col) => {
+        if (u1 - u0 < 0.01 || y1 - y0 < 0.01) return;
+        const g = axis === 'z' ? new THREE.BoxGeometry(t, y1 - y0, u1 - u0) : new THREE.BoxGeometry(u1 - u0, y1 - y0, t);
+        const um = (u0 + u1) / 2, ym = (y0 + y1) / 2;
+        put(b, g, m, axis === 'z' ? L(c, ym, um) : L(um, ym, c), col);
+      };
+      const hs = [...holes].sort((p, q) => p[0] - q[0]);
+      let u = a0;
+      const wall = (u0, u1, y0 = 0) => { seg(u0, u1, y0, Math.max(y0, 1.0), wm); seg(u0, u1, Math.max(y0, 1.0), h, fm); seg(u0, u1, 0, h, inv, true); };
+      for (const [h0, h1, hh] of hs) {
+        wall(u, h0);
+        seg(h0, h1, hh, h, fm);                                                   // imposte
+        const tr = (uu, yy, hy, wu) => put(b, axis === 'z' ? new THREE.BoxGeometry(t + 0.04, hy, wu) : new THREE.BoxGeometry(wu, hy, t + 0.04), M.brushed(), axis === 'z' ? L(c, yy, uu) : L(uu, yy, c));
+        tr(h0 + 0.03, hh / 2, hh, 0.06); tr(h1 - 0.03, hh / 2, hh, 0.06); tr((h0 + h1) / 2, hh + 0.03, 0.06, h1 - h0);
+        u = h1;
+      }
+      wall(u, a1);
+      const g = axis === 'z' ? new THREE.BoxGeometry(t + 0.02, 0.035, a1 - a0) : new THREE.BoxGeometry(a1 - a0, 0.035, t + 0.02);
+      put(b, g, M.brushed(), axis === 'z' ? L(c, 1.02, (a0 + a1) / 2) : L((a0 + a1) / 2, 1.02, c));
+    },
+    /** tableau encadré (peinture abstraite ou paysage générés) ; avant = +z */
+    art(x, y, z, yaw, w = 0.9, h = 0.65, seed = 0) {
+      const b = frame(x, y, z, yaw);
+      const mat = memo('art' + (seed % 6), () => {
+        const c = document.createElement('canvas'); c.width = 256; c.height = 192; const g = c.getContext('2d');
+        let k = seed * 7919 + 13; const r = () => ((k = (k * 16807) % 2147483647) / 2147483647);
+        const P = [['#1c2a3a', '#d8a050', '#e8dcc4', '#6a8aa8'], ['#2a1c1c', '#c84a2a', '#e8c890', '#3a5a6a'], ['#0e1a2a', '#3a6a9a', '#e8f0f4', '#f0b060'], ['#24301e', '#7a9a5a', '#e8e0c8', '#c8783a']][seed % 4];
+        if (seed % 2) {   // paysage planétaire
+          const gr = g.createLinearGradient(0, 0, 0, 192); gr.addColorStop(0, P[0]); gr.addColorStop(1, P[3]); g.fillStyle = gr; g.fillRect(0, 0, 256, 192);
+          g.fillStyle = P[1]; g.beginPath(); g.arc(70 + r() * 120, 60 + r() * 30, 22 + r() * 20, 0, 7); g.fill();
+          for (let l = 0; l < 3; l++) { g.fillStyle = l === 2 ? P[0] : P[3 - l]; g.globalAlpha = 0.6 + l * 0.2; g.beginPath(); g.moveTo(0, 192); for (let xx = 0; xx <= 256; xx += 16) g.lineTo(xx, 120 + l * 22 + Math.sin(xx * 0.03 + l + r()) * 16); g.lineTo(256, 192); g.fill(); }
+          g.globalAlpha = 1;
+        } else {          // abstrait
+          g.fillStyle = P[2]; g.fillRect(0, 0, 256, 192);
+          for (let i = 0; i < 7; i++) { g.fillStyle = P[i % 4]; g.globalAlpha = 0.55 + r() * 0.4; if (r() > 0.5) g.fillRect(r() * 200, r() * 150, 30 + r() * 110, 20 + r() * 80); else { g.beginPath(); g.arc(r() * 256, r() * 192, 15 + r() * 60, 0, 7); g.fill(); } }
+          g.globalAlpha = 1;
+        }
+        const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+        return new THREE.MeshStandardMaterial({ map: t, roughness: 0.8 });
+      });
+      put(b, rbox(w + 0.08, h + 0.08, 0.035, 0.01), M.wood(0x2a1c14), L(0, 0, 0.018));
+      put(b, new THREE.PlaneGeometry(w, h), mat, L(0, 0, 0.037));
+    },
+    /** jardinière longue (bac + plantes) ; axe x local */
+    planterBox(x, y, z, yaw, len = 2.4) {
+      const b = frame(x, y, z, yaw);
+      put(b, rbox(len, 0.6, 0.5, 0.03), M.lacquer(0x2a2e34), L(0, 0.3, 0), true);
+      put(b, rbox(len - 0.08, 0.04, 0.42, 0.01), memo('soil', () => new THREE.MeshStandardMaterial({ color: 0x2a1e14, roughness: 1 })), L(0, 0.58, 0));
+      put(b, rbox(len - 0.1, 0.01, 0.01, 0.003), M.glowW(), L(0, 0.05, 0.255));
+      for (let k = 0; k < Math.max(2, Math.round(len / 0.8)); k++) ctx.models?.place(B, k % 2 ? 'potted_plant_02' : 'potted_plant_04', 0, 0, 0, { fit: ['y', 0.8 + (k % 3) * 0.15], ry: k * 1.7, base: b.clone().multiply(L(-len / 2 + 0.4 + k * ((len - 0.8) / Math.max(1, Math.round(len / 0.8) - 1)), 0.4, 0)) });
+    },
+    /** palette chargée de cartons sanglés */
+    pallet(x, y, z, yaw, layers = 2, seed = 0, parent = null) {
+      const b = parent ? parent.clone().multiply(frame(x, y, z, yaw)) : frame(x, y, z, yaw), w = M.wood(0xb89a6a);
+      for (const s of [-1, 0, 1]) put(b, rbox(1.2, 0.1, 0.1, 0.01), w, L(0, 0.05, s * 0.45));
+      for (let k = 0; k < 7; k++) put(b, rbox(0.12, 0.022, 1.0, 0.005), w, L(-0.54 + k * 0.18, 0.112, 0));
+      const card = memo('card', () => new THREE.MeshStandardMaterial({ color: 0xb08a5a, roughness: 0.92 }));
+      for (let l = 0; l < layers; l++) for (let i = 0; i < 2; i++) for (let j = 0; j < 2; j++) {
+        if ((seed + l * 3 + i + j * 2) % 7 === 6 && l === layers - 1) continue;
+        put(b, rbox(0.56, 0.4, 0.46, 0.01), card, L(-0.29 + i * 0.58, 0.33 + l * 0.41, -0.24 + j * 0.48, 0, ((seed + i + j + l) % 3 - 1) * 0.03), l === 0);
+        put(b, rbox(0.57, 0.006, 0.08, 0.002), memo('tape', () => new THREE.MeshStandardMaterial({ color: 0xc8b890, roughness: 0.4 })), L(-0.29 + i * 0.58, 0.533 + l * 0.41, -0.24 + j * 0.48));
+      }
+      for (const s of [-0.3, 0.3]) put(b, rbox(1.22, 0.012, 0.04, 0.004), M.lacquer(0x2a5aa0), L(0, 0.12 + layers * 0.41 + 0.02, s));
+    },
+    /** rayonnage à palettes (montants bleus, lisses orange) chargé ; axe x local, accès côté +z */
+    rack(x, y, z, yaw, bays = 2, levels = 3, seed = 0) {
+      const b = frame(x, y, z, yaw), bw = 2.7, H = levels * 1.5 + 0.4, up = M.lacquer(0x2a4a8a), beam = M.lacquer(0xd86a1a);
+      for (let i = 0; i <= bays; i++) for (const s of [-0.5, 0.5]) put(b, rbox(0.08, H, 0.08, 0.01), up, L(-bays * bw / 2 + i * bw, H / 2, s), true);
+      for (let i = 0; i <= bays; i++) for (let k = 0; k < 6; k++) put(b, rbox(0.02, 0.02, 1.0, 0.005), up, L(-bays * bw / 2 + i * bw, 0.4 + k * (H - 0.6) / 5, 0, k % 2 ? 0.5 : -0.5));
+      for (let l = 1; l <= levels; l++) for (let i = 0; i < bays; i++) {
+        const yy = l * 1.5 - 1.1, cx = -bays * bw / 2 + (i + 0.5) * bw;
+        for (const s of [-0.5, 0.5]) put(b, rbox(bw - 0.08, 0.1, 0.05, 0.01), beam, L(cx, yy, s));
+        put(b, rbox(bw - 0.1, 0.02, 1.0, 0.005), memo('mesh', () => mats.metal(0x6a7076, { rough: 0.6 })), L(cx, yy + 0.06, 0));
+        if ((seed + l + i) % 4 === 3) continue;
+        for (let p = 0; p < 2; p++) {
+          const px = cx - 0.65 + p * 1.3;
+          const g = b.clone().multiply(L(px, yy + 0.07, 0));
+          if ((seed * 3 + l * 2 + i + p) % 3 === 0) D.pallet(0, 0, 0, 0, 1 + ((l + p) % 2), seed + l + p, g);
+          else if ((seed + l + p + i) % 3 === 1) for (let q = 0; q < 3; q++) ctx.models?.place(B, 'plastic_crate_01', 0, 0, 0, { fit: ['x', 0.4], base: g.clone().multiply(L(-0.42 + q * 0.42, 0, 0)) });
+          else for (let q = 0; q < 2; q++) ctx.models?.place(B, 'cardboard_box_01', 0, 0, 0, { fit: ['x', 0.55], ry: q * 0.2, base: g.clone().multiply(L(-0.3 + q * 0.6, 0, 0)) });
+        }
+      }
+    },
+    /** panneau d'outils perforé, étagère et outils suspendus ; avant = +z */
+    toolWall(x, y, z, yaw, w = 2.4) {
+      const b = frame(x, y, z, yaw);
+      put(b, rbox(w, 1.2, 0.03, 0.01), memo('peg', () => new THREE.MeshStandardMaterial({ color: 0x5a6a5a, roughness: 0.8 })), L(0, 1.6, 0));
+      for (let i = 0; i < Math.floor(w / 0.12); i++) {
+        const xx = -w / 2 + 0.12 + i * 0.12, t = i % 5;
+        if (t === 0) put(b, rbox(0.035, 0.24 + (i % 3) * 0.04, 0.015, 0.006), M.chrome(), L(xx, 1.75, 0.03, 0, 0, 0.1));       // clé
+        else if (t === 1) { put(b, rbox(0.03, 0.16, 0.03, 0.01), M.lacquer(0xc82a1a), L(xx, 1.85, 0.035)); put(b, rbox(0.008, 0.14, 0.008, 0.003), M.chrome(), L(xx, 1.7, 0.035)); }   // tournevis
+        else if (t === 2) { put(b, rbox(0.05, 0.12, 0.03, 0.01), M.dark(), L(xx, 1.45, 0.035)); put(b, rbox(0.12, 0.04, 0.035, 0.01), M.chrome(), L(xx, 1.52, 0.035)); }   // marteau
+        else if (t === 3) put(b, new THREE.TorusGeometry(0.06, 0.012, 6, 14), M.lacquer(0xd8a62a), L(xx, 1.35, 0.03));            // rouleau
+      }
+      put(b, rbox(w, 0.03, 0.3, 0.008), M.brushed(), L(0, 1.0, 0.14));
+      for (let k = 0; k < 6; k++) put(b, rbox(0.18, 0.12, 0.2, 0.01), M.lacquer([0xc82a1a, 0x2a4a8a, 0xd8a62a][k % 3]), L(-w / 2 + 0.2 + k * (w - 0.4) / 5, 1.075, 0.14));
+      put(b, rbox(w, 0.04, 0.04, 0.01), M.glowC(), L(0, 2.25, 0.08));
+    },
+    /** tableau de vannes : collecteur, volants, manomètres ; avant = +z */
+    valvePanel(x, y, z, yaw, w = 2.0) {
+      const b = frame(x, y, z, yaw);
+      put(b, rbox(w, 1.6, 0.06, 0.01), M.dark(), L(0, 1.4, 0));
+      rod(b, [-w / 2, 0.9, 0.12], [w / 2, 0.9, 0.12], 0.07, mats.paint(0x2f6f9f, { grime: 0.5 }));
+      rod(b, [-w / 2, 1.9, 0.12], [w / 2, 1.9, 0.12], 0.05, mats.paint(0x9a3a2a, { grime: 0.5 }));
+      for (let k = 0; k < 4; k++) {
+        const xx = -w / 2 + 0.3 + k * (w - 0.6) / 3;
+        rod(b, [xx, 0.9, 0.12], [xx, 1.9, 0.12], 0.035, M.brushed());
+        put(b, new THREE.TorusGeometry(0.11, 0.016, 6, 18), M.lacquer(k % 2 ? 0xc82a1a : 0xd8a62a), L(xx, 1.4, 0.24));
+        rod(b, [xx, 1.4, 0.12], [xx, 1.4, 0.24], 0.012, M.brushed());
+        put(b, cyl(0.07, 0.07, 0.04, 18), M.chrome(), L(xx, 2.15, 0.09, Math.PI / 2));
+        put(b, cyl(0.06, 0.06, 0.005, 18), M.ceramic(), L(xx, 2.15, 0.112, Math.PI / 2));
+        put(b, rbox(0.004, 0.05, 0.003, 0.001), M.lacquer(0xc82a1a), L(xx + 0.01, 2.16, 0.118, 0, 0, -0.6 + k * 0.4));
+      }
+      put(b, rbox(0.5, 0.2, 0.01, 0.004), mats.emissive(0x2a9a6a, 1.6), L(w / 2 - 0.4, 0.5, 0.035));
+    },
+    /** borne murale (écran + clavier) ; avant = +z */
+    terminal(x, y, z, yaw, col = 0x3a8ab8) {
+      const b = frame(x, y, z, yaw);
+      put(b, rbox(0.62, 0.9, 0.1, 0.02), M.dark(), L(0, 1.45, 0.05));
+      put(b, rbox(0.54, 0.4, 0.004, 0.002), mats.emissive(col, 1.3), L(0, 1.62, 0.102));
+      put(b, rbox(0.5, 0.06, 0.18, 0.01, 2), M.dark(), L(0, 1.15, 0.14, 0.4));
+      put(b, rbox(0.06, 0.06, 0.004, 0.002), mats.emissive(0x3ac870, 2), L(0.2, 1.33, 0.102));
+    },
+    /** transpalette */
+    palletJack(x, y, z, yaw) {
+      const b = frame(x, y, z, yaw), red = M.lacquer(0xc8301a);
+      for (const s of [-0.28, 0.28]) put(b, rbox(0.16, 0.07, 1.15, 0.02), red, L(s, 0.06, 0.2));
+      put(b, rbox(0.7, 0.3, 0.25, 0.04), red, L(0, 0.2, -0.45));
+      rod(b, [0, 0.3, -0.5], [0, 1.15, -0.8], 0.025, red);
+      put(b, rbox(0.36, 0.05, 0.05, 0.02), M.dark(), L(0, 1.17, -0.82));
+      for (const s of [-0.15, 0.15]) put(b, cyl(0.09, 0.09, 0.06, 14), M.dark(), L(s, 0.09, -0.45, 0, 0, Math.PI / 2));
+    },
     /** grande table de réunion arrondie à liseré lumineux */
     confTable(x, y, z, yaw, w = 5.2, d = 1.7) {
       const b = frame(x, y, z, yaw);

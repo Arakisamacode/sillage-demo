@@ -169,6 +169,12 @@ export function buildBigShip(ctx) {
     // grille centrale au sol, extincteurs, interphones
     box(1.0, 0.012, z1 - z0 - 0.5, mats.grating ? mats.grating() : dark, [(x0 + x1) / 2, y + 0.008, (z0 + z1) / 2]);
     for (let z = z0 + 9; z < z1 - 2; z += 18) { extinguisher(ctx, x1 - 0.25, y + 0.6, z, -Math.PI / 2); box(0.04, 0.3, 0.2, ledCyan, [x0 + 0.13, y + 1.5, z + 1]); }
+    const len = z1 - z0 - 0.4, zm = (z0 + z1) / 2, chrome = D.M.brushed();
+    for (const xx of [x0 + 0.13, x1 - 0.13]) {
+      box(0.02, 0.22, len, dark, [xx, y + 0.12, zm]);                               // plinthe
+      box(0.035, 0.035, len, chrome, [xx + (xx < (x0 + x1) / 2 ? 0.05 : -0.05), y + 1.0, zm]);   // main courante
+    }
+    for (let z = z0 + 5; z < z1 - 3; z += 18) if (!doorsZ.some((dz) => Math.abs(dz - z) < 1.5)) D.terminal(x1 - 0.12, y, z, -Math.PI / 2, [0x3a8ab8, 0x3ac870, 0xd8a62a][Math.abs(Math.round(z)) % 3]);
   };
 
   // ================================================================= PONT A (y 0) : cargo et machines
@@ -243,6 +249,9 @@ export function buildBigShip(ctx) {
   {
     workbench(ctx, 68, -1, Math.PI / 2); workbench(ctx, 68, 4, Math.PI / 2); toolChest(ctx, 68, 9, Math.PI / 2, 0xa3241b);
     gasRack(ctx, 77.6, 9.5, -Math.PI / 2);
+    D.toolWall(66.14, 0, 1.5, Math.PI / 2, 2.6); D.toolWall(66.14, 0, 6.5, Math.PI / 2, 2.0);
+    D.terminal(79.87, 0, 7.2, -Math.PI / 2); D.pallet(75.2, 0, 10.3, 0.15, 2, 3);
+    D.rack(70.8, 0, -4.4, 0, 1, 2, 2);
     for (const [x, z] of [[74, 1], [75.5, 6]]) crate(ctx, x, 0, z, 0.4, 1.2, 2);
     box(4, 0.08, 6, mats.paint(0x3a3e42, { grime: 0.8 }), [75, yA + 0.04, 3.5]);
     light(73, 3.2, 3.5, 0xfff2e0, 12, 11);
@@ -277,6 +286,10 @@ export function buildBigShip(ctx) {
     for (const z of [-8, 0, 8, 22, 30]) { container(ctx, 94.2, 0, z, 0, cols[k % 5], `ATL-${100 + k * 7}`); if (k % 2 === 0) container(ctx, 94.2, 2.6, z, 0, cols[(k + 2) % 5], `ATL-${200 + k * 3}`); k++; }
     for (const z of [-6, 4, 26]) container(ctx, 90.4, 0, z, 0, cols[(k++) % 5], `ATL-${300 + k}`);
     for (const [x, z] of [[89, 14], [90.5, 15], [89.6, 16.6]]) crate(ctx, x, 0, z, 0.3, 1.3, 3);
+    D.rack(96.9, 0, 3, -Math.PI / 2, 3, 3, 1); D.rack(96.9, 0, 26.5, -Math.PI / 2, 3, 3, 4);
+    for (const [x, z, r, n] of [[88.4, 33.8, 0.1, 2], [88.6, 36.1, -0.08, 3], [89.2, -10.6, 0.05, 2], [90.6, -10.4, -0.1, 1], [88.6, 19.6, 0.2, 2]]) D.pallet(x, 0, z, r, n, Math.round(x * 3 + z));
+    D.palletJack(90.4, 0, 34.6, Math.PI / 2 + 0.2);
+    D.terminal(84.12, 0, 10, Math.PI / 2); D.terminal(84.12, 0, 22, Math.PI / 2, 0xd8a62a);
     // portique roulant (rails sous la dalle C)
     for (const x of [86.8, 97.6]) box(0.3, 0.5, 52, dark, [x, S.yC - 0.9, 12]);
     box(11, 0.6, 0.6, yellow, [92.2, S.yC - 1.3, 10]); box(0.8, 0.8, 0.8, dark, [92.2, S.yC - 1.9, 10]);
@@ -294,6 +307,10 @@ export function buildBigShip(ctx) {
     for (let a = 0; a < 6; a++) { const ang = (a / 6) * Math.PI * 2; B.pipe([[rc.x + Math.cos(ang) * 2.8, 7.4, rc.z + Math.sin(ang) * 2.8], [rc.x + Math.cos(ang) * 6.5, 7.4, rc.z + Math.sin(ang) * 6.5], [rc.x + Math.cos(ang) * 6.5, 0.4, rc.z + Math.sin(ang) * 6.5]], 0.22, mats.paint(0x9a6a2a, { grime: 0.6 }), { cast: false, flangeMat: dark }); }
     for (const [x, z, ry] of [[70, 42, Math.PI / 2], [70, 50, Math.PI / 2], [94, 46, -Math.PI / 2]]) { box(1.6, 1.0, 0.8, dark, [x, 0.5, z], true, [0, ry, 0]); box(1.4, 0.5, 0.05, ledCyan, [x + Math.sin(ry) * 0.43, 1.15, z + Math.cos(ry) * 0.43], false, [0, ry, 0]); }
     box(12, 0.02, 12, mats.paint(0x2a2e32, { grime: 0.7 }), [82, 0.012, 47]);
+    D.valvePanel(66.2, 0, 46, Math.PI / 2, 3); D.valvePanel(97.8, 0, 51.5, -Math.PI / 2, 3);
+    D.terminal(97.86, 0, 41.5, -Math.PI / 2, 0x3ac870); D.terminal(66.14, 0, 53.5, Math.PI / 2, 0xd8a62a);
+    D.rack(74, 0, 55.3, Math.PI, 2, 2, 6); D.pallet(90.5, 0, 54.6, 0.1, 2, 9);
+    for (const x of [72, 92]) for (const z of [39.4, 54.6]) box(1.2, 0.012, 0.3, yellow, [x, 0.02, z]);
     rail([73, 41], [91, 41], S.yB); rail([73, 53], [91, 53], S.yB); rail([73, 41], [73, 53], S.yB); rail([91, 41], [91, 53], S.yB);
     for (const z of [41, 53]) light(82, 6, z, 0x9fe8ff, 18, 16);
     light(70, 3, 47, 0xffd0a0, 8, 10);
@@ -365,14 +382,18 @@ export function buildBigShip(ctx) {
       D.desk(66.45, yB, zc + 2.2, Math.PI / 2, 1.4);
       F.chair(67.35, yB, zc + 2.2, -Math.PI / 2, i);
       D.shelves(66.3, yB, zc - 0.55, Math.PI / 2, 1.5, 1.9, 0.32, i + 1);
-      D.armchair(72.7, yB, zc + 0.6, -Math.PI * 0.75, [0x6a4a36, 0x3a4a5a, 0x5a3a3a, 0x4a5a48][i]);
-      D.sideTable(73.6, yB, zc - 0.25);
-      D.floorLamp(73.8, yB, zc + 1.45);
-      D.rug(70.3, yB, zc, 0, 2.8, 2.0, [0x6a5a48, 0x4a5a6a, 0x5a4a5a, 0x4a5a4a][i]);
+      // cloison chambre / petit salon (passage au centre)
+      D.partition('z', z0 + 0.11, z1 - 0.11, 71.4, yB, S.h - 0.03, [[zc - 0.6, zc + 0.6, 2.2]]);
+      D.art(71.47, yB + 1.75, zc + 2.4, Math.PI / 2, 1.0, 0.7, i); D.art(71.33, yB + 1.75, zc - 2.3, -Math.PI / 2, 0.8, 0.6, i + 3);
+      D.armchair(72.6, yB, zc - 1.6, Math.PI / 2, [0x6a4a36, 0x3a4a5a, 0x5a3a3a, 0x4a5a48][i]);
+      D.sideTable(72.5, yB, zc - 2.75);
+      D.floorLamp(72.0, yB, zc - 3.3);
+      D.rug(73.0, yB, zc - 1.6, Math.PI / 2, 2.2, 1.6, 0x5a5048, 0x2a2420);
+      D.rug(68.8, yB, zc, 0, 2.2, 2.2, [0x6a5a48, 0x4a5a6a, 0x5a4a5a, 0x4a5a4a][i]);
       D.wardrobe(72.9, yB, z1 - 0.38, Math.PI, 1.5, 2.3, 0.56, [0x3a3e46, 0x463e36, 0x363e3a, 0x3e3646][i]);
       D.plant(68.9, yB, z1 - 0.4, 0.9, i % 2 ? 'potted_plant_02' : 'potted_plant_04');
       D.sconce(66.14, yB + 1.55, z0 + 1.7, Math.PI / 2);
-      D.ceilingPanel(70.3, yB, zc, S.h - 0.02, 1.6, 1.0);
+      D.ceilingPanel(68.7, yB, zc, S.h - 0.02, 1.4, 1.0); D.ceilingPanel(73, yB, zc - 1, S.h - 0.02, 0.8, 0.8);
       box(0.05, 0.8, 1.4, mats.glass(0x203040, 0.3), [74.38, yB + 1.6, zc - 1.6]); box(0.02, 0.7, 1.3, ledCyan, [74.34, yB + 1.6, zc - 1.6]);
       // cabinet de toilette (entrée, x 74.5..80) : douche, WC suspendu, lavabo, armoire d'entrée
       wallZ(74.5, z0, z1, yB, S.h, [[zc + 1.2, zc + 2.6, 2.2]], wallWarm, 0.14);
@@ -384,7 +405,7 @@ export function buildBigShip(ctx) {
       box(5.2, 0.02, z1 - z0 - 0.3, mats.ph('large_grey_tiles', 0xd8d8d4, { rough: 0.6, metal: 0, grime: 0.1, scratch: 0.1 }), [77.25, yB + 0.016, zc]);
       D.ceilingPanel(77.4, yB, zc, S.h - 0.02, 0.9, 0.9, false);
       box(0.04, 0.6, 1.0, ledWarm, [S.x0 + 0.14, yB + 1.6, zc + 2.2]);      // hublot éclairé (écran-fenêtre)
-      light(70.5, yB + 3.2, zc, 0xffd9a8, 6, 7);
+      light(68.7, yB + 3.2, zc, 0xffd9a8, 6, 7); light(73, yB + 3.0, zc - 1, 0xffd9a8, 3, 4);
       light(77.5, yB + 3.2, zc, 0xf4f8ff, 4, 5);
       sign([`CABINE ${['B1', 'B2', 'B3', 'B4'][i]}`], 0.9, [CX0 + 0.13, yB + 2.65, zc + (i === 0 ? 3.5 : 0)], Math.PI / 2, '#e8e2d2', 100);
       out.seats.push({ p: new THREE.Vector3(67.2, yB + 0.55, z0 + 0.68), yaw: 0, taken: null });
@@ -426,10 +447,12 @@ export function buildBigShip(ctx) {
       D.floorLamp(92.6, yB, z - 1.6);
       D.ceilingPanel(94.5, yB, z, S.h - 0.02, 2.4, 0.5);
     }
+    D.slats('x', 89.5, 96.6, -23.25, yB, 2.2, 0x5a3a24); D.planterBox(88.6, yB, -23.25, 0, 1.4);
     F.planter(87, yB, -28, 0.8); F.planter(87, yB, -16, 0.8);
     ctx.models?.place(B, 'potted_plant_04', 87, yB + 0.62, -28, { fit: ['y', 1.2] });
     ctx.models?.place(B, 'potted_plant_02', 87, yB + 0.62, -16, { fit: ['y', 1.1] });
     D.bottleWall(84.35, yB, -23.2, Math.PI / 2, 2.4);
+    D.art(84.13, yB + 1.8, -27.5, Math.PI / 2, 1.4, 0.9, 7); D.art(84.13, yB + 1.8, -17.2, Math.PI / 2, 1.4, 0.9, 9);
     light(91, yB + 3.2, -22, 0xffe8d0, 8, 10);
     sign(['SALON D\'OBSERVATION'], 1.8, [CX1 - 0.13, yB + 2.9, -24], -Math.PI / 2, '#e8e2d2', 100);
   }
@@ -500,7 +523,9 @@ export function buildBigShip(ctx) {
     D.doubleBed(71, yC, -29.65, 0, 0x2a3a5a);
     D.rug(71, yC, -27.6, 0, 3.0, 2.0, 0x6a2a2a, 0xc8a070);
     D.desk(72.9, yC, -19.6, Math.PI, 1.6); F.chair(72.9, yC, -20.5, 0, 2);
-    D.shelves(73.78, yC, -24.8, -Math.PI / 2, 2.6, 2.3, 0.34, 7);
+    D.shelves(73.78, yC, -24.3, -Math.PI / 2, 2.6, 2.3, 0.34, 7);
+    D.slats('x', 68.15, 71.2, -26.15, yC, 2.7, 0x4a3024);
+    D.planterBox(70.9, yC, -25.75, 0, 0.9);
     D.sofa(70.4, yC, -23.6, -Math.PI / 2, 2.2, 0x5a3a2a);
     D.coffeeTable(69.2, yC, -23.6, Math.PI / 2, 1.1, 0.6);
     D.rug(69.7, yC, -23.6, Math.PI / 2, 3.0, 2.4, 0x3a4a5a, 0xd8c8a8);
@@ -508,6 +533,7 @@ export function buildBigShip(ctx) {
     D.wardrobe(68.9, yC, -17.5, 0, 1.6, 2.3, 0.56, 0x3a2a20);
     D.ceilingPanel(71, yC, -28.5, S.h - 0.02, 1.8, 1.0); D.ceilingPanel(71, yC, -22.5, S.h - 0.02, 1.8, 1.0);
     for (const x of [69.6, 72.4]) D.sconce(x, yC + 1.6, -30.86, 0);
+    D.art(71, yC + 1.85, -30.87, 0, 1.4, 0.8, 1);
     light(71, yC + 3, -24, 0xffd9a8, 7, 8);
   }
   // ---------- salle de briefing (x 68..80, z -17..-2) : grande table, écran mural
@@ -536,7 +562,9 @@ export function buildBigShip(ctx) {
       D.floorLamp(91.6, yC, z - 1.7);
       D.ceilingPanel(93, yC, z, S.h - 0.02, 2.6, 0.5);
     }
+    for (const z of [-21.8, -13.4]) { D.slats('x', 89, 94.6, z, yC, 2.2, 0x5a3a24); D.planterBox(88.2, yC, z, 0, 1.4); }
     D.bar(86.4, yC, -16, Math.PI / 2, 6);
+    for (const [z, k] of [[-27, 2], [-8.5, 3], [-4.2, 4]]) D.art(84.13, yC + 1.8, z, Math.PI / 2, 1.6, 1.0, k);
     for (let z = -18.4; z < -13; z += 1.2) D.stool(87.3, yC, z);
     D.bottleWall(84.35, yC, -16, Math.PI / 2, 5);
     for (const z of [-30.3, -3]) D.plant(85, yC, z, 1.4, 'potted_plant_04', z);

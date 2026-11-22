@@ -287,6 +287,11 @@ rétroéclairé), lits médicalisés avec potence et moniteur, bar avec tabouret
 table de réunion à liseré lumineux. Les pièces de vie ont un faux plafond clair, des plafonniers, appliques et
 lampadaires, des lambris bois et tissu, de la moquette, du parquet, des tapis, des plantes et des accessoires
 photoscannés (Poly Haven, CC0).
+Les grandes pièces sont redécoupées : chaque cabine a une chambre et un petit salon séparés par une cloison
+lambrissée ; claustras en lames de bois et jardinières dans la cabine du capitaine et les deux salons ; tableaux
+générés (abstraits et paysages). Zones techniques détaillées : rayonnages à palettes chargés, palettes de
+cartons sanglés, transpalette, panneaux d'outils, tableaux de vannes et manomètres, bornes murales, mains
+courantes et plinthes dans les coursives.
 
 Équipage animé : la capitaine Ilse Varga, deux pilotes assis aux pupitres, un mécanicien au réacteur, une
 cuisinière et un médecin (personnages Rocketbox), un manutentionnaire, des membres d'équipage au réfectoire et
