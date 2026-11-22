@@ -350,7 +350,7 @@ export function shipDecor(ctx, B) {
     },
     /** cloison intérieure habillée (lambris bois en bas, tissu en haut, deux faces) ; axis 'z' : mur le long de z en x = c.
      *  holes : [[début, fin, hauteur]] (passages, avec chambranle) */
-    partition(axis, a0, a1, c, y, h, holes = [], t = 0.12, wain = 0x6a4a34) {
+    partition(axis, a0, a1, c, y, h, holes = [], t = 0.12, wain = 0x6a4a34, solid = true) {
       const b = frame(0, y, 0, 0), wm = M.wood(wain), fm = M.fabric(0xb8ae9e), inv = memo('inv', () => new THREE.MeshBasicMaterial({ visible: false }));
       const seg = (u0, u1, y0, y1, m, col) => {
         if (u1 - u0 < 0.01 || y1 - y0 < 0.01) return;
@@ -360,7 +360,7 @@ export function shipDecor(ctx, B) {
       };
       const hs = [...holes].sort((p, q) => p[0] - q[0]);
       let u = a0;
-      const wall = (u0, u1, y0 = 0) => { seg(u0, u1, y0, Math.max(y0, 1.0), wm); seg(u0, u1, Math.max(y0, 1.0), h, fm); seg(u0, u1, 0, h, inv, true); };
+      const wall = (u0, u1, y0 = 0) => { seg(u0, u1, y0, Math.max(y0, 1.0), wm); seg(u0, u1, Math.max(y0, 1.0), h, fm); if (solid) seg(u0, u1, 0, h, inv, true); };
       for (const [h0, h1, hh] of hs) {
         wall(u, h0);
         seg(h0, h1, hh, h, fm);                                                   // imposte
@@ -372,6 +372,9 @@ export function shipDecor(ctx, B) {
       const g = axis === 'z' ? new THREE.BoxGeometry(t + 0.02, 0.035, a1 - a0) : new THREE.BoxGeometry(a1 - a0, 0.035, t + 0.02);
       put(b, g, M.brushed(), axis === 'z' ? L(c, 1.02, (a0 + a1) / 2) : L((a0 + a1) / 2, 1.02, c));
     },
+    /** habillage d'un mur existant (lambris + tissu, passages encadrés) : c = position de la face côté pièce
+     *  sens : +1 si la pièce est du côté des x (ou z) croissants, -1 sinon */
+    clad(axis, a0, a1, c, sens, y, h, holes = [], wain = 0x6a4a34) { D.partition(axis, a0, a1, c + sens * 0.0125, y, h, holes, 0.025, wain, false); },
     /** tableau encadré (peinture abstraite ou paysage générés) ; avant = +z */
     art(x, y, z, yaw, w = 0.9, h = 0.65, seed = 0) {
       const b = frame(x, y, z, yaw);

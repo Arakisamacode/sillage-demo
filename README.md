@@ -292,6 +292,7 @@ lambrissée ; claustras en lames de bois et jardinières dans la cabine du capit
 générés (abstraits et paysages). Zones techniques détaillées : rayonnages à palettes chargés, palettes de
 cartons sanglés, transpalette, panneaux d'outils, tableaux de vannes et manomètres, bornes murales, mains
 courantes et plinthes dans les coursives.
+Les murs des salons, de la salle de briefing et du réfectoire sont habillés (lambris bois, tissu, passages encadrés).
 
 Équipage animé : la capitaine Ilse Varga, deux pilotes assis aux pupitres, un mécanicien au réacteur, une
 cuisinière et un médecin (personnages Rocketbox), un manutentionnaire, des membres d'équipage au réfectoire et

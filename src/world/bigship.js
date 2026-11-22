@@ -424,6 +424,8 @@ export function buildBigShip(ctx) {
     for (let z = 18; z < 38; z += 5) { light(71, yB + 3.2, z, 0xffd9a8, 8, 8); F.lamp(69.5, yB + 2.4, z, yB + S.h); }
     box(13.8, 0.02, 22.8, floorTile, [73, yB + 0.012, 26.5]);
     D.cozy(66.11, 79.89, 15.11, 37.89, yB, S.h, '', 0xd4ccc0);
+    D.clad('z', 15.11, 37.89, 79.89, -1, yB, S.h - 0.03, [[19.5, 21.3, DH], [32, 33.8, DH]], 0x6a4a34);
+    D.clad('x', 66.11, 79.89, 15.11, 1, yB, S.h - 0.03, [], 0x6a4a34); D.clad('x', 66.11, 79.89, 37.99, -1, yB, S.h - 0.03, [], 0x6a4a34);
     if (ctx.models) {
       const Mo = ctx.models;
       Mo.place(B, 'wooden_cutting_board', 78.9, yB + 0.96, 28.6, { fit: ['max', 0.45], ry: 0.3 });
@@ -439,6 +441,7 @@ export function buildBigShip(ctx) {
   // ---------- salon d'observation (tribord avant, x 84..98, z -30..-14)
   {
     box(13.7, 0.02, 15.7, M_parquet, [91, yB + 0.02, -22]); D.cozy(84.11, 97.8, -29.9, -14.1, yB, S.h, '', 0xe0d8cc);
+    D.clad('z', -29.89, -14.11, 84.11, 1, yB, S.h - 0.03, [[-21.5, -19.7, DH]], 0x5a3a24); D.clad('x', 84.11, 97.89, -14.11, -1, yB, S.h - 0.03, [], 0x5a3a24); D.clad('x', 84.11, 97.89, -29.89, 1, yB, S.h - 0.03, [], 0x5a3a24);
     for (const [z, c] of [[-26.5, 0x3a4a5a], [-20, 0x5a4a3a]]) {
       D.sofa(93.4, yB, z, Math.PI / 2, 2.6, c);
       D.coffeeTable(95, yB, z, Math.PI / 2, 1.2, 0.6);
@@ -539,6 +542,8 @@ export function buildBigShip(ctx) {
   // ---------- salle de briefing (x 68..80, z -17..-2) : grande table, écran mural
   {
     box(11.7, 0.02, 14.7, mats.plastic(0x2e3238, 0.95), [74, yC + 0.02, -9.5]); D.cozy(68.11, 79.89, -16.89, -2.11, yC, S.h, '', 0xd8dce0);
+    D.clad('z', -16.89, -2.11, 79.89, -1, yC, S.h - 0.03, [[-10, -8.2, DH]], 0x3a3e44); D.clad('z', -16.89, -2.11, 68.11, 1, yC, S.h - 0.03, [], 0x3a3e44);
+    D.clad('x', 68.11, 79.89, -16.89, 1, yC, S.h - 0.03, [[70.1, 71.9, DH]], 0x3a3e44); D.clad('x', 68.11, 79.89, -2.11, -1, yC, S.h - 0.03, [], 0x3a3e44);
     D.confTable(74, yC, -9.5, 0, 5.6, 1.9);
     D.rug(74, yC, -9.5, 0, 7.6, 4.2, 0x2a3440, 0x1a1e24);
     for (const z of [-15.8, -3.2]) { D.plant(69, yC, z, 1.2, 'potted_plant_02'); D.ceilingPanel(74, yC, z + (z < -9 ? 3 : -3), S.h - 0.02, 3.6, 0.4, false); }
@@ -547,13 +552,15 @@ export function buildBigShip(ctx) {
     for (let k = 0; k < 4; k++) for (const s of [-1, 1]) F.chair(71.9 + k * 1.4, yC, -9.5 + s * 1.35, s > 0 ? Math.PI : 0, 2);
     const bs = new Screen(384, 200, (c, w, h, t) => { c.fillStyle = '#081018'; c.fillRect(0, 0, w, h); c.strokeStyle = '#6fdcff'; c.strokeRect(10, 10, w - 20, h - 20); c.fillStyle = '#e8f4ff'; c.font = `700 22px ${FONT}`; c.fillText('ROUTE HALDEN-7 → CORVIN', 22, 44); c.strokeStyle = '#ffd27a'; c.beginPath(); c.moveTo(40, 160); c.quadraticCurveTo(190, 60 + Math.sin(t) * 6, 340, 120); c.stroke(); c.fillStyle = '#ff6a4a'; c.beginPath(); c.arc(220, 104, 6, 0, 7); c.fill(); c.fillStyle = '#c8d8e8'; c.font = `500 15px ${FONT}`; c.fillText('Zone de risque : ceinture d\'Ardent', 150, 180); }, { period: 0.4, intensity: 1.3 });
     ctx.screens.push(bs);
-    const bm = new THREE.Mesh(new THREE.PlaneGeometry(3.2, 1.67), bs.material); bm.position.set(68.13, yC + 1.9, -9.5); bm.rotation.y = Math.PI / 2; scene.add(bm);
+    const bm = new THREE.Mesh(new THREE.PlaneGeometry(3.2, 1.67), bs.material); bm.position.set(68.16, yC + 1.9, -9.5); bm.rotation.y = Math.PI / 2; scene.add(bm);
     light(74, yC + 3.2, -9.5, 0xeaf2ff, 9, 10);
   }
   // ---------- salon panoramique (x 84..96, z -31..-2) : fauteuils face à la baie, bar
   {
     box(11.6, 0.02, 28.6, M_parquet, [90.1, yC + 0.02, -16.5]);
     D.cozy(84.11, 95.9, -30.9, -2.1, yC, S.h, '', 0xe0d8cc);
+    D.clad('z', -30.89, -2.11, 84.11, 1, yC, S.h - 0.03, [[-12, -10.2, DH]], 0x5a3a24);          // mur côté coursive (porte)
+    D.clad('x', 84.11, 95.89, -30.89, 1, yC, S.h - 0.03, [], 0x5a3a24); D.clad('x', 84.11, 95.89, -2.11, -1, yC, S.h - 0.03, [], 0x5a3a24);
     for (const [z, c] of [[-26, 0x3a4652], [-17.6, 0x5a4636], [-9.2, 0x3e4a3e]]) {
       D.rug(93.4, yC, z, 0, 3.6, 4.4, [0x8a7a64, 0x5a6470, 0x7a6a5a][Math.abs(Math.round(z)) % 3], 0x2a2420);
       D.sofa(92.4, yC, z, Math.PI / 2, 2.6, c);
