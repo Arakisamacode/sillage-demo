@@ -4,6 +4,7 @@ import { platedHull } from './hullkit.js';
 import { HX, SHIPLOCK } from './layout.js';
 import { paintedText, decalMaterial, neonTexture, neonMaterial, Screen, FONT } from './signage.js';
 import { sciFurniture } from './scififurn.js';
+import { shipDecor } from './shipdecor.js';
 import { container, crate, barrel, workbench, toolChest, gasRack, extinguisher } from './props.js';
 
 // Frégate de transport « Atalante » (190 m), amarrée le long du flanc est de la station et reliée au hangar 07
@@ -35,6 +36,8 @@ export function buildBigShip(ctx) {
   const glass = mats.glass(0x9fc4dc, 0.12);
   const ledW = mats.emissive(0xeaf2ff, 3.0), ledWarm = mats.emissive(0xffd9a8, 2.4), ledCyan = mats.emissive(0x6fdcff, 2.6), ledRed = mats.emissive(0xff3a2a, 3);
   const F = sciFurniture(ctx);
+  const D = shipDecor(ctx, B);
+  const M_parquet = D.M.wood(0x8a6a4c);
   const box = (w, h, d, m, p, col = false, rot = null, tex = 2) => B.box(w, h, d, m, p, rot, { collide: col, cast: false, tex });
   const light = (x, y, z, color = 0xeaf2ff, i = 14, d = 11) => { const l = new THREE.PointLight(color, i, d, 2); l.position.set(x, y, z); scene.add(l); out.lights.push(l); return l; };
 
@@ -331,10 +334,15 @@ export function buildBigShip(ctx) {
   door('x', CX1, -20.6, yB); door('z', 82, 38.1, yB); door('x', 74, -28.6, yB);
   // ---------- infirmerie (x 66..74, z -30..-17)
   {
-    const med = mats.paint(0xe8eef0, { grime: 0.1, rust: 0 });
-    for (const z of [-28, -24.5]) { box(2.1, 0.55, 0.95, med, [69, yB + 0.55, z], true); box(2.0, 0.12, 0.9, mats.plastic(0x7ab8c8, 0.6), [69, yB + 0.88, z]); box(0.06, 1.2, 0.06, trim, [70.2, yB + 1.2, z - 0.5]); }
-    box(0.6, 2.2, 3, med, [S.x0 + 0.4, yB + 1.1, -21], true);
-    box(1.4, 0.9, 0.6, med, [72.6, yB + 0.45, -20], true);
+    box(7.7, 0.02, 12.7, mats.plastic(0xd8e2e4, 0.35), [70, yB + 0.02, -23.5]); D.cozy(66.11, 73.89, -29.89, -17.11, yB, S.h, '', 0xf0f4f4);
+    for (const z of [-28, -24.5]) D.medBed(68.4, yB, z, -Math.PI / 2);
+    box(2.4, 0.03, 0.03, trim, [68.4, yB + 2.45, -26.25]); box(2.2, 2.0, 0.02, mats.plastic(0x9ac8d0, 0.9), [68.4, yB + 1.4, -26.25]);   // rideau entre les lits
+    D.medCabinet(66.5, yB, -21, Math.PI / 2, 2.4, 2.1);
+    D.desk(72.6, yB, -19.8, Math.PI, 1.4); F.chair(72.6, yB, -20.7, 0, 1);
+    D.sideTable(70.6, yB, -22.6, 0.85);
+    D.rug(70.2, yB, -26.2, 0, 3.4, 5.6, 0xc8dde2, 0x8ab0b8);
+    D.ceilingPanel(68.6, yB, -28, S.h - 0.02, 1.4, 1.4, false); D.ceilingPanel(68.6, yB, -24.5, S.h - 0.02, 1.4, 1.4, false);
+    D.plant(73.3, yB, -29.4, 1.0, 'potted_plant_02');
     const ms = new Screen(256, 160, (c, w, h, t) => { c.fillStyle = '#04120e'; c.fillRect(0, 0, w, h); c.strokeStyle = '#4dff9a'; c.lineWidth = 2; c.beginPath(); for (let x = 0; x < w; x += 4) { const p = ((x + t * 80) % 90); c.lineTo(x, 80 - (p > 40 && p < 48 ? (p - 40) * 9 : 0) + Math.sin(x * 0.1) * 2); } c.stroke(); c.fillStyle = '#c8f0d0'; c.font = `600 18px ${FONT}`; c.fillText('INFIRMERIE · BLOC 1', 10, 24); }, { period: 0.1, intensity: 1.3 });
     ctx.screens.push(ms);
     const msm = new THREE.Mesh(new THREE.PlaneGeometry(1.0, 0.62), ms.material); msm.position.set(S.x0 + 0.14, yB + 1.9, -26); msm.rotation.y = Math.PI / 2; scene.add(msm);
@@ -350,29 +358,36 @@ export function buildBigShip(ctx) {
     cab.forEach(([z0, z1], i) => {
       const zc = (z0 + z1) / 2;
       box(CX0 - S.x0 - 0.3, 0.02, z1 - z0 - 0.3, mats.plastic([0x3a4252, 0x42383a, 0x34403a, 0x3e3a46][i], 0.95), [(S.x0 + CX0) / 2, yB + 0.012, zc]);   // moquette
-      box(2.1, 0.45, 0.95, wallWarm, [S.x0 + 1.15, yB + 0.3, zc - 1.6], true); box(2.0, 0.16, 0.9, mats.plastic(0x3a4a6a, 0.8), [S.x0 + 1.15, yB + 0.6, zc - 1.6]);
-      box(2.1, 0.45, 0.95, wallWarm, [S.x0 + 1.15, yB + 1.75, zc - 1.6]); box(2.0, 0.16, 0.9, mats.plastic(0x6a3a3a, 0.8), [S.x0 + 1.15, yB + 2.05, zc - 1.6]);
-      box(0.05, 1.5, 0.05, trim, [S.x0 + 2.2, yB + 1.2, zc - 2.05]);
-      box(1.4, 0.75, 0.6, wallWarm, [S.x0 + 1, yB + 0.37, zc + 2], true); box(1.45, 0.04, 0.65, mats.plastic(0x2a2a2a, 0.4), [S.x0 + 1, yB + 0.76, zc + 2]);
-      F.chair(S.x0 + 1.8, yB, zc + 1.2, Math.PI * 0.8, i);
-      // cloison : coin nuit côté coque, entrée et cabinet de toilette côté coursive
-      wallZ(74.5, z0, z1, yB, S.h, [[zc + 1.2, zc + 2.6, 2.2]], wallWarm, 0.14);
-      box(1.6, 2.3, 0.08, glass, [77.6, yB + 1.15, z0 + 1.9]); box(0.08, 2.3, 1.7, glass, [76.8, yB + 1.15, z0 + 1.05]);   // douche vitrée
-      box(1.5, 0.06, 1.6, mats.paint(0xd8d8d4), [77.6, yB + 0.03, z0 + 1.0]); box(0.3, 0.06, 0.1, trim, [78.2, yB + 2.1, z0 + 0.35]);
-      box(0.9, 0.85, 0.5, mats.paint(0xe2e0da), [78.4, yB + 0.42, z1 - 0.5], true); box(0.6, 0.6, 0.04, mats.glass(0xcfe0ea, 0.5), [78.4, yB + 1.5, z1 - 0.22]);
-      box(0.25, 0.03, 0.5, ledWarm, [78.4, yB + 1.86, z1 - 0.3]);
-      // coin nuit : tapis, fauteuil, étagère, écran mural
-      box(2.4, 0.015, 1.8, mats.plastic([0x6a5a48, 0x4a5a6a, 0x5a4a5a, 0x4a5a4a][i], 0.98), [70.4, yB + 0.03, zc]);
-      box(0.9, 0.45, 0.85, mats.plastic(0x5a4a3a, 0.85), [72.8, yB + 0.23, zc + 0.9], true); box(0.9, 0.5, 0.18, mats.plastic(0x5a4a3a, 0.85), [72.8, yB + 0.62, zc + 1.28]);
-      for (const h of [1.2, 1.6, 2.0]) box(0.32, 0.04, 1.4, wallWarm, [S.x0 + 0.38, yB + h, zc - 0.1]);
-      for (let k = 0; k < 5; k++) box(0.22, 0.26, 0.06, mats.plastic([0x8a3a2a, 0x2a4a7a, 0xc8b070, 0x3a6a3a, 0x6a2a5a][(k + i) % 5], 0.7), [S.x0 + 0.38, yB + 1.36, zc - 0.6 + k * 0.08]);
+      // coin nuit (x 66..74.5) : lits superposés contre la cloison, bureau sous le hublot, bibliothèque, fauteuil
+      D.cozy(S.x0 + 0.11, 74.43, z0 + 0.11, z1 - 0.11, yB, S.h, 'nsw', [0xd8d0c4, 0xd0d4d8, 0xd4d0c8, 0xd8d0d4][i]);
+      const duv = [0x3a4a6a, 0x5a4a3a, 0x3a5a4a, 0x4a3a5a][i];
+      D.bed(67.2, yB, z0 + 0.68, Math.PI / 2, { col: duv, bunk: true });
+      D.desk(66.45, yB, zc + 2.2, Math.PI / 2, 1.4);
+      F.chair(67.35, yB, zc + 2.2, -Math.PI / 2, i);
+      D.shelves(66.3, yB, zc - 0.55, Math.PI / 2, 1.5, 1.9, 0.32, i + 1);
+      D.armchair(72.7, yB, zc + 0.6, -Math.PI * 0.75, [0x6a4a36, 0x3a4a5a, 0x5a3a3a, 0x4a5a48][i]);
+      D.sideTable(73.6, yB, zc - 0.25);
+      D.floorLamp(73.8, yB, zc + 1.45);
+      D.rug(70.3, yB, zc, 0, 2.8, 2.0, [0x6a5a48, 0x4a5a6a, 0x5a4a5a, 0x4a5a4a][i]);
+      D.wardrobe(72.9, yB, z1 - 0.38, Math.PI, 1.5, 2.3, 0.56, [0x3a3e46, 0x463e36, 0x363e3a, 0x3e3646][i]);
+      D.plant(68.9, yB, z1 - 0.4, 0.9, i % 2 ? 'potted_plant_02' : 'potted_plant_04');
+      D.sconce(66.14, yB + 1.55, z0 + 1.7, Math.PI / 2);
+      D.ceilingPanel(70.3, yB, zc, S.h - 0.02, 1.6, 1.0);
       box(0.05, 0.8, 1.4, mats.glass(0x203040, 0.3), [74.38, yB + 1.6, zc - 1.6]); box(0.02, 0.7, 1.3, ledCyan, [74.34, yB + 1.6, zc - 1.6]);
-      light(77.5, yB + 3, zc, 0xfff0dc, 4, 5);
-      box(0.6, 2.2, 1.6, mats.paint(0x3a4a5a, { grime: 0.3 }), [CX0 - 0.6, yB + 1.1, zc + (z1 - z0) / 2 - 1.1], true);
-      box(0.04, 0.6, 1.0, ledWarm, [S.x0 + 0.14, yB + 1.6, zc + 2]);      // hublot éclairé (écran-fenêtre)
-      light(72, yB + 3, zc, 0xffd9a8, 6, 7);
+      // cabinet de toilette (entrée, x 74.5..80) : douche, WC suspendu, lavabo, armoire d'entrée
+      wallZ(74.5, z0, z1, yB, S.h, [[zc + 1.2, zc + 2.6, 2.2]], wallWarm, 0.14);
+      D.shower(77.6, yB, z0 + 0.95, 0, 1.5, 1.75);
+      box(0.06, 2.1, 1.75, mats.glass(0xd0e4ee, 0.22), [76.82, yB + 1.08, z0 + 0.95]);
+      D.toilet(79.55, yB, z0 + 0.5, -Math.PI / 2);
+      D.vanity(78.3, yB, z1 - 0.32, Math.PI);
+      D.wardrobe(79.5, yB, zc + 2.9, -Math.PI / 2, 1.5, 2.3, 0.56, 0x4a4e56);
+      box(5.2, 0.02, z1 - z0 - 0.3, mats.ph('large_grey_tiles', 0xd8d8d4, { rough: 0.6, metal: 0, grime: 0.1, scratch: 0.1 }), [77.25, yB + 0.016, zc]);
+      D.ceilingPanel(77.4, yB, zc, S.h - 0.02, 0.9, 0.9, false);
+      box(0.04, 0.6, 1.0, ledWarm, [S.x0 + 0.14, yB + 1.6, zc + 2.2]);      // hublot éclairé (écran-fenêtre)
+      light(70.5, yB + 3.2, zc, 0xffd9a8, 6, 7);
+      light(77.5, yB + 3.2, zc, 0xf4f8ff, 4, 5);
       sign([`CABINE ${['B1', 'B2', 'B3', 'B4'][i]}`], 0.9, [CX0 + 0.13, yB + 2.65, zc + (i === 0 ? 3.5 : 0)], Math.PI / 2, '#e8e2d2', 100);
-      out.seats.push({ p: new THREE.Vector3(S.x0 + 1.15, yB + 0.55, zc - 1.6), yaw: 0, taken: null });
+      out.seats.push({ p: new THREE.Vector3(67.2, yB + 0.55, z0 + 0.68), yaw: 0, taken: null });
     });
   }
   // ---------- réfectoire et cuisine (x 66..80, z 15..38) : baies sur l'espace
@@ -387,14 +402,34 @@ export function buildBigShip(ctx) {
     box(4.2, 1.0, 0.7, mats.plastic(0x3a3e44, 0.5), [75.5, yB + 0.5, 22], true); box(4.3, 0.05, 0.8, mats.plastic(0xe8e8e8, 0.3), [75.5, yB + 1.02, 22]);
     for (let z = 18; z < 38; z += 5) { light(71, yB + 3.2, z, 0xffd9a8, 8, 8); F.lamp(69.5, yB + 2.4, z, yB + S.h); }
     box(13.8, 0.02, 22.8, floorTile, [73, yB + 0.012, 26.5]);
+    D.cozy(66.11, 79.89, 15.11, 37.89, yB, S.h, '', 0xd4ccc0);
+    if (ctx.models) {
+      const Mo = ctx.models;
+      Mo.place(B, 'wooden_cutting_board', 78.9, yB + 0.96, 28.6, { fit: ['max', 0.45], ry: 0.3 });
+      for (const [id, dz] of [['lemon', 0], ['food_lime_01', 0.1], ['yellow_onion', 0.22], ['food_apple_01', -0.14]]) Mo.place(B, id, 79.0, yB + 0.96, 29.6 + dz, { fit: ['max', 0.08] });
+      Mo.place(B, 'croissant', 75.2, yB + 1.045, 22, { fit: ['max', 0.14] }); Mo.place(B, 'croissant', 75.5, yB + 1.045, 22.1, { fit: ['max', 0.14], ry: 1 });
+      Mo.place(B, 'carrot_cake', 76.3, yB + 1.045, 22, { fit: ['max', 0.24] });
+      for (const [z, k] of [[20, 0], [25, 1], [30, 2], [35, 3]]) Mo.place(B, ['food_apple_01', 'food_kiwi_01', 'food_pomegranate_01', 'lemon'][k], 69.5, yB + 0.745, z + 0.05, { fit: ['max', 0.08] });
+      Mo.place(B, 'potted_plant_04', 67, yB, 37, { fit: ['y', 1.3] }); Mo.place(B, 'potted_plant_02', 67, yB, 16, { fit: ['y', 1.1] });
+    }
     sign(['RÉFECTOIRE'], 1.6, [CX0 + 0.13, yB + 2.9, 24], Math.PI / 2, '#ffd27a', 110);
     out.spots.galley = new THREE.Vector3(77.9, yB, 26); out.spots.mess = new THREE.Vector3(72, yB, 27);
   }
   // ---------- salon d'observation (tribord avant, x 84..98, z -30..-14)
   {
-    for (const z of [-27, -23, -19]) { F.bench(95.6, yB, z, 2.6); F.table(93.6, yB, z, 1, 0.45, 0.55); }
+    box(13.7, 0.02, 15.7, M_parquet, [91, yB + 0.02, -22]); D.cozy(84.11, 97.8, -29.9, -14.1, yB, S.h, '', 0xe0d8cc);
+    for (const [z, c] of [[-26.5, 0x3a4a5a], [-20, 0x5a4a3a]]) {
+      D.sofa(93.4, yB, z, Math.PI / 2, 2.6, c);
+      D.coffeeTable(95, yB, z, Math.PI / 2, 1.2, 0.6);
+      D.armchair(95.2, yB, z - 2.0, 0, 0x6a4a36); D.armchair(95.2, yB, z + 2.0, Math.PI, 0x6a4a36);
+      D.rug(94.6, yB, z, Math.PI / 2, 4.6, 3.2, 0x5a6470, 0x2a2e34);
+      D.floorLamp(92.6, yB, z - 1.6);
+      D.ceilingPanel(94.5, yB, z, S.h - 0.02, 2.4, 0.5);
+    }
     F.planter(87, yB, -28, 0.8); F.planter(87, yB, -16, 0.8);
     ctx.models?.place(B, 'potted_plant_04', 87, yB + 0.62, -28, { fit: ['y', 1.2] });
+    ctx.models?.place(B, 'potted_plant_02', 87, yB + 0.62, -16, { fit: ['y', 1.1] });
+    D.bottleWall(84.35, yB, -23.2, Math.PI / 2, 2.4);
     light(91, yB + 3.2, -22, 0xffe8d0, 8, 10);
     sign(['SALON D\'OBSERVATION'], 1.8, [CX1 - 0.13, yB + 2.9, -24], -Math.PI / 2, '#e8e2d2', 100);
   }
@@ -460,16 +495,30 @@ export function buildBigShip(ctx) {
   }
   // ---------- cabine du capitaine (x 68..74, z -31..-17) : lit, bureau, bibliothèque, baie
   {
-    box(2.2, 0.5, 1.6, wallWarm, [69.3, yC + 0.3, -28.5], true); box(2.1, 0.18, 1.5, mats.plastic(0x2a3a5a, 0.85), [69.3, yC + 0.62, -28.5]);
-    box(1.6, 0.75, 0.8, wallWarm, [72.6, yC + 0.37, -21], true); F.chair(72.6, yC, -21.9, 0, 1);
-    box(0.35, 2.4, 3, wallWarm, [73.7, yC + 1.2, -25], true);
-    for (let y = 0.5; y < 2.4; y += 0.45) for (let k = 0; k < 9; k++) box(0.25, 0.3, 0.06, mats.plastic([0x8a2a2a, 0x2a4a6a, 0x5a6a3a, 0xc8a050][k % 4], 0.7), [73.5, yC + y + 0.15, -26.3 + k * 0.3]);
+    box(5.8, 0.02, 13.8, mats.plastic(0x3a3430, 0.95), [71, yC + 0.012, -24]);          // moquette
+    D.cozy(68.11, 73.89, -30.89, -17.11, yC, S.h, 'nse', 0xd8d0c4, 0x4a3024);
+    D.doubleBed(71, yC, -29.65, 0, 0x2a3a5a);
+    D.rug(71, yC, -27.6, 0, 3.0, 2.0, 0x6a2a2a, 0xc8a070);
+    D.desk(72.9, yC, -19.6, Math.PI, 1.6); F.chair(72.9, yC, -20.5, 0, 2);
+    D.shelves(73.78, yC, -24.8, -Math.PI / 2, 2.6, 2.3, 0.34, 7);
+    D.sofa(70.4, yC, -23.6, -Math.PI / 2, 2.2, 0x5a3a2a);
+    D.coffeeTable(69.2, yC, -23.6, Math.PI / 2, 1.1, 0.6);
+    D.rug(69.7, yC, -23.6, Math.PI / 2, 3.0, 2.4, 0x3a4a5a, 0xd8c8a8);
+    D.floorLamp(70.6, yC, -21.8); D.plant(68.6, yC, -18.3, 1.3, 'potted_plant_04');
+    D.wardrobe(68.9, yC, -17.5, 0, 1.6, 2.3, 0.56, 0x3a2a20);
+    D.ceilingPanel(71, yC, -28.5, S.h - 0.02, 1.8, 1.0); D.ceilingPanel(71, yC, -22.5, S.h - 0.02, 1.8, 1.0);
+    for (const x of [69.6, 72.4]) D.sconce(x, yC + 1.6, -30.86, 0);
     light(71, yC + 3, -24, 0xffd9a8, 7, 8);
   }
   // ---------- salle de briefing (x 68..80, z -17..-2) : grande table, écran mural
   {
-    box(5.4, 0.06, 1.8, mats.plastic(0x1c1f22, 0.3), [74, yC + 0.76, -9.5]); box(5, 0.74, 1.2, dark, [74, yC + 0.37, -9.5], true);
-    for (let k = 0; k < 4; k++) for (const s of [-1, 1]) F.chair(72 + k * 1.35, yC, -9.5 + s * 1.3, s > 0 ? Math.PI : 0, k);
+    box(11.7, 0.02, 14.7, mats.plastic(0x2e3238, 0.95), [74, yC + 0.02, -9.5]); D.cozy(68.11, 79.89, -16.89, -2.11, yC, S.h, '', 0xd8dce0);
+    D.confTable(74, yC, -9.5, 0, 5.6, 1.9);
+    D.rug(74, yC, -9.5, 0, 7.6, 4.2, 0x2a3440, 0x1a1e24);
+    for (const z of [-15.8, -3.2]) { D.plant(69, yC, z, 1.2, 'potted_plant_02'); D.ceilingPanel(74, yC, z + (z < -9 ? 3 : -3), S.h - 0.02, 3.6, 0.4, false); }
+    D.ceilingPanel(74, yC, -9.5, S.h - 0.02, 5.0, 1.2, false);
+    D.wardrobe(78.9, yC, -15, -Math.PI / 2, 2.4, 1.0, 0.5, 0x2a2e34);
+    for (let k = 0; k < 4; k++) for (const s of [-1, 1]) F.chair(71.9 + k * 1.4, yC, -9.5 + s * 1.35, s > 0 ? Math.PI : 0, 2);
     const bs = new Screen(384, 200, (c, w, h, t) => { c.fillStyle = '#081018'; c.fillRect(0, 0, w, h); c.strokeStyle = '#6fdcff'; c.strokeRect(10, 10, w - 20, h - 20); c.fillStyle = '#e8f4ff'; c.font = `700 22px ${FONT}`; c.fillText('ROUTE HALDEN-7 → CORVIN', 22, 44); c.strokeStyle = '#ffd27a'; c.beginPath(); c.moveTo(40, 160); c.quadraticCurveTo(190, 60 + Math.sin(t) * 6, 340, 120); c.stroke(); c.fillStyle = '#ff6a4a'; c.beginPath(); c.arc(220, 104, 6, 0, 7); c.fill(); c.fillStyle = '#c8d8e8'; c.font = `500 15px ${FONT}`; c.fillText('Zone de risque : ceinture d\'Ardent', 150, 180); }, { period: 0.4, intensity: 1.3 });
     ctx.screens.push(bs);
     const bm = new THREE.Mesh(new THREE.PlaneGeometry(3.2, 1.67), bs.material); bm.position.set(68.13, yC + 1.9, -9.5); bm.rotation.y = Math.PI / 2; scene.add(bm);
@@ -477,8 +526,21 @@ export function buildBigShip(ctx) {
   }
   // ---------- salon panoramique (x 84..96, z -31..-2) : fauteuils face à la baie, bar
   {
-    for (const z of [-27, -22, -17, -12, -7]) { F.chair(93, yC, z, Math.PI / 2, Math.abs(Math.round(z / 5))); F.chair(93, yC, z + 1.4, Math.PI / 2, 2); F.table(94.4, yC, z + 0.7, 1, 0.5, 0.45); }
-    box(1.0, 1.05, 6, mats.plastic(0x2a1c14, 0.4), [86, yC + 0.52, -16], true); box(1.1, 0.05, 6.1, mats.smooth(0xd4af37, 0.3, 0.9, { grime: 0, rust: 0 }), [86, yC + 1.07, -16]);
+    box(11.6, 0.02, 28.6, M_parquet, [90.1, yC + 0.02, -16.5]);
+    D.cozy(84.11, 95.9, -30.9, -2.1, yC, S.h, '', 0xe0d8cc);
+    for (const [z, c] of [[-26, 0x3a4652], [-17.6, 0x5a4636], [-9.2, 0x3e4a3e]]) {
+      D.rug(93.4, yC, z, 0, 3.6, 4.4, [0x8a7a64, 0x5a6470, 0x7a6a5a][Math.abs(Math.round(z)) % 3], 0x2a2420);
+      D.sofa(92.4, yC, z, Math.PI / 2, 2.6, c);
+      D.coffeeTable(93.9, yC, z, Math.PI / 2, 1.2, 0.6);
+      D.armchair(94.1, yC, z - 1.95, 0, 0x7a5a3a); D.armchair(94.1, yC, z + 1.95, Math.PI, 0x7a5a3a);
+      D.floorLamp(91.6, yC, z - 1.7);
+      D.ceilingPanel(93, yC, z, S.h - 0.02, 2.6, 0.5);
+    }
+    D.bar(86.4, yC, -16, Math.PI / 2, 6);
+    for (let z = -18.4; z < -13; z += 1.2) D.stool(87.3, yC, z);
+    D.bottleWall(84.35, yC, -16, Math.PI / 2, 5);
+    for (const z of [-30.3, -3]) D.plant(85, yC, z, 1.4, 'potted_plant_04', z);
+    D.plant(95.6, yC, -13.2, 1.1, 'potted_plant_02'); D.plant(95.6, yC, -22, 1.1, 'potted_plant_02');
     for (const z of [-24, -14, -6]) light(90, yC + 3.2, z, 0xffe0c0, 7, 9);
     out.spots.lounge = new THREE.Vector3(91, yC, -16);
   }
@@ -532,7 +594,7 @@ export function buildBigShip(ctx) {
     const t = paintedText(['ATALANTE', 'HT-4471'], { size: 220, color: '#e9e4d8', spacing: 14, wear: 1.2 });
     for (const s of [-1, 1]) { const m = new THREE.Mesh(new THREE.PlaneGeometry(30, 30 / t.aspect), decalMaterial(t.tex, { rough: 0.8 })); m.position.set(S.cx + s * 17.4, 8, 92); m.rotation.y = s * Math.PI / 2; scene.add(m); }
     // amarrage : bras de maintien entre la coque de la station et la frégate, ombilicaux
-    for (const z of [-30, 20, 60]) { E.box(26, 1.4, 1.4, dark, [50, 9, z], null, { cast: false }); E.box(2, 3, 2, yellow, [63.5, 9, z], null, { cast: false }); }
+    for (const z of [-6, 30, 64]) { E.box(26, 1.4, 1.4, dark, [50, 9, z], null, { cast: false }); E.box(2, 3, 2, yellow, [63.5, 9, z], null, { cast: false }); }
     for (const z of [-22, 40]) E.cable([37.5, 12, z], [62.5, 10, z + 3], 2.5, 0.25, mats.paint(0x2a2a2a, { plain: true }));
     // feux de position
     for (const [x, y, z, c] of [[S.cx - 20.4, 6.6, -30, 0xff2a1a], [S.cx + 20.4, 6.6, -30, 0x2aff6a], [S.cx, 22, 30, 0xffffff], [S.cx, -6.6, 60, 0xffffff]]) E.box(0.5, 0.5, 0.5, mats.emissive(c, 6), [x, y, z], null, { cast: false });
@@ -595,14 +657,14 @@ export function populateBigShip(ctx, lib, player, SH) {
   const cook = mk('UF_light', { rb: 'Chef_Female_01', civil: true }, V(77.9, yB, 26), Math.PI / 2, 'cuisinier', null);
   actor(cook, () => [act('interact', R2(4, 7), Math.PI / 2), { move: V(77.9, yB, 31) }, act('pickup', 2.4, Math.PI / 2), { move: V(77.9, yB, 24) }, act('interact', R2(3, 5), Math.PI / 2)]);
   const doc = mk('UM_light', { rb: 'Medical_Male_01', civil: true }, V(71, yB, -26), -Math.PI / 2, 'équipage', 'Dr Oren Halsey');
-  actor(doc, () => [act('idle', R2(5, 8), -Math.PI / 2), { move: V(72.6, yB, -21.2) }, act('interact', R2(3, 5), Math.PI), { move: V(71, yB, -26) }]);
+  actor(doc, () => [act('idle', R2(5, 8), -Math.PI / 2), { move: V(72.6, yB, -21.3) }, act('interact', R2(3, 5), 0), { move: V(71, yB, -26) }]);
   // manutentionnaire dans la soute
   const load = mk('UM_light', { hair: 'Hair_SimpleParted', outfit: { top: 0x3a4a2a, bottom: 0x2a2c30, boot: 0x16181a, accent: 0xd8a62a, hivis: true } }, V(91, yA, -2), Math.PI / 2, 'équipage', null);
   actor(load, () => [act('interact', R2(4, 6), Math.PI / 2), { move: V(91, yA, 12) }, act('pickup', 2.4, Math.PI / 2), { move: V(91, yA, 20) }, act('idle', 3, Math.PI / 2), { move: V(91, yA, -2) }]);
   // équipage au repos : réfectoire (assis), salon d'observation, coursives
   const sits = [[69.5, 20 + 0.9, Math.PI], [69.5, 25 - 0.9, 0], [69.5, 30 + 0.9, Math.PI]];
   sits.forEach(([x, z, ry], i) => { const c = mk(i % 2 ? 'UF_dark' : 'UM_dark', { hair: i % 2 ? 'Hair_Long' : 'Hair_Buzzed', outfit: uniform }, V(x, yB, z), ry, 'équipage', null); actor(c, () => [act(i === 1 ? 'sitTalk' : 'sit', R2(12, 22), ry), act('sitTalk', R2(4, 8), ry)]); });
-  const lounge = mk('UF_light', { hair: 'Hair_Buns', outfit: uniform }, V(93.2, yC, -17), Math.PI / 2, 'équipage', null);
+  const lounge = mk('UF_light', { hair: 'Hair_Buns', outfit: uniform }, V(92.55, yC, -17.6), Math.PI / 2, 'équipage', null);
   actor(lounge, () => [act('sit', R2(15, 25), Math.PI / 2)]);
   const walkers = [];
   for (const [y, za, zb, m] of [[yA, -26, 34, 'UM_light'], [yB, -24, 34, 'UF_light']]) {

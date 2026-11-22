@@ -280,6 +280,14 @@ entièrement parcourable à pied, portes coulissantes automatiques, escalier ent
 - **Pont C (commandement)** : passerelle vitrée (pupitres, fauteuil de commandement, table holographique),
   cabine du capitaine, salle de briefing, salon panoramique.
 
+Intérieurs meublés en détail (`src/world/shipdecor.js`) : lits superposés avec couettes, oreillers et échelle,
+lit double et chevets, canapés et fauteuils capitonnés, tables basses, bureaux équipés (écran, clavier, lampe
+articulée), armoires, bibliothèques garnies, salles d'eau (douche vitrée, WC suspendu, lavabo et miroir
+rétroéclairé), lits médicalisés avec potence et moniteur, bar avec tabourets et mur de bouteilles rétroéclairé,
+table de réunion à liseré lumineux. Les pièces de vie ont un faux plafond clair, des plafonniers, appliques et
+lampadaires, des lambris bois et tissu, de la moquette, du parquet, des tapis, des plantes et des accessoires
+photoscannés (Poly Haven, CC0).
+
 Équipage animé : la capitaine Ilse Varga, deux pilotes assis aux pupitres, un mécanicien au réacteur, une
 cuisinière et un médecin (personnages Rocketbox), un manutentionnaire, des membres d'équipage au réfectoire et
 au salon, deux rondes dans les coursives. Tous parlent (touche E) et apparaissent au mode analyse ; l'entrée
