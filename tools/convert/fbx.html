@@ -1,0 +1,17 @@
+<!doctype html><meta charset="utf-8"><title>conversion FBX</title>
+<script type="module">
+import * as THREE from 'three';
+import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
+import { TGALoader } from 'three/addons/loaders/TGALoader.js';
+window.loadFBX = async (url) => {
+  const mgr = new THREE.LoadingManager(); mgr.addHandler(/\.tga$/i, new TGALoader(mgr));
+  const o = await new FBXLoader(mgr).loadAsync(url);
+  await new Promise((r) => { if (!mgr.itemsLoading) r(); mgr.onLoad = r; setTimeout(r, 15000); });
+  const info = { meshes: [], bones: [], anims: o.animations.length };
+  o.updateMatrixWorld(true);
+  o.traverse((c) => { if (c.isMesh) info.meshes.push([c.name, c.type, c.geometry.attributes.position.count, (Array.isArray(c.material) ? c.material : [c.material]).map((m) => m.name + ':' + (m.map?.image?.width || 0)).join('|')]); if (c.isBone) info.bones.push(c.name); });
+  const b = new THREE.Box3().setFromObject(o); info.size = b.getSize(new THREE.Vector3()).toArray().map((v) => +v.toFixed(2));
+  window.__obj = o; return info;
+};
+window.ready = true;
+</script>
