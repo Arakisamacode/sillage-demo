@@ -655,7 +655,9 @@ export function buildBigShip(ctx) {
   out.registerMeshes = (list) => { for (const m of list) { const t = m.userData.tag; if (t && t.startsWith('ship')) out.interior[t.slice(4)].push(m); } };
   out.visibleDecks = null;   // (null : force le premier passage)
   out.updateCull = (p, force = false) => {
-    const show = !p || !out.near(p) ? '' : !out.inside(p) ? 'A' : p.y < 4.0 ? 'AB' : p.y < 8.6 ? 'ABC' : 'BC';
+    // cage d'escalier (x 73..81, z -31..-16) : vue plongeante jusqu'au pont A depuis le pont C
+    const stair = p && p.x > 73 && p.x < 81 && p.z > -31 && p.z < -16;
+    const show = !p || !out.near(p) ? '' : !out.inside(p) ? 'A' : p.y < 4.0 ? 'AB' : p.y < 8.6 || stair ? 'ABC' : 'BC';
     if (show === out.visibleDecks && !force) return;
     out.visibleDecks = show;
     for (const k of ['A', 'B', 'C']) for (const m of out.interior[k]) m.visible = show.includes(k);

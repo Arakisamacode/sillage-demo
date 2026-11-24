@@ -347,7 +347,7 @@ export function buildProps(ctx) {
   });
 
   // --- caisses le long des murs
-  const wallCrates = [[-HX + 2.2, -30], [-HX + 2.2, -27.8], [-HX + 2.4, 22], [-HX + 2.2, 24.2], [HX - 2.2, -38], [HX - 2.3, -14.5], [HX - 2.2, -16.7]]   // (dégagées du sas 3, z -10.8..-7.2);
+  const wallCrates = [[-HX + 2.2, -30], [-HX + 2.2, -27.8], [-HX + 2.4, 22], [-HX + 2.2, 24.2], [HX - 2.2, -38], [HX - 2.3, -14.5], [HX - 2.2, -16.7]];   // (dégagées du sas 3, z -10.8..-7.2)
   wallCrates.forEach(([x, z], i) => {
     let y = 0;
     const n = 1 + (i % 3);

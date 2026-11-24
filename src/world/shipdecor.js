@@ -417,7 +417,7 @@ export function shipDecor(ctx, B) {
       put(b, rbox(len, 0.6, 0.5, 0.03), M.lacquer(0x2a2e34), L(0, 0.3, 0), true);
       put(b, rbox(len - 0.08, 0.04, 0.42, 0.01), memo('soil', () => new THREE.MeshStandardMaterial({ color: 0x2a1e14, roughness: 1 })), L(0, 0.58, 0));
       put(b, rbox(len - 0.1, 0.01, 0.01, 0.003), M.glowW(), L(0, 0.05, 0.255));
-      for (let k = 0; k < Math.max(2, Math.round(len / 0.8)); k++) ctx.models?.place(B, 'potted_plant_04', 0, 0, 0, { fit: ['y', 0.8 + (k % 3) * 0.15], ry: k * 1.7, base: b.clone().multiply(L(-len / 2 + 0.4 + k * ((len - 0.8) / Math.max(1, Math.round(len / 0.8) - 1)), 0.4, 0)) });
+      for (let k = 0; k < Math.max(2, Math.round(len / 0.8)); k++) ctx.models?.place(B, ['fern_02', 'shrub_04', 'potted_plant_04'][(k + Math.abs(Math.round(x * 7 + z * 3))) % 3], 0, 0, 0, { fit: ['y', 0.7 + (k % 3) * 0.15], ry: k * 1.7 + x, base: b.clone().multiply(L(-len / 2 + 0.4 + k * ((len - 0.8) / Math.max(1, Math.round(len / 0.8) - 1)), 0.4, 0)) });
     },
     /** palette chargée de cartons sanglés */
     pallet(x, y, z, yaw, layers = 2, seed = 0, parent = null) {
