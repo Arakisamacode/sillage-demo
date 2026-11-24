@@ -65,6 +65,8 @@ export const SHOTS = {
   ship_workshop: { pos: [78.5, 1.7, 11], look: [67, 1.3, 1], fov: 72 },
   ship_engine: { pos: [74, 1.7, 40.5], look: [90, 2.0, 54], fov: 74 },
   ship_corridor: { pos: [82, 6.3, 36], look: [82, 5.8, 10], fov: 70 },
+  ship_sas3: { pos: [20, 1.7, -9], look: [32, 1.5, -9], fov: 70 },
+  ship_holdup: { pos: [90, 1.7, 0], look: [92, 8, 12], fov: 78 },
   ship_cabin: { pos: [74, 6.3, 6.3], look: [67, 5.2, 1], fov: 74 },
   ship_ext: { pos: [170, 40, -110], look: [80, 5, 30], fov: 55 },
   dome_ext: { pos: [20, 70, 60], look: [-40, 45, 5], fov: 60 },

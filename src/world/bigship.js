@@ -21,7 +21,12 @@ const CX0 = 80, CX1 = 84;                       // coursive centrale
 export function buildBigShip(ctx) {
   const { mats, scene, builder: B } = ctx;
   const low = ctx.quality.name === 'low';
-  const out = { lights: [], doors: [], seats: [], spots: {}, rooms: [] };
+  const out = { lights: [], doors: [], seats: [], spots: {}, rooms: [], interior: { A: [], B: [], C: [] } };
+  // masquage par pont : la géométrie intérieure est étiquetée selon le pont (A, B, C) et n'est dessinée que près
+  // du vaisseau (pont courant et ponts voisins), jamais depuis le hangar, la galerie ou les étages de la station
+  const sceneBefore = new Set(scene.children);
+  const deckOf = (y) => (y < 4.4 ? 'A' : y < 9.0 ? 'B' : 'C');
+  B.tagFn = (c) => (c.x > S.x0 - 0.6 && c.x < S.x1 + 0.6 && c.z > S.zBow - 0.6 && c.z < S.zEnd + 0.6 && c.y > -0.5 && c.y < 14 ? 'ship' + deckOf(c.y) : null);
   // ---------------------------------------------------------------- matériaux
   const wallM = mats.paint(0xc9ced3, { grime: 0.35, scratch: 0.3, rust: 0, rough: 0.6 });
   const wallLow = mats.paint(0x4a5058, { grime: 0.6, scratch: 0.5, rust: 0.05 });
@@ -433,7 +438,7 @@ export function buildBigShip(ctx) {
       Mo.place(B, 'croissant', 75.2, yB + 1.045, 22, { fit: ['max', 0.14] }); Mo.place(B, 'croissant', 75.5, yB + 1.045, 22.1, { fit: ['max', 0.14], ry: 1 });
       Mo.place(B, 'carrot_cake', 76.3, yB + 1.045, 22, { fit: ['max', 0.24] });
       for (const [z, k] of [[20, 0], [25, 1], [30, 2], [35, 3]]) Mo.place(B, ['food_apple_01', 'food_kiwi_01', 'food_pomegranate_01', 'lemon'][k], 69.5, yB + 0.745, z + 0.05, { fit: ['max', 0.08] });
-      Mo.place(B, 'potted_plant_04', 67, yB, 37, { fit: ['y', 1.3] }); Mo.place(B, 'potted_plant_02', 67, yB, 16, { fit: ['y', 1.1] });
+      Mo.place(B, 'potted_plant_04', 67, yB, 37, { fit: ['y', 1.3] }); Mo.place(B, 'potted_plant_04', 67, yB, 16, { fit: ['y', 1.1] });
     }
     sign(['RÉFECTOIRE'], 1.6, [CX0 + 0.13, yB + 2.9, 24], Math.PI / 2, '#ffd27a', 110);
     out.spots.galley = new THREE.Vector3(77.9, yB, 26); out.spots.mess = new THREE.Vector3(72, yB, 27);
@@ -453,7 +458,7 @@ export function buildBigShip(ctx) {
     D.slats('x', 89.5, 96.6, -23.25, yB, 2.2, 0x5a3a24); D.planterBox(88.6, yB, -23.25, 0, 1.4);
     F.planter(87, yB, -28, 0.8); F.planter(87, yB, -16, 0.8);
     ctx.models?.place(B, 'potted_plant_04', 87, yB + 0.62, -28, { fit: ['y', 1.2] });
-    ctx.models?.place(B, 'potted_plant_02', 87, yB + 0.62, -16, { fit: ['y', 1.1] });
+    ctx.models?.place(B, 'potted_plant_04', 87, yB + 0.62, -16, { fit: ['y', 1.1] });
     D.bottleWall(84.35, yB, -23.2, Math.PI / 2, 2.4);
     D.art(84.13, yB + 1.8, -27.5, Math.PI / 2, 1.4, 0.9, 7); D.art(84.13, yB + 1.8, -17.2, Math.PI / 2, 1.4, 0.9, 9);
     light(91, yB + 3.2, -22, 0xffe8d0, 8, 10);
@@ -600,6 +605,13 @@ export function buildBigShip(ctx) {
   }
 
   // ================================================================= COQUE EXTÉRIEURE (constructeur à part, sans collisions)
+  B.tagFn = null;
+  // objets ajoutés directement à la scène à l'intérieur (portes, lampes, écrans, enseignes) : même masquage
+  for (const o of scene.children) {
+    if (sceneBefore.has(o) || o.isLight || o === out.holo) continue;
+    const p = o.position;
+    if (p.x > S.x0 - 1 && p.x < S.x1 + 1 && p.z > S.zBow - 1 && p.z < S.zEnd + 1 && p.y > -1 && p.y < 15) out.interior[deckOf(p.y)].push(o);
+  }
   const E = new Builder(null); E.cellSize = 1000;
   {
     const ds = (m) => { const c = m.clone(); c.side = THREE.DoubleSide; c.onBeforeCompile = m.onBeforeCompile; c.customProgramCacheKey = m.customProgramCacheKey; return c; };
@@ -639,6 +651,16 @@ export function buildBigShip(ctx) {
 
   out.inside = (p) => p.x > S.x0 - 1 && p.x < S.x1 + 1 && p.z > S.zBow - 1 && p.z < S.zEnd + 1 && p.y > -1 && p.y < 15;
   out.near = (p) => (p.x > HX - 4 && p.x < S.x1 + 6 && p.z > S.zBow - 10 && p.z < S.zEnd + 10 && p.y > -2 && p.y < 18);
+  /** maillages fusionnés de la station : récupère ceux de l'intérieur du vaisseau (étiquetés) */
+  out.registerMeshes = (list) => { for (const m of list) { const t = m.userData.tag; if (t && t.startsWith('ship')) out.interior[t.slice(4)].push(m); } };
+  out.visibleDecks = null;   // (null : force le premier passage)
+  out.updateCull = (p, force = false) => {
+    const show = !p || !out.near(p) ? '' : !out.inside(p) ? 'A' : p.y < 4.0 ? 'AB' : p.y < 8.6 ? 'ABC' : 'BC';
+    if (show === out.visibleDecks && !force) return;
+    out.visibleDecks = show;
+    for (const k of ['A', 'B', 'C']) for (const m of out.interior[k]) m.visible = show.includes(k);
+  };
+  ctx.updaters.push(() => out.updateCull(ctx.cullFromCamera ? ctx.camera.position : ctx.player?.pos));
   for (const l of out.lights) l.userData.ship = true;
   ctx.updaters.push((dt, t) => { if (out.holo) { out.holo.rotation.y += dt * 0.3; out.holo.visible = out.near(ctx.player?.pos || new THREE.Vector3(1e9, 0, 0)); } });
   void airlock; void neonTexture; void neonMaterial; void low;

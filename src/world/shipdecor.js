@@ -28,24 +28,37 @@ function woodTexture() {
 export function shipDecor(ctx, B) {
   const { mats } = ctx;
   const cache = {};
+  const low = ctx.quality?.name === 'low';
   const memo = (k, f) => cache[k] || (cache[k] = f());
   const M = {
     wood: (c = 0xb08a62) => memo('w' + c, () => new THREE.MeshStandardMaterial({ color: c, map: woodTexture(), roughness: 0.55, metalness: 0 })),
-    fabric: (c) => memo('f' + c, () => new THREE.MeshPhysicalMaterial({ color: c, roughness: 0.9, sheen: 0.6, sheenRoughness: 0.5, sheenColor: new THREE.Color(c).lerp(new THREE.Color(0xffffff), 0.35) })),
+    fabric: (c) => memo('f' + c, () => low ? new THREE.MeshStandardMaterial({ color: c, roughness: 0.92 }) : new THREE.MeshPhysicalMaterial({ color: c, roughness: 0.9, sheen: 0.6, sheenRoughness: 0.5, sheenColor: new THREE.Color(c).lerp(new THREE.Color(0xffffff), 0.35) })),
     leather: (c) => memo('l' + c, () => new THREE.MeshPhysicalMaterial({ color: c, roughness: 0.42, clearcoat: 0.25, clearcoatRoughness: 0.5 })),
     sheet: () => memo('sheet', () => new THREE.MeshStandardMaterial({ color: 0xece8e0, roughness: 0.95 })),
     ceramic: () => memo('cer', () => new THREE.MeshStandardMaterial({ color: 0xf2f2ee, roughness: 0.12, metalness: 0 })),
     chrome: () => mats.smooth(0xd0d4d8, 0.16, 1, { grime: 0, rust: 0, scratch: 0.1 }),
     brushed: () => mats.smooth(0x9aa0a6, 0.38, 0.9, { grime: 0.1, rust: 0 }),
     dark: () => mats.smooth(0x2a2d31, 0.5, 0.6, { grime: 0.15, rust: 0 }),
-    lacquer: (c) => memo('lq' + c, () => new THREE.MeshPhysicalMaterial({ color: c, roughness: 0.35, clearcoat: 0.6, clearcoatRoughness: 0.2 })),
+    lacquer: (c) => memo('lq' + c, () => new THREE.MeshStandardMaterial({ color: c, roughness: 0.3, metalness: 0.05 })),   // (petits objets : pas de vernis physique)
     screen: () => memo('scr', () => { const m = new THREE.MeshBasicMaterial({ color: new THREE.Color(0x3a8ab8).multiplyScalar(1.2) }); return m; }),
     glowW: () => mats.emissive(0xffe2bc, 2.6),
     glowC: () => mats.emissive(0xdff0ff, 2.8),
     glass: (t = 0xbcd4e4, o = 0.18) => mats.glass(t, o),
   };
   // --- géométrie
-  const rbox = (w, h, d, r = 0.02, seg = 2) => new RoundedBoxGeometry(w, h, d, seg, Math.min(r, w / 2 - 0.001, h / 2 - 0.001, d / 2 - 0.001));
+  // budget de triangles : boîte simple (12 tri.) pour les pièces fines (< 6 cm), arrondi à 1 segment (108 tri.) en
+  // général, 2 segments (300 tri.) réservés aux coussins et matelas ; géométries partagées par dimensions
+  const geoCache = new Map();
+  // modèle photoscanné lourd (44 k triangles) remplacé par la variante légère (4 k) à bord
+  const LIGHT_PLANT = (id) => (id === 'potted_plant_02' ? 'potted_plant_04' : id);
+  const rbox = (w, h, d, r = 0.02, seg = 2) => {
+    const thin = Math.min(w, h, d) < 0.06;
+    const sg = thin ? 0 : seg >= 3 ? 2 : 1;
+    const k = `${w.toFixed(3)}|${h.toFixed(3)}|${d.toFixed(3)}|${r.toFixed(3)}|${sg}`;
+    let g = geoCache.get(k);
+    if (!g) { g = sg === 0 ? new THREE.BoxGeometry(w, h, d) : new RoundedBoxGeometry(w, h, d, sg, Math.min(r, w / 2 - 0.001, h / 2 - 0.001, d / 2 - 0.001)); geoCache.set(k, g); }
+    return g;
+  };
   const cyl = (rt, rb, h, n = 16) => new THREE.CylinderGeometry(rt, rb, h, n);
   const frame = (x, y, z, yaw) => new THREE.Matrix4().compose(new THREE.Vector3(x, y, z), new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), yaw), new THREE.Vector3(1, 1, 1));
   const L = (x, y, z, rx = 0, ry = 0, rz = 0) => new THREE.Matrix4().compose(new THREE.Vector3(x, y, z), new THREE.Quaternion().setFromEuler(new THREE.Euler(rx, ry, rz)), new THREE.Vector3(1, 1, 1));
@@ -336,7 +349,7 @@ export function shipDecor(ctx, B) {
       put(b, rbox(len, 0.9, 0.45, 0.02), M.lacquer(0x22252a), L(0, 0.45, 0.06), true);
     },
     /** plante en pot (modèle photoscanné) */
-    plant(x, y, z, h = 1.0, id = 'potted_plant_04', ry = 0) { ctx.models?.place(B, id, x, y, z, { fit: ['y', h], ry }); },
+    plant(x, y, z, h = 1.0, id = 'potted_plant_04', ry = 0) { ctx.models?.place(B, LIGHT_PLANT(id), x, y, z, { fit: ['y', h], ry }); },
     /** cloison ajourée en lames de bois (séparation de pièce) entre x0 et x1 (axe x) ou z0 et z1 (axe z) */
     slats(axis, a0, a1, c, y, h = 2.6, col = 0x6a4a30, step = 0.12) {
       const len = a1 - a0, n = Math.floor(len / step), wm = M.wood(col);
@@ -404,7 +417,7 @@ export function shipDecor(ctx, B) {
       put(b, rbox(len, 0.6, 0.5, 0.03), M.lacquer(0x2a2e34), L(0, 0.3, 0), true);
       put(b, rbox(len - 0.08, 0.04, 0.42, 0.01), memo('soil', () => new THREE.MeshStandardMaterial({ color: 0x2a1e14, roughness: 1 })), L(0, 0.58, 0));
       put(b, rbox(len - 0.1, 0.01, 0.01, 0.003), M.glowW(), L(0, 0.05, 0.255));
-      for (let k = 0; k < Math.max(2, Math.round(len / 0.8)); k++) ctx.models?.place(B, k % 2 ? 'potted_plant_02' : 'potted_plant_04', 0, 0, 0, { fit: ['y', 0.8 + (k % 3) * 0.15], ry: k * 1.7, base: b.clone().multiply(L(-len / 2 + 0.4 + k * ((len - 0.8) / Math.max(1, Math.round(len / 0.8) - 1)), 0.4, 0)) });
+      for (let k = 0; k < Math.max(2, Math.round(len / 0.8)); k++) ctx.models?.place(B, 'potted_plant_04', 0, 0, 0, { fit: ['y', 0.8 + (k % 3) * 0.15], ry: k * 1.7, base: b.clone().multiply(L(-len / 2 + 0.4 + k * ((len - 0.8) / Math.max(1, Math.round(len / 0.8) - 1)), 0.4, 0)) });
     },
     /** palette chargée de cartons sanglés */
     pallet(x, y, z, yaw, layers = 2, seed = 0, parent = null) {
@@ -433,7 +446,7 @@ export function shipDecor(ctx, B) {
           const px = cx - 0.65 + p * 1.3;
           const g = b.clone().multiply(L(px, yy + 0.07, 0));
           if ((seed * 3 + l * 2 + i + p) % 3 === 0) D.pallet(0, 0, 0, 0, 1 + ((l + p) % 2), seed + l + p, g);
-          else if ((seed + l + p + i) % 3 === 1) for (let q = 0; q < 3; q++) ctx.models?.place(B, 'plastic_crate_01', 0, 0, 0, { fit: ['x', 0.4], base: g.clone().multiply(L(-0.42 + q * 0.42, 0, 0)) });
+          else if ((seed + l + p + i) % 3 === 1) for (let q = 0; q < 3; q++) D.tote(-0.42 + q * 0.42, 0, 0, 0, [0x2a5a9a, 0xd8a62a, 0x3a7a4a][(q + l) % 3], g);
           else for (let q = 0; q < 2; q++) ctx.models?.place(B, 'cardboard_box_01', 0, 0, 0, { fit: ['x', 0.55], ry: q * 0.2, base: g.clone().multiply(L(-0.3 + q * 0.6, 0, 0)) });
         }
       }
@@ -477,6 +490,13 @@ export function shipDecor(ctx, B) {
       put(b, rbox(0.54, 0.4, 0.004, 0.002), mats.emissive(col, 1.3), L(0, 1.62, 0.102));
       put(b, rbox(0.5, 0.06, 0.18, 0.01, 2), M.dark(), L(0, 1.15, 0.14, 0.4));
       put(b, rbox(0.06, 0.06, 0.004, 0.002), mats.emissive(0x3ac870, 2), L(0.2, 1.33, 0.102));
+    },
+    /** bac de rangement en plastique (empilable), posé en (x, y, z) dans le repère parent */
+    tote(x, y, z, yaw, col = 0x2a5a9a, parent = null) {
+      const b = parent ? parent.clone().multiply(frame(x, y, z, yaw)) : frame(x, y, z, yaw), m = M.lacquer(col);
+      put(b, new THREE.BoxGeometry(0.36, 0.22, 0.5), m, L(0, 0.11, 0));
+      put(b, new THREE.BoxGeometry(0.4, 0.03, 0.54), m, L(0, 0.235, 0));
+      put(b, new THREE.BoxGeometry(0.2, 0.05, 0.01), M.dark(), L(0, 0.17, 0.252));
     },
     /** transpalette */
     palletJack(x, y, z, yaw) {

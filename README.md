@@ -413,6 +413,12 @@ Par défaut : *Basse* sur écran tactile, *Haute* sur ordinateur.
 | Occlusion ambiante (N8AO) | non | demi-résolution | demi-résolution | pleine |
 | Personnages | 18 | 28 | 40 | 52 |
 
+Frégate Atalante : l'intérieur n'est dessiné qu'à proximité du vaisseau, pont par pont (pont courant et ponts
+voisins ; rien depuis le hangar, la galerie ou les étages). Budget de géométrie : petites pièces en boîtes simples,
+arrondis à 1 segment (2 pour les coussins), variante légère des plantes photoscannées, bacs procéduraux. Mesuré
+sur le profil téléphone : intérieur 2,29 → 0,87 M triangles, mémoire de géométrie de la scène 372 → 235 Mo, hangar
+1,40 → 0,77 M triangles par image.
+
 ## Mise en ligne
 
 - **Artifact claude.ai** : `npm run build:artifact` produit `dist-artifact/`, où les .glb/.exr sont livrés

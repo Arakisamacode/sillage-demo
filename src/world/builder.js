@@ -47,9 +47,10 @@ export class Builder {
     const cs = this.cellSize || 40;
     // cellule : position au sol et tranche de hauteur (niveaux de la station dessinés séparément)
     const cell = g.boundingSphere.radius > 30 ? 'big' + Math.floor(c.y / 25) : Math.floor(c.x / cs) + '_' + Math.floor(c.z / cs) + '_' + Math.floor(c.y / 25);
-    const key = mat.uuid + (cast ? 'c' : '') + (receive ? 'r' : '') + cell;
+    const tag = this.tagFn ? this.tagFn(c) : null;   // zone masquable à part (ex. pont de la frégate)
+    const key = mat.uuid + (cast ? 'c' : '') + (receive ? 'r' : '') + cell + (tag ? '#' + tag : '');
     let grp = this.groups.get(key);
-    if (!grp) { grp = { mat, geos: [], cast, receive }; this.groups.set(key, grp); }
+    if (!grp) { grp = { mat, geos: [], cast, receive, tag }; this.groups.set(key, grp); }
     grp.geos.push(g);
     if (opts.collide) this.colliders.push(g);
     return g;
@@ -153,6 +154,7 @@ export class Builder {
       mesh.receiveShadow = grp.receive;
       mesh.matrixAutoUpdate = false;
       mesh.updateMatrix();
+      if (grp.tag) mesh.userData.tag = grp.tag;
       parent.add(mesh);
       meshes.push(mesh);
     }

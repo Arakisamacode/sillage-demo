@@ -125,6 +125,7 @@ async function boot() {
   const scenes = buildScenes(ctx);
   const crowd = new Crowd(ctx, scenes);
   const staticMeshes = builder.finalize();
+  ctx.bigship.registerMeshes(staticMeshes);   // intérieur de la frégate : masquage par pont (hors LevelCull)
   ctx.fx = buildFX(ctx);
   const player = new Player(ctx, builder.collisionGeometry());
   const flight = new Flight(ctx, ctx.ships.heron);
@@ -874,6 +875,7 @@ async function boot() {
 
   // ------------------------------------------------------------------ mode capture d'écran (revue artistique)
   if (shotName) {
+    ctx.cullFromCamera = !!SHOTS[shotName] && !params.get('player');   // vues fixes : masquage d'après la caméra
     const sim = +(params.get('sim') || 0);
     const s = SHOTS[shotName];
     if (s) { player.pos.set(s.pos[0], s.pos[1] > 30 && s.pos[1] < 60 ? 40 : 0, s.pos[2]); }
@@ -1252,7 +1254,7 @@ async function boot() {
   }
   // performances : réserve de lumières à effectif constant, découpage par niveaux, shaders précompilés
   const lightPool = new LightPool(scene, quality);
-  const levelCull = new LevelCull(staticMeshes);
+  const levelCull = new LevelCull(staticMeshes.filter((m) => !m.userData.tag));
   ctx.lightPool = lightPool; ctx.levelCull = levelCull;
   ctx.updaters.push(() => {
     const free = flight.active && !ground.onFoot;
