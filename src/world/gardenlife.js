@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import { DECK_Y } from './habitat.js';
+import { keepFromPlayer, targetBlocked } from '../ai/keepout.js';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 
 // Vie du Grand Dôme : enfants (chat, balançoires, toboggan, tourniquet, bascule, canards), parents sur les bancs,
@@ -204,8 +205,9 @@ export function populateGarden(ctx, lib, player, G) {
       const d = new THREE.Vector3().subVectors(s.move, n.pos).setY(0), len = d.length();
       if (len < 0.1) { n.q.shift(); return; }
       const sp = s.speed || n.speed || 1.1;
+      if (!s.fly && targetBlocked(n.pos, s.move, player)) { c.setSpeed(0); return; }   // cible occupée par le joueur
       n.pos.addScaledVector(d.normalize(), Math.min(len, sp * dt));
-      if (!s.fly) n.pos.y = ground(n.pos);
+      if (!s.fly) { keepFromPlayer(n.pos, player, d.x, d.z); n.pos.y = ground(n.pos); }
       c.root.position.copy(n.pos); turnTo(c, Math.atan2(d.x, d.z), dt, 8); c.setSpeed(sp);
       if (c.override) c.stop(0.25);
       return;

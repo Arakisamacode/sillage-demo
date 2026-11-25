@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { Builder } from './builder.js';
 import { platedHull } from './hullkit.js';
 import { HX, SHIPLOCK } from './layout.js';
+import { keepFromPlayer, targetBlocked } from '../ai/keepout.js';
 import { paintedText, decalMaterial, neonTexture, neonMaterial, Screen, FONT } from './signage.js';
 import { sciFurniture } from './scififurn.js';
 import { shipDecor } from './shipdecor.js';
@@ -707,7 +708,8 @@ export function populateBigShip(ctx, lib, player, SH) {
     if (s.move) {
       const d = new THREE.Vector3().subVectors(s.move, n.pos).setY(0), len = d.length();
       if (len < 0.1) { n.q.shift(); return; }
-      n.pos.addScaledVector(d.normalize(), Math.min(len, (s.speed || 1.15) * dt)); n.pos.y = s.move.y;
+      if (targetBlocked(n.pos, s.move, player)) { c.setSpeed(0); return; }   // cible occupée par le joueur : attente
+      n.pos.addScaledVector(d.normalize(), Math.min(len, (s.speed || 1.15) * dt)); keepFromPlayer(n.pos, player, d.x, d.z); n.pos.y = s.move.y;
       c.root.position.copy(n.pos); turn(c, Math.atan2(d.x, d.z), dt, 8); c.setSpeed(s.speed || 1.15); if (c.override) c.stop(0.25);
       return;
     }

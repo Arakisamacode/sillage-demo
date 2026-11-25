@@ -26,6 +26,11 @@ const LOOPING = new Set(['idle', 'talk', 'walk', 'walkFormal', 'jog', 'run', 'si
 // os du haut du corps : les clips « …U » ne pilotent qu'eux (visée en marchant)
 const UPPER = /^(spine_02|spine_03|neck_01|head|clavicle_|upperarm_|lowerarm_|hand_|thumb_|index_|middle_|ring_|pinky_)/i;
 const UPPER_ROLES = ['aim', 'aimHold', 'shoot', 'reload'];
+// rôles « debout au repos » où l'aplomb est corrigé (bras plus près du corps, pieds moins écartés)
+const STANCE_ROLES = new Set(['idle', 'talk']);
+// l'idle partagé (reciblé) écarte les bras (~21° / 12°) et les jambes (~9° / 13°, pieds à ~0,6 m) : correction
+// dans le plan frontal, en repère monde (indépendante des axes locaux des os UBC ou Rocketbox)
+const ARM_REST = 0.12, ARM_K = 0.6, ARM_MAX = 0.2, LEG_REST = 0.03, LEG_K = 0.8, LEG_MAX = 0.2;
 
 // vitesse au sol (m/s) correspondant à timeScale = 1 pour une taille de référence
 const GAIT = { walk: 1.35, walkFormal: 1.25, jog: 3.1, run: 5.6 };
@@ -348,6 +353,14 @@ function slimBody(mesh, fem = false) {
 
 const _v = new THREE.Vector3(), _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _m = new THREE.Matrix4();
 const UP = new THREE.Vector3(0, 1, 0);
+const _sx = new THREE.Vector3(), _sa = new THREE.Vector3(), _sb = new THREE.Vector3(), _sq = new THREE.Quaternion(), _spq = new THREE.Quaternion();
+/** Rotation d'un os autour d'un axe monde (sans allocation). */
+function rotBoneWorld(bone, axis, angle) {
+  bone.parent.getWorldQuaternion(_spq);
+  _sq.setFromAxisAngle(axis, angle).multiply(_spq);   // R · P
+  _sq.premultiply(_spq.invert());                     // P⁻¹ · R · P
+  bone.quaternion.premultiply(_sq).normalize();
+}
 const _f = new THREE.Vector3(), _r = new THREE.Vector3(), _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c = new THREE.Vector3(), _t = new THREE.Vector3();
 
 export class Character {
@@ -421,7 +434,11 @@ export class Character {
     this.loco = ['idle', 'walk', 'jog', 'run'];
     if (opts.formal) this.loco[1] = 'walkFormal';
     for (const r of this.loco) { const a = this.actions[r]; a.play(); a.setEffectiveWeight(r === 'idle' ? 1 : 0); }
-    this.actions.idle.time = Math.random() * 3;
+    // variété : chaque personnage a sa propre cadence (0,9–1,1) et sa propre phase sur les boucles (pas de foule synchrone)
+    this.rate = 0.9 + Math.random() * 0.2;
+    this.actions.idle.time = Math.random() * this.clips.idle.duration;
+    this.actions.idle.timeScale = this.rate;
+    this._stW = 1;
     this.speed = 0;
     this.override = null;
     this.overrideW = 0;
@@ -443,6 +460,95 @@ export class Character {
       o.boundingSphere = o.geometry.boundingSphere.clone(); o.boundingSphere.radius *= 1.35;
       o.frustumCulled = true;
     });
+    // pose appliquée dès la création : jamais de pose de liaison (T) même si le personnage n'est jamais mis à jour (loin, LOD)
+    this._locomotion();
+    this.mixer.update(0);
+    for (const [b, q, k] of this._fingers) b.quaternion.slerp(q, k);
+    this._stance(1);
+  }
+
+  /**
+   * Pose figée (mannequin, statue, figurant immobile) : image `time` du clip `role`, doigts détendus, aplomb corrigé,
+   * puis retouche facultative `tweak(c)` ; plus aucune mise à jour d'animation ensuite (coût nul, indépendant du LOD).
+   */
+  freeze(role = 'idle', time = 0, tweak = null) {
+    this.mixer.stopAllAction();
+    const a = this.actions[role] || this.actions.idle;
+    a.reset(); a.setEffectiveWeight(1); a.timeScale = 0; a.play();
+    a.time = Math.min(time, a.getClip().duration - 1e-3);
+    this.override = null; this.speed = 0;
+    this.mixer.update(0);
+    for (const [b, q, k] of this._fingers) b.quaternion.slerp(q, k);
+    this._stance(1);
+    if (tweak) tweak(this);
+    this.root.updateMatrixWorld(true);
+    this.frozen = true;
+  }
+
+  /** Rotation d'un os autour d'un axe exprimé dans le repère du personnage (X gauche, Y haut, Z avant). */
+  turnBone(name, ax, ay, az, angle) {
+    const b = this.bones[name];
+    if (!b) return;
+    this.root.updateWorldMatrix(true, false);
+    _sx.set(ax, ay, az).transformDirection(this.root.matrixWorld);
+    rotBoneWorld(b, _sx, angle);
+  }
+
+  /** Pose de défilé (contrapposto) : bassin basculé, épaules en contre, une main sur la hanche selon la variante. */
+  fashionPose(v = 0) {
+    const side = v % 2 ? -1 : 1;                       // côté de la jambe d'appui
+    this._stance(1, 0.1, 0, 1.5);                      // aplomb de mannequin : jambes sous les hanches, bras près du corps
+    this.turnBone('pelvis', 0, 0, 1, 0.07 * side);
+    this.turnBone('pelvis', 0, 1, 0, 0.1 * side);
+    this.turnBone('spine_01', 0, 0, 1, -0.06 * side);
+    this.turnBone('spine_03', 0, 0, 1, -0.05 * side);
+    this.turnBone('spine_03', 0, 1, 0, -0.12 * side);
+    // jambe libre légèrement fléchie et avancée, jambe d'appui verticale
+    const free = side > 0 ? 'l' : 'r';
+    this.turnBone(`thigh_${free}`, 1, 0, 0, -0.16);
+    this.turnBone(`calf_${free}`, 1, 0, 0, 0.26);
+    this.turnBone(`foot_${free}`, 1, 0, 0, -0.1);
+    this.turnBone('Head', 0, 1, 0, -0.32 * side);
+    this.turnBone('Head', 0, 0, 1, 0.06 * side);
+    if (v === 2) return;                               // variante bras le long du corps
+    // main sur la hanche (côté de la jambe libre) : bras écarté puis IK épaule-coude-poignet vers la hanche
+    const s = free === 'l' ? 1 : -1, b = this.bones;
+    this.turnBone(`upperarm_${free}`, 0, 0, 1, 0.75 * s);
+    this.root.updateMatrixWorld(true);
+    const pel = (b.spine_01 || b.pelvis).getWorldPosition(new THREE.Vector3());
+    const lx = new THREE.Vector3(1, 0, 0).transformDirection(this.root.matrixWorld), fz = new THREE.Vector3(0, 0, 1).transformDirection(this.root.matrixWorld);
+    const tgt = pel.addScaledVector(lx, s * 0.15).addScaledVector(fz, -0.01);   // main à la taille, coude en dehors
+    this._ik2(b[`upperarm_${free}`], b[`lowerarm_${free}`], b[`hand_${free}`], tgt);
+  }
+
+  /**
+   * Aplomb au repos : rapproche les bras du corps et resserre les pieds (plan frontal, repère monde : valable pour tous
+   * les squelettes). w : poids 0..1. Appelé après mixer.update (le mixeur réécrit les os à chaque pas : pas de cumul).
+   */
+  _stance(w, armRest = ARM_REST, legRest = LEG_REST, k = 1) {
+    if (w < 0.01) return;
+    const b = this.bones;
+    this.root.updateWorldMatrix(true, false);
+    const m = this.root.matrixWorld.elements;
+    for (let i = 0; i < 4; i++) {
+      const arm = i < 2, sgn = i % 2 ? -1 : 1, sd = i % 2 ? 'r' : 'l';
+      // bras : direction épaule → coude ; jambe : hanche → cheville (axe complet de la jambe)
+      const A = arm ? b[`upperarm_${sd}`] : b[`thigh_${sd}`], B = arm ? b[`lowerarm_${sd}`] : b[`foot_${sd}`];
+      if (!A || !B) continue;
+      // côté extérieur (monde) : X local du personnage (gauche) ou son opposé
+      _sx.set(m[0] * sgn, m[1] * sgn, m[2] * sgn).normalize();
+      if (arm) { A.updateWorldMatrix(true, false); _sb.copy(B.position).applyMatrix4(A.matrixWorld); } else { B.updateWorldMatrix(true, false); _sb.setFromMatrixPosition(B.matrixWorld); }
+      _sa.setFromMatrixPosition(A.matrixWorld);
+      _sb.sub(_sa);
+      const ang = Math.atan2(_sb.dot(_sx), -_sb.y);
+      const d = arm ? Math.min(ARM_MAX * k, Math.max(0, ang - armRest) * Math.min(1, ARM_K * k)) : Math.min(LEG_MAX * k, Math.max(0, ang - legRest) * Math.min(1, LEG_K * k));
+      if (d < 1e-3) continue;
+      // axe = extérieur × bas : une rotation positive ramène le membre vers la verticale
+      _sx.set(_sx.z, 0, -_sx.x).normalize();
+      rotBoneWorld(A, _sx, d * w);
+      // pied : contre-rotation pour garder la semelle à plat
+      if (!arm) rotBoneWorld(B, _sx, -d * w);
+    }
   }
 
   /** Action plein corps (discussion, assis, travail…). */
@@ -451,17 +557,30 @@ export class Character {
     if (!a) return;
     if (this.override === role && !opts.restart) return;
     const prev = this.override ? this.actions[this.override] : null;
+    const loop = LOOPING.has(role);
     a.reset();
-    a.timeScale = opts.speed ?? 1;
+    // boucles : cadence propre au personnage et phase aléatoire (les figurants ne bougent pas à l'unisson)
+    a.timeScale = opts.speed ?? (loop ? this.rate : 1);
     a.setEffectiveWeight(1);
     a.play();
-    const fade = opts.fade ?? 0.4;
+    if (loop && opts.time === undefined) a.time = Math.random() * a.getClip().duration;
+    // pas encore animé (créé puis mis en pose aussitôt) : pas de fondu, pose appliquée tout de suite
+    const fresh = !this._frame;
+    const fade = fresh ? 0 : opts.fade ?? 0.4;
     if (prev && prev !== a) prev.fadeOut(fade);
     a.fadeIn(fade);
     if (opts.time !== undefined) a.time = opts.time;
     this.override = role;
     this.overrideFadeOut = false;
     this._onDone = opts.onDone || null;
+    if (fresh && !this.frozen) {
+      if (prev && prev !== a) prev.stop();
+      a.stopFading(); a.setEffectiveWeight(1);
+      this._locomotion();
+      this.mixer.update(0);
+      this._stW = STANCE_ROLES.has(role) ? 1 : 0;
+      this._stance(this._stW);
+    }
     if (!LOOPING.has(role)) {
       const onFin = (e) => {
         if (e.action !== a) return;
@@ -690,6 +809,7 @@ export class Character {
   }
 
   update(dt, camPos) {
+    if (this.frozen) return;
     // niveau de détail : animation à cadence réduite au loin
     if (camPos) {
       const d = camPos.distanceToSquared(this.root.position);
@@ -702,6 +822,11 @@ export class Character {
     this._locomotion();
     this.mixer.update(step);
     if (!this.held && !this.upperRole && !this.meal) for (const [b, q, k] of this._fingers) b.quaternion.slerp(q, k);
+    // aplomb au repos (debout immobile ou en conversation), en fondu ; pas au loin (lodSkip ≥ 2) ni mains occupées
+    const busy = this.held || this.upperRole || this.meal || this.carry;
+    const want = busy ? 0 : this.override ? (STANCE_ROLES.has(this.override) ? 1 : 0) : this.actions[this.loco[0]].getEffectiveWeight();
+    this._stW += (want - this._stW) * Math.min(1, step * 4);
+    if (this.lodSkip < 2) this._stance(this._stW);
     this._applyLook(step);
     if (this.held) this._placeHeld();
     if (this.carry) this._carryPose();

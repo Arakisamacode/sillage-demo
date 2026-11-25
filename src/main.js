@@ -14,6 +14,7 @@ import { buildGallery } from './world/gallery.js';
 import { CharacterLibrary } from './characters/characters.js';
 import { buildScenes } from './ai/scenes.js';
 import { Crowd } from './ai/crowd.js';
+import { keepFromPlayer, targetBlocked } from './ai/keepout.js';
 import { Player } from './player/player.js';
 import { Audio } from './audio/audio.js';
 import { SHOTS } from './shots.js';
@@ -247,7 +248,10 @@ async function boot() {
         const d = new THREE.Vector3().subVectors(s.move, n.pos).setY(0), L = d.length();
         s.each?.(n, dt);
         if (L < 0.08) { n.q.shift(); return; }
+        // le joueur occupe la cible : on attend ; sinon on avance en gardant ≥ 0,6 m de lui (contournement)
+        if (targetBlocked(n.pos, s.move, player)) { c.setSpeed(0); return; }
         n.pos.addScaledVector(d.normalize(), Math.min(L, (s.speed || 1.3) * dt));
+        keepFromPlayer(n.pos, player, d.x, d.z);
         c.root.position.copy(n.pos);
         turn(c, Math.atan2(d.x, d.z), dt, 8);
         c.setSpeed(s.speed || 1.3);
@@ -346,7 +350,8 @@ async function boot() {
     const walkTo = (n, tgt, dt, sp = 1.1) => {
       const d = new THREE.Vector3().subVectors(tgt, n.pos).setY(0), L = d.length();
       if (L < 0.06) { n.c.setSpeed(0); return true; }
-      n.pos.addScaledVector(d.normalize(), Math.min(L, sp * dt)); n.c.root.position.copy(n.pos); turn(n.c, Math.atan2(d.x, d.z), dt, 8); n.c.setSpeed(sp);
+      if (targetBlocked(n.pos, tgt, player)) { n.c.setSpeed(0); return false; }
+      n.pos.addScaledVector(d.normalize(), Math.min(L, sp * dt)); keepFromPlayer(n.pos, player, d.x, d.z); n.c.root.position.copy(n.pos); turn(n.c, Math.atan2(d.x, d.z), dt, 8); n.c.setSpeed(sp);
       return false;
     };
     /** pose le plateau sur la table devant la place ch */

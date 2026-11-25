@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { keepFromPlayer } from './keepout.js';
 
 // Agent : un PNJ avec un rôle et une routine (générateur de tâches).
 // Tâches : goto, act, sit, move (linéaire avec hauteur), call, wait, despawn.
@@ -201,6 +202,9 @@ export class Agent {
     else if (nav.walkable(nx, this.pos.z)) this.pos.x = nx;
     else if (nav.walkable(this.pos.x, nz)) this.pos.z = nz;
     else { this.pos.x = nx; this.pos.z = nz; } // sortie de cellule bloquée
+    // jamais dans la capsule du joueur (≥ 0,6 m), sans être poussé dans un mur
+    const kx = this.pos.x, kz = this.pos.z;
+    if (keepFromPlayer(this.pos, player, this.vel.x, this.vel.z) && !nav.walkable(this.pos.x, this.pos.z)) { this.pos.x = kx; this.pos.z = kz; }
     const v = Math.hypot(this.vel.x, this.vel.z);
     if (v > 0.15) this.faceTowards(Math.atan2(this.vel.x, this.vel.z), dt, 7);
     // bloqué trop longtemps : recalcul du chemin

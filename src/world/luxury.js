@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { DECK_Y } from './habitat.js';
+import { keepFromPlayer, targetBlocked } from '../ai/keepout.js';
 import { neonTexture, neonMaterial, Screen, FONT } from './signage.js';
 import { stationPanel } from './scififurn.js';
 import { loft, wing, flipFaces, nozzle } from './shipkit.js';
@@ -460,9 +461,12 @@ export function populateLuxury(ctx, lib, player, L) {
     c.root.visible = false; scene.add(c.root); people.push(c); return c;
   };
   // mannequins vivants sur podiums tournants (Maison Élysée)
-  for (const m of L.mannequins) { const c = mk(m.k * 2, RICH[m.k], m.p.clone().setY(LUX_Y + 0.22), m.face, null, { civil: false }); c.noTalk = true; spin.push({ c, sp: 0.18 }); }
+  for (const m of L.mannequins) { const c = mk(m.k * 2, RICH[m.k], m.p.clone().setY(LUX_Y + 0.22), m.face, null, { civil: false }); c.noTalk = true; spin.push({ c, sp: 0.18 });
+    // pose de défilé figée (contrapposto, main sur la hanche selon la variante) : jamais de pose T, coût d'animation nul
+    c.freeze('idle', [0.4, 1.7, 2.6][m.k] ?? 1, (q) => q.fashionPose(m.k));
+  }
   // combinaisons de haute technologie dans les vitrines (Nova Atelier)
-  for (const s of L.suits) { const c = mk(s.k + 1, { top: 0x1a1c20, bottom: 0x1a1c20, boot: 0x0a0a0a, accent: LUX_SUITS[s.k].accent, gloves: true }, s.p, s.face, null, { armor: LUX_SUITS[s.k], armorShadows: false }); c.noTalk = true; spin.push({ c, sp: -0.25 }); }
+  for (const s of L.suits) { const c = mk(s.k + 1, { top: 0x1a1c20, bottom: 0x1a1c20, boot: 0x0a0a0a, accent: LUX_SUITS[s.k].accent, gloves: true }, s.p, s.face, null, { armor: LUX_SUITS[s.k], armorShadows: false }); c.noTalk = true; spin.push({ c, sp: -0.25 }); c.freeze('idle', 1 + s.k * 0.7); }
   // ---------------------------------------------------------------- moteur de routines (déplacements, actions, attentes)
   const turnTo0 = (c, yaw, dt, k = 6) => { let d = yaw - c.root.rotation.y; d = Math.atan2(Math.sin(d), Math.cos(d)); c.root.rotation.y += d * (1 - Math.exp(-dt * k)); };
   const step = (n, dt) => {
@@ -476,7 +480,9 @@ export function populateLuxury(ctx, lib, player, L) {
       const d = new THREE.Vector3().subVectors(s.move, n.pos).setY(0), len = d.length();
       s.each?.(n, dt);
       if (len < 0.08) { n.q.shift(); return; }
+      if (targetBlocked(n.pos, s.move, player)) { c.setSpeed(0); return; }   // cible occupée par le joueur : attente
       n.pos.addScaledVector(d.normalize(), Math.min(len, (s.speed || 1.05) * dt));
+      keepFromPlayer(n.pos, player, d.x, d.z);
       c.root.position.copy(n.pos); turnTo0(c, Math.atan2(d.x, d.z), dt, 8); c.setSpeed(s.speed || 1.05);
       if (c.override) c.stop(0.25);
     } else {
@@ -641,7 +647,9 @@ export function populateLuxury(ctx, lib, player, L) {
       if (Math.random() < 0.18) { const s = stops[Math.floor(Math.random() * stops.length)]; w.detour = s.clone().setY(LUX_Y).add(new THREE.Vector3((Math.random() - 0.5) * 1.2, 0, (Math.random() - 0.5) * 1.2)); }
       return;
     }
+    if (targetBlocked(w.pos, T, player)) { w.c.setSpeed(0); return; }
     w.pos.addScaledVector(d.normalize(), Math.min(len, 1.0 * dt));
+    keepFromPlayer(w.pos, player, d.x, d.z);
     w.c.root.position.copy(w.pos);
     turnTo(w.c, Math.atan2(d.x, d.z), dt, 8);
     w.c.setSpeed(1.0);
