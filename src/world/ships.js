@@ -3,6 +3,10 @@ import { Builder } from './builder.js';
 import { metricBox } from './materials.js';
 import { loft, wing, nozzle, flipFaces } from './shipkit.js';
 import { platedHull } from './hullkit.js';
+import {
+  skinHull, nozzle as bellNozzle, nozzleMaterials, kitMaterials, LiveryAtlas, planeDecal, addParts, bevelBox, rodBetween,
+  rcsBlock, antenna, radiator, lightPod, ventPanel, dockingClamp, landingStrut,
+} from './hullkit2.js';
 import { PADS } from './layout.js';
 import { paintedText, decalMaterial } from './signage.js';
 
@@ -49,6 +53,10 @@ class ShipCtx {
     this.add(h.alt, m.alt || m.plate, [0, 0, 0], null, { cast: true });
     if (opts.collide !== false) { const c = h.under.clone(); c.applyMatrix4(this.M); this.CB.addCollider(c); }
     return h;
+  }
+  /** pose une liste de pièces hullkit2 ({geo, role}) avec un jeu de matériaux par rôle */
+  parts(list, matSet, pos = [0, 0, 0], rot = null, opts = {}) {
+    addParts((g, m, p, r, o) => this.add(g, m, p, r, o), list, matSet, pos, rot, opts);
   }
   /** boîte de collision en coordonnées locales */
   cbox(w, h, d, pos) {
@@ -99,6 +107,7 @@ class ShipCtx {
 }
 
 /** section interpolée linéairement entre stations (pour poser des éléments sur la coque) */
+// eslint-disable-next-line no-unused-vars
 function interpStation(st, z) {
   for (let i = 0; i < st.length - 1; i++) {
     const a = st[i], b = st[i + 1];
@@ -478,85 +487,257 @@ function buildHeron(ctx) {
 
 // =============================================================================== Mulet H4 (cargo)
 
+// Cargo lourd de 33 m : cabine émoussée à verrière cerclée, poutre de soute biseautée (soute arrière
+// ouverte, rampe), berceau dorsal à conteneurs, deux nacelles à tuyères en cloche, train lourd, livrée.
+// Coque lisse hullkit2 (UV en mètres → tôles « hull » à l'échelle), tout fusionné par le Builder.
 function buildMulet(ctx) {
   const pad = PADS.p3;
   const S = new ShipCtx(ctx, pad, 'mulet');
   const { mats } = ctx;
-
-  const hull2 = mats.paint(0x5a605a, { grime: 0.8, scratch: 0.4, rust: 0.3 });
-  const yellow = mats.paint(0xc89a1e, { grime: 0.9 });
-  const metal = mats.metal(0x4d5154);
-  const glass = new THREE.MeshStandardMaterial({ color: 0x0b1015, roughness: 0.08, metalness: 1.0 });
+  const K = kitMaterials(mats, { hull: 0xbdbab0, dark: 0x30343a, accent: 0xd0601a });
+  const NZ = nozzleMaterials(mats, { glow: 0x9cc4ff, idle: 0.06, key: 'mulet' });
+  const M = { ...K, ...NZ, fin: mats.smooth(0x9a9c9e, 0.45, 0.9, { grime: 0.7, rust: 0.05, floor: 0 }), lens: K.lensWhite, mech: K.mech, chrome: K.chrome };
   const fy = 2.3, iw = 3.6, cy = 7.6;
-  // corps principal anguleux
-  const HMm = hullMats(mats, 0xa3a88f, 0x4a504a);
-  S.plated([
-    { z: -15.5, w: 2.6, h: 2.0, y: 4.6, n: 3 },
-    { z: -13, w: 4.6, h: 3.1, y: 4.9, n: 5, fb: 0.1 },
-    { z: -8, w: 5.0, h: 3.4, y: 5.0, n: 7, fb: 0.15 },
-    { z: 12, w: 5.0, h: 3.4, y: 5.0, n: 7, fb: 0.15 },
-    { z: 15.5, w: 4.8, h: 3.2, y: 5.0, n: 7, fb: 0.15 },
-  ], { facets: 16, steps: 4, plateEvery: [3, 1], altBelow: 2.6, altRandom: 0.05, missing: 0.04, seed: 50 }, HMm);
-  // passerelle de commandement surélevée
-  const bridge = loft([
-    { z: -14.2, w: 0.8, h: 0.3, y: 8.3, n: 3 },
-    { z: -13, w: 2.4, h: 1.0, y: 8.4, n: 4 },
-    { z: -8, w: 2.8, h: 1.2, y: 8.5, n: 5 },
-    { z: -4, w: 2.4, h: 0.9, y: 8.4, n: 5 },
-  ], { radial: 36, steps: 5, arc: [0.02, Math.PI - 0.02] });
-  S.add(bridge, hull2);
-  S.box(4.6, 0.12, 0.8, glass, [0, 8.85, -13.2], [0.75, 0, 0], { cast: false });
-  for (const x of [-1.6, 1.6]) S.box(1.4, 0.7, 0.08, glass, [x * 1.05, 8.7, -12.5], [0, x * 0.35, 0], { cast: false });
-  // côtes de renfort et bandes de danger
-  // conteneurs/modules latéraux et moteurs
-  for (const s of [-1, 1]) {
-    S.box(1.4, 2.6, 18, hull2, [s * 5.6, 4.6, 1.5], null, { tex: 3 });
-    for (const z of [-4, 10]) {
-      S.plated([
-        { z: z - 2.5, w: 0.4, h: 0.4, y: 5.2, x: s * 7.3, n: 2 },
-        { z: z - 1.5, w: 1.3, h: 1.3, y: 5.2, x: s * 7.3, n: 2.2 },
-        { z: z + 2.8, w: 1.35, h: 1.35, y: 5.2, x: s * 7.3, n: 2.2 },
-      ], { facets: 12, steps: 2, plateEvery: [1, 1], seed: 60 + z, collide: false }, HMm);
-      S.add(nozzle(1.1, 1.3), metal, [s * 7.3, 5.2, z + 2.7]);
-      S.add(new THREE.CircleGeometry(0.85, 20), mats.metal(0x0d0e0f), [s * 7.3, 5.2, z + 2.9], null, { cast: false });
-      S.box(1.8, 0.6, 2.0, hull2, [s * 6.4, 5.2, z + 0.5]);
-    }
-    S.navLight([s * 7.3, 6.7, -4], s < 0 ? 0xff2010 : 0x20ff40, 0);
-    // bandes de danger sur les flancs
-    S.box(0.05, 0.4, 18, yellow, [s * 6.31, 3.5, 1.5], null, { cast: false, tex: 1 });
-  }
-  greebles(S, metal, -3.5, 3.5, 8.35, -2, 14, 40, 777);
-  // marquages
-  S.decal(['MULET H4', 'SILLAGE ORBITAL LOGISTICS'], 6.5, [-6.31, 5.6, 1.5], -Math.PI / 2, { color: '#d9d2bf', size: 120, wear: 1.2 });
-  S.decal(['MH4-0918'], 4, [6.31, 5.6, 1.5], Math.PI / 2, { color: '#d9d2bf', size: 140, wear: 1.2 });
-  S.decal(['CHARGE MAX 120 T'], 2.6, [0, 7.0, 15.56], 0, { color: '#e6c040', size: 100, wear: 0.8 });
+  const RX = Math.PI;
 
-  // soute : plancher, parois, plafond, éclairage
-  const floorM = mats.metal(0x55595b, { rough: 0.65 });
-  S.box(iw * 2, 0.15, 25, floorM, [0, fy - 0.07, 2.5], null, { tex: 2 });
-  for (const s of [-1, 1]) {
-    S.box(0.15, cy - fy, 25, hull2, [s * iw, (fy + cy) / 2, 2.5], null, { tex: 3 });
-    for (let z = -9; z < 15; z += 2) S.box(0.25, cy - fy, 0.2, metal, [s * (iw - 0.1), (fy + cy) / 2, z], null, { cast: false });
-    S.box(0.1, 0.06, 23, mats.paint(0xc89a1e), [s * (iw - 0.2), fy + 1.0, 2.5], null, { cast: false });
+  // ---------------------------------------------------------------- livrée (régions déclarées d'abord)
+  const L = new LiveryAtlas({ ppm: 40, accent: '#d0601a', wear: 0.55, seed: 2207 });
+  const rStripe = L.region(22.5, 0.5, (d) => { d.stripe(0.16, 0.3, d.accent); d.stripe(0.02, 0.07, '#25282b'); });
+  const rReg = L.region(8.5, 0.9, (d) => d.text('MULET H4 · HT-2207', 0.05, 0.12, 0.66, { color: '#26292c', spacing: 0.06 }));
+  const rOp = L.region(7, 0.34, (d) => d.text('SILLAGE ORBITAL LOGISTICS — HALDEN-7', 0.05, 0.05, 0.24, { color: '#3a3e42', weight: 600, spacing: 0.1 }));
+  const rCab = L.region(4.6, 1.5, (d) => {
+    const c = d.ctx, k = d.px, H = 1.5 * k;
+    c.fillStyle = d.accent; c.beginPath(); c.moveTo(0, H); c.lineTo(4.6 * k, H); c.lineTo(4.6 * k, 0.25 * k); c.lineTo(3.9 * k, 0); c.lineTo(0, 0); c.fill();
+    d.text('04', 0.25, 0.2, 1.0, { color: '#e9e4d6', weight: 700 });
+    d.rect(1.65, 0.28, 2.6, 0.07, '#26292c');
+    d.text('AIRE 03 · HALDEN', 1.65, 0.42, 0.26, { color: '#26292c', weight: 600 });
+  });
+  const rChev = L.region(7.6, 0.36, (d) => d.chevrons(0, 0, 7.6, 0.36, { pitch: 0.22 }));
+  const rChevV = L.region(5.6, 0.3, (d) => d.chevrons(0, 0, 5.6, 0.3, { pitch: 0.2 }));
+  const rBlast = L.region(3.6, 0.55, (d) => { d.chevrons(0, 0, 3.6, 0.14, { pitch: 0.12 }); d.text('DANGER · SOUFFLE', 0.04, 0.17, 0.3, { color: '#e7c23a', weight: 700 }); });
+  const rCharge = L.region(3.2, 0.42, (d) => d.text('CHARGE MAX 120 T', 0.04, 0.06, 0.32, { color: '#e2b83a', weight: 700 }));
+  const rNo = L.region(1.4, 0.9, (d) => d.text('H4', 0.05, 0.08, 0.8, { color: '#26292c', weight: 700 }));
+  L.build();
+  const LM = L.material();
+  const decal = (geo) => S.add(geo, LM, [0, 0, 0], null, { cast: false, receive: true });
+
+  // ---------------------------------------------------------------- poutre de soute (deux tons)
+  const spineSt = [
+    { z: -10.2, w: 4.3, tw: 3.9, h: 2.9, hb: 3.1, y: 5.1, c: 0.5, r: 0.16, steps: 3 },
+    { z: -8.0, w: 5.0, tw: 4.6, h: 3.4, hb: 3.4, y: 5.0, c: 0.55, r: 0.18, steps: 8 },
+    { z: 14.9, w: 5.0, tw: 4.6, h: 3.4, hb: 3.4, y: 5.0, c: 0.55, r: 0.18, steps: 1 },
+    { z: 15.5, w: 4.85, tw: 4.45, h: 3.28, hb: 3.28, y: 5.0, c: 0.6, r: 0.18 },
+  ];
+  const WAIST = 0.32; // ligne de séparation peinture claire / composite sombre (angle sous l'horizontale)
+  const spineTop = skinHull(spineSt, { radial: 40, smooth: false, arc: [-WAIST, RX + WAIST] });
+  const spineBot = skinHull(spineSt, { radial: 20, smooth: false, arc: [RX + WAIST, 2 * RX - WAIST], cap0: true, cap1: { hole: [-3.68, 2.22, 3.68, 7.68] } });
+  S.add(spineTop.geometry, K.hull);
+  S.add(spineBot.geometry, K.hullDark);
+  S.add(spineBot.cap0, K.service);
+  S.add(spineBot.cap1, K.service);
+  const sp = spineTop; // surface de référence (patchs)
+  // nervures structurelles (cadres) et liston de flanc
+  for (const z of [-7.4, -1.4, 4.6, 10.6]) S.add(sp.band({ z, width: 0.42, depth: 0.07, a0: -0.75, a1: RX + 0.75 }), K.service);
+  for (const z of [-9.2, 15.15]) S.add(sp.band({ z, width: 0.5, depth: 0.09, a0: -0.75, a1: RX + 0.75 }), K.service);
+  for (const a of [-WAIST + 0.02, RX + WAIST - 0.02]) S.add(sp.strip({ z0: -8.6, z1: 14.9, angle: a, width: 0.22, depth: 0.08 }), K.service);
+  // trappes et panneaux composites rapportés
+  for (const s of [1, -1]) {
+    const a = s > 0 ? 0.05 : RX - 0.05;
+    for (const [z0, z1, h, sh] of [[-6.4, -4.6, 1.1, -0.7], [0.2, 2.6, 0.8, -0.7], [11.6, 13.8, 0.9, -0.7]]) {
+      S.add(sp.raised({ z0, z1, angle: a, height: h, shift: sh * s, depth: 0.035, segZ: 2, segS: 2 }), K.hullDark);
+    }
   }
-  S.box(iw * 2, 0.15, 25, hull2, [0, cy, 2.5]);
+  // gaines de train sous le ventre
+  for (const s of [-1, 1]) S.add(spineBot.raised({ z0: 8.7, z1: 11.3, angle: -RX / 2, height: 1.2, shift: s * 3.8, depth: 0.05, segZ: 2, segS: 2 }), K.service);
+
+  // ---------------------------------------------------------------- cabine (nez émoussé, verrière cerclée)
+  const cabSt = [
+    { z: -17.6, w: 2.7, tw: 1.7, h: 0.55, hb: 1.25, y: 3.95, c: 0.3, r: 0.18, steps: 3 },
+    { z: -17.1, w: 3.45, tw: 2.35, h: 1.05, hb: 1.95, y: 4.3, c: 0.4, r: 0.22, steps: 5 },
+    { z: -16.0, w: 3.95, tw: 2.75, h: 2.3, hb: 2.85, y: 5.0, c: 0.45, r: 0.25, steps: 5 },
+    { z: -14.8, w: 4.15, tw: 3.05, h: 2.75, hb: 3.2, y: 5.2, c: 0.5, r: 0.25, steps: 3 },
+    { z: -12.6, w: 4.15, tw: 3.05, h: 2.8, hb: 3.3, y: 5.2, c: 0.5, r: 0.25, steps: 3 },
+    { z: -9.6, w: 4.15, tw: 3.05, h: 2.8, hb: 3.3, y: 5.2, c: 0.5, r: 0.25 },
+  ];
+  const cab = skinHull(cabSt, { radial: 48, cap0: true });
+  S.add(cab.geometry, K.hull);
+  S.add(cab.cap0, K.hullDark);
+  // ventre de la cabine en composite (patch conforme)
+  S.add(cab.patch({ z0: -17.3, z1: -9.7, a0: RX + 0.45, a1: 2 * RX - 0.35, off: 0.006, segZ: 14, segS: 10, metric: true }), K.hullDark);
+  // collier cabine / poutre
+  S.add(cab.band({ z: -9.85, width: 0.45, depth: 0.1 }), K.service);
+  // verrière : vitrage conforme + cadre (meneaux et traverses en relief)
+  const gz0 = -16.95, gz1 = -15.25, ga0 = 0.42, ga1 = RX - 0.42;
+  S.add(cab.patch({ z0: gz0, z1: gz1, a0: ga0, a1: ga1, off: 0.004, segZ: 6, segS: 16 }), K.glass, [0, 0, 0], null, { cast: false });
+  for (const z of [gz0, gz1]) S.add(cab.raised({ z0: z - 0.08, z1: z + 0.08, a0: ga0 - 0.04, a1: ga1 + 0.04, depth: 0.08, segZ: 1, segS: 16 }), K.frame);
+  for (const a of [ga0, 0.95, RX / 2, RX - 0.95, ga1]) S.add(cab.strip({ z0: gz0, z1: gz1, angle: a, width: 0.12, depth: 0.08, segZ: 6 }), K.frame);
+  // hublots latéraux
+  for (const s of [1, -1]) {
+    const a = s > 0 ? 0.42 : RX - 0.42;
+    for (const [z0, z1] of [[-14.5, -13.5], [-13.2, -12.2]]) {
+      S.add(cab.patch({ z0, z1, angle: a, height: 0.55, off: 0.004, segZ: 2, segS: 2 }), K.glass, [0, 0, 0], null, { cast: false });
+      S.add(cab.raised({ z0: z0 - 0.06, z1: z1 + 0.06, angle: a, height: 0.69, depth: 0.03, segZ: 2, segS: 2, base: -0.02 }), K.frame);
+    }
+    // porte d'équipage (bâbord) : cadre en relief
+    if (s < 0) S.add(cab.raised({ z0: -11.9, z1: -10.6, angle: RX + 0.05, height: 2.0, depth: 0.025, segZ: 2, segS: 4 }), K.service);
+  }
+  // capteur de menton + pare-chocs du nez
+  S.add(new THREE.SphereGeometry(0.32, 20, 12, 0, Math.PI * 2, 0, Math.PI / 2), K.black, [0, 2.35, -16.2], [Math.PI, 0, 0]);
+  S.add(bevelBox(4.4, 0.32, 0.36, 0.1), K.service, [0, 3.35, -17.62]);
+  for (const s of [-1, 1]) {
+    S.add(bevelBox(1.0, 0.4, 0.14, 0.05), K.frame, [s * 1.55, 4.05, -17.58]);
+    for (const k of [-1, 1]) S.add(new THREE.CircleGeometry(0.12, 16), K.lensWhite, [s * 1.55 + k * 0.24, 4.05, -17.66], [0, Math.PI, 0], { cast: false });
+  }
+
+  // ---------------------------------------------------------------- berceau dorsal : conteneurs
+  const contCol = [0x7a3a2c, 0x2f4d66, 0x6a6a5c, 0x7d6a34];
+  const yTop = 8.4;
+  for (let b = 0; b < 3; b++) {
+    const zc = -4.4 + b * 6.0;
+    for (const s of [-1, 1]) {
+      if (b === 2 && s > 0) continue; // emplacement vide : pinces visibles
+      const cm = mats.cladding(contCol[(b * 2 + (s > 0 ? 1 : 0)) % 4], { grime: 0.8, rust: 0.25 });
+      S.box(2.44, 2.44, 5.7, cm, [s * 1.33, yTop + 0.06 + 1.22, zc], null, { tex: 2 });
+      // cadres d'extrémité du conteneur
+      for (const e of [-1, 1]) S.add(bevelBox(2.5, 2.5, 0.12, 0.03), K.mech, [s * 1.33, yTop + 0.06 + 1.22, zc + e * 2.86]);
+    }
+    if (b === 2) for (const e of [-1, 1]) for (const x of [0.6, 2.1]) S.parts(dockingClamp({ size: 0.55 }), M, [x, yTop, zc + e * 2.2]);
+  }
+  // gaines techniques le long des flancs (sur le composite sombre), colliers tous les 2 m
+  for (const s of [-1, 1]) {
+    for (const [y, r] of [[3.05, 0.09], [2.8, 0.06]]) {
+      const x = s * (5.0 + r + 0.02);
+      S.add(rodBetween(new THREE.Vector3(x, y, -7.6), new THREE.Vector3(x, y, 14.4), r, 10), K.mech);
+    }
+    for (let z = -7; z <= 14; z += 2) S.add(bevelBox(0.16, 0.48, 0.12, 0.03), K.service, [s * 5.12, 2.93, z]);
+  }
+  // rails du berceau + poteaux aux nervures
+  for (const s of [-1, 1]) S.add(bevelBox(0.3, 0.14, 18.4, 0.04), K.service, [s * 2.75, yTop + 0.07, 1.6]);
+  for (const z of [-7.4, -1.4, 4.6, 10.6]) for (const s of [-1, 1]) {
+    S.add(bevelBox(0.3, 1.5, 0.34, 0.05), K.service, [s * 2.85, yTop + 0.75, z]);
+    S.add(bevelBox(0.32, 0.12, 0.36, 0.02), K.hazard, [s * 2.85, yTop + 1.56, z]);
+  }
+
+  // ---------------------------------------------------------------- nacelles + pylônes + tuyères
+  for (const s of [-1, 1]) {
+    const nx = s * 7.5, ny = 5.4;
+    const nacSt = [
+      { z: 2.4, w: 1.12, h: 1.08, x: nx, y: ny, n: 2.25, steps: 3 },
+      { z: 3.0, w: 1.42, h: 1.38, x: nx, y: ny, n: 2.3, steps: 2 },
+      { z: 3.6, w: 1.5, h: 1.45, x: nx, y: ny, n: 2.35, steps: 4 },
+      { z: 10.6, w: 1.5, h: 1.45, x: nx, y: ny, n: 2.35, steps: 5 },
+      { z: 12.6, w: 0.95, h: 0.92, x: nx, y: ny, n: 2.1 },
+    ];
+    const cowl = skinHull(nacSt.slice(0, 3), { radial: 40, cap0: true });
+    const nac = skinHull(nacSt.slice(2), { radial: 40, cap1: true });
+    S.add(cowl.geometry, K.accent);
+    S.add(cowl.cap0, K.vent);
+    S.add(nac.geometry, K.hull);
+    S.add(nac.cap1, K.mech);
+    // lèvre d'entrée d'air
+    S.add(new THREE.TorusGeometry(1.06, 0.07, 8, 40), K.bare, [nx, ny, 2.42]);
+    S.add(new THREE.CylinderGeometry(0.28, 0.4, 0.5, 20), K.mech, [nx, ny, 2.3], [Math.PI / 2, 0, 0]);
+    // cerclages, panneau composite inférieur, trappes de maintenance
+    for (const z of [4.3, 7.2, 10.1]) S.add(nac.band({ z, width: 0.22, depth: 0.05 }), K.service);
+    S.add(nac.patch({ z0: 3.7, z1: 10.9, a0: RX + 0.5, a1: 2 * RX - 0.5, off: 0.006, segZ: 12, segS: 8, metric: true }), K.hullDark);
+    S.add(nac.raised({ z0: 5.0, z1: 6.6, angle: s > 0 ? 0.2 : RX - 0.2, height: 0.9, depth: 0.03, segZ: 2, segS: 3 }), K.hullDark);
+    S.parts(ventPanel(0.9, 1.4, 0.07), M, [nx, ny + 1.42, 8.8]);
+    // pylône (biseauté, carénage incliné) + radiateur
+    const px = s * 6.05;
+    S.add(bevelBox(2.4, 1.0, 7.2, 0.18), K.hull, [px, 5.7, 7.2]);
+    S.add(bevelBox(2.2, 0.5, 7.0, 0.12), K.hullDark, [px, 5.0, 7.2]);
+    S.parts(radiator({ len: 5.2, h: 0.42, n: 8, w: 1.2 }), M, [s * 5.6, 6.2, 7.4]);
+    // tuyère principale
+    S.parts(bellNozzle({ rt: 0.46, re: 1.08, len: 2.5, wall: 0.055, seg: 40, mount: 0.75, bands: 2 }), M, [nx, ny, 13.15]);
+    // bouclier thermique arrière (anneau en métal nu, teinté)
+    S.add(nac.band({ z: 12.3, width: 0.3, depth: 0.04 }), K.bare);
+    // livrée nacelle
+    decal(nac.patch({ z0: 7.6, z1: 11.1, angle: s > 0 ? 0.35 : RX - 0.35, height: 0.55, uv: rBlast.uv, readable: true, segZ: 6, segS: 2 }));
+    // feux de position (bâbord rouge, tribord vert) en bout de nacelle
+    S.parts(lightPod({ r: 0.08 }), M, [s * 9.0, ny, 4.2], [0, 0, -s * Math.PI / 2]);
+    S.navLight([s * 9.14, ny, 4.2], s < 0 ? 0xff2010 : 0x20ff40, 0);
+    // RCS
+    S.parts(rcsBlock({ size: 0.42, dirs: ['+y', '-y', s > 0 ? '+x' : '-x'] }), M, [nx + s * 1.25, ny + 0.75, 11.2], [0, 0, -s * 0.5]);
+  }
+  // RCS aux quatre coins de la poutre
+  for (const s of [-1, 1]) for (const z of [-7.0, 14.2]) S.parts(rcsBlock({ size: 0.46, dirs: ['+y', s > 0 ? '+x' : '-x', z < 0 ? '-z' : '+z'] }), M, [s * 4.46, 8.26, z], [0, 0, -s * Math.PI / 4]);
+
+  // ---------------------------------------------------------------- antennes, feux, détails cabine
+  S.parts(antenna({ type: 'dish', h: 1.1, r: 0.42, tilt: 0.7 }), M, [-1.4, 7.97, -11.2]);
+  S.parts(antenna({ type: 'whip', h: 1.6 }), M, [1.6, 7.97, -12.6]);
+  S.parts(antenna({ type: 'blade', h: 0.45 }), M, [0.3, 7.99, -13.6]);
+  S.parts(antenna({ type: 'mast', h: 1.2 }), M, [3.4, 8.4, 14.0]);
+  S.parts(lightPod({ r: 0.09 }), M, [0, 7.98, -10.6]);
+  S.navLight([0, 8.17, -10.6], 0xff3018, 0.3);
+  S.parts(lightPod({ r: 0.09 }), M, [0, 8.4, 15.0]);
+  S.navLight([0, 8.6, 15.0], 0xffffff, 0.9);
+  S.parts(lightPod({ r: 0.08 }), M, [0, 1.62, 2.0], [Math.PI, 0, 0]);
+  S.navLight([0, 1.42, 2.0], 0xff3018, 0.75);
+  // phares d'atterrissage sous le nez
+  for (const s of [-1, 1]) {
+    S.add(new THREE.CylinderGeometry(0.16, 0.2, 0.14, 16), K.mech, [s * 1.1, 2.06, -15.6]);
+    S.add(new THREE.CircleGeometry(0.14, 16), K.lensWhite, [s * 1.1, 1.985, -15.6], [Math.PI / 2, 0, 0], { cast: false });
+  }
+
+  // ---------------------------------------------------------------- livrée (décalcomanies conformes)
+  for (const s of [1, -1]) {
+    const side = s > 0 ? 0 : RX;
+    decal(sp.patch({ z0: -7.9, z1: 14.6, angle: side, shift: s * 2.1, height: 0.5, uv: rStripe.uv, readable: true, segZ: 8, segS: 2 }));
+    decal(sp.patch({ z0: -6.6, z1: 1.9, angle: side, shift: s * 1.2, height: 0.9, uv: rReg.uv, readable: true, segZ: 6, segS: 2 }));
+    decal(sp.patch({ z0: -6.6, z1: 0.4, angle: side, shift: s * 0.45, height: 0.34, uv: rOp.uv, readable: true, segZ: 6, segS: 2 }));
+    decal(cab.patch({ z0: -14.9, z1: -10.3, angle: side, shift: s * -0.55, height: 1.5, uv: rCab.uv, readable: true, segZ: 8, segS: 4 }));
+  }
+  decal(cab.patch({ z0: -12.4, z1: -11.0, angle: RX / 2, height: 0.9, uv: rNo.uv, readable: true, up: [0, 0, -1], segZ: 3, segS: 3 }));
+  // chevrons autour de l'ouverture de soute (face arrière plane)
+  {
+    const g = planeDecal(7.6, 0.36, rChev.uv); g.translate(0, 7.95, 15.53); decal(g);
+    for (const s of [-1, 1]) { const v = planeDecal(5.6, 0.3, rChevV.uv); v.rotateZ(Math.PI / 2); v.translate(s * 3.95, 4.95, 15.53); decal(v); }
+    const c = planeDecal(3.2, 0.42, rCharge.uv); c.translate(0, 6.9, -9.88); decal(c);
+  }
+  // cadre de l'ouverture
+  S.add(bevelBox(8.1, 0.5, 0.3, 0.08), K.service, [0, 7.93, 15.4]);
+  for (const s of [-1, 1]) S.add(bevelBox(0.5, 5.8, 0.3, 0.08), K.service, [s * 3.93, 5.0, 15.4]);
+
+  // ---------------------------------------------------------------- soute : plancher, parois, plafond, éclairage
+  const floorM = mats.metal(0x55595b, { rough: 0.65 });
+  const wallM = mats.paint(0x6c716f, { kind: 'wide', uv: 3, grime: 0.7, scratch: 0.5, rust: 0.1 });
+  S.box(iw * 2, 0.15, 25.5, floorM, [0, fy - 0.07, 2.75], null, { tex: 2 });
+  for (const s of [-1, 1]) {
+    S.box(0.15, cy - fy, 25.5, wallM, [s * iw, (fy + cy) / 2, 2.75], null, { tex: 3 });
+    for (let z = -9; z < 15; z += 2) S.box(0.25, cy - fy, 0.2, K.mech, [s * (iw - 0.1), (fy + cy) / 2, z], null, { cast: false });
+    S.box(0.1, 0.06, 23, K.hazard, [s * (iw - 0.2), fy + 1.0, 2.5], null, { cast: false });
+  }
+  S.box(iw * 2, 0.15, 25.5, wallM, [0, cy, 2.75]);
   for (let z = -8; z < 14; z += 4) S.box(1.2, 0.05, 0.3, mats.emissive(0xfff2dd, 3.5), [0, cy - 0.1, z], null, { cast: false });
-  S.box(iw * 2, cy - fy, 0.2, hull2, [0, (fy + cy) / 2, -10]);
-  // porte arrière (rampe large)
+  S.box(iw * 2, cy - fy, 0.2, wallM, [0, (fy + cy) / 2, -10]);
+  // rampe arrière : tablier, longerons, charnière, vérins
   const rampLen = Math.hypot(fy, 5.2), ang = Math.atan2(fy, 5.2);
   S.box(iw * 2 - 0.2, 0.18, rampLen, mats.metal(0x5a5e60, { rough: 0.5 }), [0, fy / 2 + 0.02, 15.5 + 2.6], [ang, 0, 0], { tex: 2 });
+  S.add(new THREE.CylinderGeometry(0.16, 0.16, iw * 2 - 0.3, 16), K.mech, [0, fy - 0.05, 15.5], [0, 0, Math.PI / 2]);
   for (const s of [-1, 1]) {
-    S.box(0.1, 0.25, rampLen, yellow, [s * (iw - 0.15), fy / 2 + 0.2, 15.5 + 2.6], [ang, 0, 0], { cast: false });
-    S.cyl(0.09, 0.09, 3.0, mats.smooth(0xc8ccce, 0.2, 1), [s * (iw - 0.4), fy * 0.8 + 0.5, 16.5], [Math.PI / 2 - 1.0, 0, 0]);
+    S.box(0.16, 0.3, rampLen, K.hazard, [s * (iw - 0.15), fy / 2 + 0.2, 15.5 + 2.6], [ang, 0, 0], { cast: false });
+    S.add(rodBetween(new THREE.Vector3(s * (iw - 0.4), 6.6, 15.3), new THREE.Vector3(s * (iw - 0.4), 1.55, 17.6), 0.11, 12), K.mech);
+    S.add(rodBetween(new THREE.Vector3(s * (iw - 0.4), 3.5, 16.7), new THREE.Vector3(s * (iw - 0.4), 1.4, 17.7), 0.06, 10), K.chrome);
   }
-  // pieds d'atterrissage
-  for (const s of [-1, 1]) for (const z of [-11, 10]) S.gear(s * 4.0, z, 2.6, mats, { r: 0.24, pad: 1.6 });
+  // train d'atterrissage
+  const chock = mats.plastic(0xd4a017, 0.6);
+  for (const s of [-1, 1]) {
+    for (const [x, z, h, br] of [[3.4, -12.0, 1.95, '+z'], [3.8, 10.0, 1.65, '-z']]) {
+      S.parts(landingStrut({ h, r: 0.24, pad: 1.5, brace: br }), M, [s * x, 0, z]);
+      S.box(0.25, 0.2, 0.3, chock, [s * x + 0.95, 0.1, z]);
+      S.box(0.25, 0.2, 0.3, chock, [s * x - 0.95, 0.1, z]);
+    }
+  }
+  S.engines = NZ; // S.engines.setThrust(0..1) : lueur des tuyères (veille par défaut)
+
   // collisions
   S.cbox(10.4, fy, 31, [0, fy / 2, 0]);
   for (const s of [-1, 1]) S.cbox(0.4, cy - fy, 26, [s * (iw + 0.2), (fy + cy) / 2, 2.5]);
-  for (const s of [-1, 1]) S.cbox(3.2, 6, 26, [s * 6.0, 4.6, 2.5]);
+  for (const s of [-1, 1]) S.cbox(1.4, 6.8, 25.5, [s * 4.4, 5.0, 2.75]);
+  for (const s of [-1, 1]) S.cbox(3.0, 2.9, 12.5, [s * 7.5, 5.4, 8.4]);
   S.cbox(iw * 2, 0.3, 26, [0, cy + 0.15, 2.5]);
-  S.cbox(10, 7, 6, [0, 5, -13]);
+  S.cbox(9.6, 3.0, 18.5, [0, 9.7, 1.6]);
+  S.cbox(8.4, 6.6, 7.8, [0, 5.2, -13.4]);
   {
     const g = new THREE.PlaneGeometry(iw * 2 - 0.2, rampLen + 0.1).toNonIndexed(); g.rotateX(-Math.PI / 2);
     g.applyMatrix4(Builder.matrix([0, fy / 2 + 0.11, 15.5 + 2.6], [ang, 0, 0])); g.applyMatrix4(S.M); ctx.builder.addCollider(g);

@@ -69,5 +69,10 @@ export const SHOTS = {
   ship_holdup: { pos: [90, 1.7, 0], look: [92, 8, 12], fov: 78 },
   ship_cabin: { pos: [74, 6.3, 6.3], look: [67, 5.2, 1], fov: 74 },
   ship_ext: { pos: [170, 40, -110], look: [80, 5, 30], fov: 55 },
+  mulet_front: { pos: [4, 3.2, -38], look: [13.5, 5.5, -17], fov: 62 },
+  mulet_side: { pos: [30.5, 2.0, 5], look: [12.5, 5.6, -15], fov: 68 },
+  mulet_engines: { pos: [25, 2.4, 9], look: [15, 5.4, -5], fov: 62 },
+  mulet_nozzle: { pos: [25.5, 4.2, 7.5], look: [20.5, 5.6, -1.5], fov: 50 },
+  mulet_top: { pos: [-1, 13.5, -31], look: [13.5, 6.5, -12], fov: 62 },
   dome_ext: { pos: [20, 70, 60], look: [-40, 45, 5], fov: 60 },
 };
