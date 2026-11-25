@@ -54,6 +54,7 @@ import { Mining } from './game/mining.js';
 import { Combat } from './game/combat.js';
 import { Ground } from './game/ground.js';
 import { StationClock } from './game/clock.js';
+import { Notifier } from './ui/notify.js';
 
 const params = new URLSearchParams(location.search);
 const HX_ = 32;
@@ -596,11 +597,11 @@ async function boot() {
   ground.onEvent = (e, a, b, c, d) => {
     if (e === 'raid') {
       audio.say(`Ici ${a.name}. Nous sommes attaqués ! Des pirates sortent de la tour. Demandons assistance immédiate.`);
-      toast(`Raid pirate sur ${a.name} · ${plural(b, 'assaillant', 'assaillants')} · ${touch ? 'DESC.' : 'G'} : descendre armé`);
+      toast(`Raid pirate sur ${a.name} · ${plural(b, 'assaillant', 'assaillants')} · ${touch ? 'DESC.' : 'G'} : descendre armé`, { urgent: true });
     }
     if (e === 'alert') {
       audio.say('Alerte. Intrusion armée, baie du hangar zéro sept. Civils, mettez-vous à l\'abri. Port d\'arme autorisé.');
-      toast(`Alerte intrusion · ${plural(a, 'pirate franchit', 'pirates franchissent')} le champ de la baie · ${touch ? 'ARME' : 'G'} : dégainer`);
+      toast(`Alerte intrusion · ${plural(a, 'pirate franchit', 'pirates franchissent')} le champ de la baie · ${touch ? 'ARME' : 'G'} : dégainer`, { urgent: true });
     }
     if (e === 'alertEnd') { audio.say('Fin d\'alerte. Reprise normale des opérations.'); toast('Fin d\'alerte · armes rangées'); }
     if (e === 'evacStation') toast(`Soigné à l'infirmerie de la station · −${money(a)} ¤ · la sécurité a repoussé l'intrusion`);
@@ -614,9 +615,9 @@ async function boot() {
       toast(`${what} · ${c}`);
     }
     if (e === 'loot') toast(`Butin ramassé · ${a}`);
-    if (e === 'guardDown') toast(`${a.name} est à terre !`);
-    if (e === 'down') { audio.say('Blessé grave. Évacuation vers le vaisseau.'); toast('Vous êtes à terre !'); }
-    if (e === 'evac') toast(`Évacué à bord · soins d'urgence −${money(a)} ¤ · les pirates pillent le dépôt et s'enfuient`);
+    if (e === 'guardDown') toast(`${a.name} est à terre !`, { urgent: true });
+    if (e === 'down') { audio.say('Blessé grave. Évacuation vers le vaisseau.'); toast('Vous êtes à terre !', { urgent: true }); }
+    if (e === 'evac') toast(`Évacué à bord · soins d'urgence −${money(a)} ¤ · les pirates pillent le dépôt et s'enfuient`, { urgent: true });
     if (e === 'fled') toast('Décollage · le raid se poursuit sans vous');
     if (e === 'noguns') toast('Armes interdites dans la station');
     if (e === 'nogun') toast('Aucune arme personnelle · Armurerie Kestrel, galerie');
@@ -630,11 +631,11 @@ async function boot() {
     const fire = touch ? 'TIR' : 'clic gauche / X';
     if (e === 'wave' && c) {
       audio.say('Alerte. Cargo pirate escorté. Désemparez-le pour l\'aborder.');
-      return toast(`Cargo pirate Rançonneur et ${plural(a - 1, 'escorte', 'escortes')} · abattez ses boucliers et sa coque sous 30 % pour l'aborder`);
+      return toast(`Cargo pirate Rançonneur et ${plural(a - 1, 'escorte', 'escortes')} · abattez ses boucliers et sa coque sous 30 % pour l'aborder`, { urgent: true });
     }
     if (e === 'wave') {
       audio.say('Alerte. Contacts hostiles en approche.');
-      toast(`Contacts hostiles · ${plural(a, 'chasseur pirate', 'chasseurs pirates')} · ${b} m${mining.mode ? ` · ${touch ? 'MIN' : 'M'} : quitter le minage` : ` · ${fire} : tirer`}`);
+      toast(`Contacts hostiles · ${plural(a, 'chasseur pirate', 'chasseurs pirates')} · ${b} m${mining.mode ? ` · ${touch ? 'MIN' : 'M'} : quitter le minage` : ` · ${fire} : tirer`}`, { urgent: true });
     }
     if (e === 'kill') { toast(`${a.K.name} détruit · prime +${b.toLocaleString('fr-FR').replace(/\u202f/g, ' ')} ¤${c ? ` · ${plural(c, 'hostile restant', 'hostiles restants')}` : ''}`); }
     if (e === 'clear') { audio.say('Menace éliminée. Primes versées par la sécurité de Halden.'); setTimeout(() => toast(`Menace éliminée · primes : +${a.toLocaleString('fr-FR').replace(/\u202f/g, ' ')} ¤ · capsules d'épave à récupérer (repères jaunes du radar)`), 2500); }
@@ -645,7 +646,7 @@ async function boot() {
     if (e === 'nomissiles') toast('Plus de missiles · réarmement à l\'atterrissage');
     if (e === 'nolock') toast('Pas de verrouillage · gardez la cible dans l\'axe pendant 3 s');
     if (e === 'launch') toast(`Missile lancé · ${plural(a, 'restant', 'restants')}`);
-    if (e === 'destroyed') { audio.say('Alerte. Perte d\'intégrité de la coque. Éjection.'); toast('Héron détruit !'); }
+    if (e === 'destroyed') { audio.say('Alerte. Perte d\'intégrité de la coque. Éjection.'); toast('Héron détruit !', { urgent: true }); }
     if (e === 'disabled') { audio.say('Cargo pirate désemparé. Arrimage possible.'); toast(`${a.K.name} désemparé · approchez à moins de 150 m, ralentissez · ${touch ? 'ABORD.' : 'E / B'} : arrimer et aborder`); }
     if (e === 'docked') { flight.lastDock = flight.dockedAt; toast('Arrimage · passage du sas'); }
     if (e === 'escorts') toast('Impossible d\'arrimer : éliminez d\'abord les escortes');
@@ -684,9 +685,9 @@ async function boot() {
   // ascenseur panoramique de La Couronne (pont habitat ↔ étage de prestige)
   const luxLift = new Elevators(ctx.lux.shafts, player);
   ctx.luxLift = luxLift;
-  luxLift.onEvent = (e, S, carried) => {
+  luxLift.onEvent = (e, S, carried, who) => {
     if (e === 'start' || e === 'arrived') audio.blip();
-    if (e === 'called') toast('Ascenseur panoramique appelé');
+    if (e === 'called' && who === 'player') toast('Ascenseur panoramique appelé');
     if (e === 'queued') toast('Cabine en route · votre appel est prioritaire, elle viendra vous chercher');
     if (e === 'arrived' && carried) toast(S.y > DECK_Y + 1 ? 'La Couronne · Maison Élysée, Nova Atelier, Aérodyne, salon Le Zénith' : 'Pont habitat · bar La Comète, infirmerie, cabines · Cour des Saveurs');
   };
@@ -702,9 +703,9 @@ async function boot() {
     const LUXD = ['Coupe de champagne de Lys', 'Cocktail « Nébuleuse »', 'Thé blanc des serres orbitales', 'Single malt vieilli en apesanteur'];
     interactables.push({ pos: LS.bar.pos, r: 1.7, label: 'E — Le Zénith : commander (120 ¤)', fn: () => { if (!game.pay(120)) return 'Crédits insuffisants'; audio.coffee(); toast(`${LUXD[Math.floor(Math.random() * LUXD.length)]} · servi sur glace taillée`); } });
   }
-  elevators.onEvent = (e, S, carried) => {
+  elevators.onEvent = (e, S, carried, who) => {
     if (e === 'start' || e === 'arrived') audio.blip();
-    if (e === 'called') toast('Ascenseur appelé · cabine en approche');
+    if (e === 'called' && who === 'player') toast('Ascenseur appelé · cabine en approche');
     if (e === 'queued') toast('Cabine en route · votre appel est prioritaire, elle viendra vous chercher');
     if (e === 'arrived' && carried) toast(S.y > 1 ? 'Pont habitat · bar La Comète, infirmerie, cabines · Cour des Saveurs (couloir nord) · Grand Dôme au fond de la Cour' : 'Rez-de-chaussée · galerie marchande');
   };
@@ -818,8 +819,32 @@ async function boot() {
     if (document.pointerLockElement) document.exitPointerLock();
     fn();
   }
-  let toastT = 0;
-  function toast(msg) { const el = $('toast'); el.textContent = msg; el.classList.remove('hidden'); toastT = 4; }
+  // messages du HUD : file d'attente, durée selon la longueur, urgences prioritaires, journal (menu Échap)
+  const notes = new Notifier($('toast'), { clock: () => ctx.time.label.split(' · ')[0] });
+  notes.paused = true;   // jusqu'à l'entrée en jeu : les messages attendent derrière l'écran d'accueil
+  /** toast(msg) : message ordinaire ; toast(msg, { urgent: true }) : alerte prioritaire ; { duration } en secondes */
+  function toast(msg, opts) { notes.push(msg, opts); }
+  ctx.notes = notes;
+  const logEl = $('msglog'), logBtn = $('logbtn');
+  const renderLog = () => {
+    const ol = logEl.querySelector('ol'); ol.textContent = '';
+    for (const m of [...notes.log].reverse()) {
+      const li = document.createElement('li'); if (m.urgent) li.className = 'urgent';
+      const tm = document.createElement('time'); tm.textContent = m.time;
+      const tx = document.createElement('span'); tx.textContent = m.n > 1 ? `${m.text} (×${m.n})` : m.text;
+      li.append(tm, tx); ol.appendChild(li);
+    }
+    logEl.querySelector('.ml-empty').classList.toggle('hidden', notes.log.length > 0);
+  };
+  const showLog = (on) => {
+    logEl.classList.toggle('hidden', !on); $('start').classList.toggle('logopen', on);
+    logBtn.textContent = on ? 'Fermer le journal' : 'Journal des messages';
+    logBtn.setAttribute('aria-expanded', String(on));
+    if (on) { renderLog(); logEl.querySelector('ol').scrollTop = 0; }
+  };
+  logBtn.addEventListener('click', () => showLog(logEl.classList.contains('hidden')));
+  notes.onLog = () => { if (!logEl.classList.contains('hidden')) renderLog(); };
+  ctx.showLog = showLog;
 
   // ------------------------------------------------------------------ menu / démarrage
   let running = false;
@@ -828,7 +853,7 @@ async function boot() {
     $('hud').classList.remove('hidden');
     if (touch) $('touch').classList.remove('hidden');
     input.enabled = true;
-    running = true;
+    running = true; notes.paused = false; showLog(false);
     if (!touch) lockPointer();
     audio.start($('sound').checked);
     if ($('go').textContent !== 'Reprendre') toast('Boutiques, armurerie, recrutement : galerie marchande, par le sas droit devant vous');
@@ -842,8 +867,9 @@ async function boot() {
     if (saved) vm.value = saved; audio.voiceMode = vm.value;
     vm.addEventListener('change', () => { audio.voiceMode = vm.value; try { localStorage.setItem('sillage.voice', vm.value); } catch { /* */ } audio.speakAs('Bonjour, pilote. Voici ma voix.', { pitch: 1, rate: 1 }); }); }
   const openMenu = () => {
-    running = false; input.enabled = false;
+    running = false; input.enabled = false; notes.paused = true;
     $('start').classList.remove('hidden'); $('touch').classList.add('hidden');
+    logBtn.classList.toggle('hidden', !notes.log.length); showLog(false);
     if (document.pointerLockElement) document.exitPointerLock();
   };
 
@@ -851,6 +877,7 @@ async function boot() {
   function simulate(dt, t) {
     mats.shared.uTime.value = t;
     ctx.time.update(dt);
+    notes.update(dt);
     const blockers = crowd.blockers(player);
     for (const u of scenes.updaters) u(dt, t, blockers);
     crowd.update(dt, player, camera.position);
@@ -910,7 +937,7 @@ async function boot() {
   $('start').classList.remove('hidden');
 
   // ------------------------------------------------------------------ HUD du fret : contrats en cours et repère de navigation
-  const navEl = $('nav'), navTxt = navEl.querySelector('span'), jobsEl = $('jobs');
+  const navEl = $('nav'), navTxt = navEl.querySelector('span'), jobsEl = $('jobs'), toastEl = $('toast');
   let jobsAcc = 1, persistAcc = 0;
   const _p = new THREE.Vector3();
   /** Figurants solides du pont habitat (Cour des Saveurs et promenade) pour les collisions du joueur. */
@@ -1104,9 +1131,14 @@ async function boot() {
     navTxt.textContent = `${T.name} · ${d > 1000 ? (d / 1000).toFixed(1).replace('.', ',') + ' km' : Math.round(d) + ' m'}`;
     // le losange reste sur le point projeté ; seul le texte est décalé pour rester entièrement à l'écran
     const px = (x * 0.5 + 0.5) * innerWidth, hh = navEl.offsetHeight / 2 + 4;
-    const py = Math.min(innerHeight - hh, Math.max(hh, (-y * 0.5 + 0.5) * innerHeight));
+    let py = Math.min(innerHeight - hh, Math.max(hh, (-y * 0.5 + 0.5) * innerHeight));
     const hw = navTxt.offsetWidth / 2, m = 8;
     const dx = Math.max(0, m + hw - px) + Math.min(0, innerWidth - m - hw - px);
+    // le repère ne passe jamais sous les messages : il est remonté juste au-dessus de leur zone
+    if (notes.visible.length) {
+      const r = toastEl.getBoundingClientRect();
+      if (px + dx + hw > r.left && px + dx - hw < r.right && py + hh > r.top - 4 && py - hh < r.bottom) py = Math.max(hh, r.top - 4 - hh);
+    }
     navEl.style.left = `${px}px`; navEl.style.top = `${py}px`;
     navTxt.style.transform = dx ? `translateX(${dx}px)` : '';
   }
@@ -1251,7 +1283,6 @@ async function boot() {
     }
     simulate(dt, t);
     audio.update(dt, player, crowd, scenes);
-    if (toastT > 0) { toastT -= dt; if (toastT <= 0) $('toast').classList.add('hidden'); }
     clockEl.textContent = `HALDEN-7 · ${ctx.time.label} · ${crowd.agents.filter((a) => !a.away).length} pers.`;
     renderer.setExposure(1.15 - 0.45 * ctx.time.dusk);
     updateFreightHud();

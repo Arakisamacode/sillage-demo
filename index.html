@@ -40,6 +40,12 @@
         </label>
       </div>
       <button id="go">Entrer dans le hangar</button>
+      <button id="logbtn" class="hidden" type="button" aria-controls="msglog" aria-expanded="false">Journal des messages</button>
+      <div id="msglog" class="hidden" role="log" aria-label="Journal des messages">
+        <div class="ml-head">Journal des messages <small>20 derniers · heure de la station</small></div>
+        <p class="ml-empty">Aucun message pour l'instant.</p>
+        <ol></ol>
+      </div>
       <div class="help desktop">
         <b>ZQSD / WASD</b> se déplacer · <b>Maj</b> courir · <b>Souris</b> regarder · <b>V</b> vue 1re / 3e personne ·
         <b>E</b> interagir / parler · <b>C</b> mode analyse · <b>K</b> codex · <b>I</b> inventaire · <b>Échap</b> menu<br>Aux commandes du Héron : <b>Espace</b> décoller · en vol <b>ZQSD</b> poussée, <b>souris</b> orientation, <b>Espace / C</b> monter / descendre, <b>Q / E</b> roulis, <b>Maj</b> postcombustion, <b>L</b> atterrir<br>Contrats de fret : terminal du quai, à gauche de la rampe du Héron · Combat spatial : <b>clic gauche</b> ou <b>X</b> tirer, <b>R</b> missile (après verrouillage), <b>T</b> changer de cible · Avant-postes : <b>G</b> descendre armé / dégainer, <b>clic gauche</b> tirer, <b>R</b> recharger, <b>T</b> changer d'arme, <b>H</b> stylo médical, <b>E</b> à la rampe pour remonter · Minage en vol : <b>M</b> mode minage, même bouton pour le laser
@@ -72,7 +78,7 @@
     <div id="foot" class="hidden"></div>
     <canvas id="radar" class="hidden" width="150" height="150"></canvas>
     <div id="fps"></div>
-    <div id="toast" class="hidden"></div>
+    <div id="toast" class="hidden" aria-live="polite"></div>
   </div>
 
   <div id="touch" class="hidden">

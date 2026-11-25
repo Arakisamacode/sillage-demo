@@ -263,7 +263,7 @@ export class Elevators {
     if (who === 'npc' && ((S.pending !== undefined && S.pending !== y) || (S.hold > 0 && !this.isAt(S, y)))) return;
     if (S.moving) { if (who === 'player' && S.to !== y) { S.pending = y; this.onEvent('queued', S); } return; }
     if (this.isAt(S, y)) { S.hold = Math.max(S.hold, 3); if (who === 'player') S.pending = undefined; return; }
-    this._start(S, y, false); if (who === 'player') S.pending = undefined; this.onEvent('called', S);
+    this._start(S, y, false); if (who === 'player') S.pending = undefined; this.onEvent('called', S, false, who);
   }
   ride(S) { if (S.moving) return; const [a, b] = S.levels || [0, DECK_Y]; this._start(S, Math.abs(S.y - a) < 1 ? b : a, true); }
   /** Départ demandé par un passager non joueur (figurant) vers le niveau y. */
@@ -281,7 +281,7 @@ export class Elevators {
       // appel du joueur en file : servi dès que les portes ont laissé sortir les passagers
       if (!S.moving && S.pending !== undefined) {
         if (Math.abs(S.y - S.pending) < 0.05) S.pending = undefined;
-        else if (S.hold < 2 && !this._inside(S)) { const y = S.pending; S.pending = undefined; this._start(S, y, false); this.onEvent('called', S); }
+        else if (S.hold < 2 && !this._inside(S)) { const y = S.pending; S.pending = undefined; this._start(S, y, false); this.onEvent('called', S, false, 'player'); }
       }
       if (!S.moving) continue;
       if (S.closeT > 0) S.closeT -= dt;
