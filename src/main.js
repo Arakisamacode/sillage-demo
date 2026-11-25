@@ -33,6 +33,7 @@ import { trayFactory, utensilMesh, DISH_OF } from './world/foodprops.js';
 import { Models } from './world/models.js';
 import { Dialogue } from './ui/dialogue.js';
 import { Story } from './game/story.js';
+import { Guide } from './game/guide.js';
 import { Scanner, nameFor } from './ui/scanner.js';
 import { peopleTree } from './game/chatter.js';
 import { buildBriefRoom, buildMerle } from './world/briefroom.js';
@@ -720,7 +721,7 @@ async function boot() {
     audio.blip(); toast(`${CANS[Math.floor(Math.random() * CANS.length)]} · −4 ¤`);
   } });
   for (const tm of ctx.furnish.terminals) interactables.push({ pos: tm.pos, r: 1.4, label: 'E — Borne : plan de la station', fn: () => {
-    audio.blip(); toast('Hangar 07 : est, par le sas · Boutiques : côté nord · Module habitat et ascenseurs : porte ouest · Contrats de fret : quai du hangar · Grand Dôme (jardins) : pont habitat, Cour des Saveurs, porte est');
+    audio.blip(); toast('Hangar 07 : est, par le sas · Boutiques : côté nord · Module habitat et ascenseurs : porte ouest · Contrats de fret : quai du hangar · Grand Dôme (jardins) : pont habitat, Cour des Saveurs, porte est · Frégate Atalante (amarrée, visites) : sas 3, mur est du hangar');
   } });
   const F = ctx.furnish;
   interactables.push({ pos: F.diag.pos, r: 1.4, label: 'E — Terminal de diagnostic du Héron', fn: () => {
@@ -928,6 +929,9 @@ async function boot() {
   ctx.dialog = dialog; ctx.toast = toast;
   const story = new Story({ game, audio, dialog, toast, combat, flight, ground, outposts: ctx.outposts });
   buildMerle(ctx, story.merle);
+  // premiers pas (objectifs d'accueil, découverte de l'Atalante) et repère à pied selon l'étage
+  const guide = new Guide(ctx, { game, story, toast, player });
+  ctx.guide = guide;
   // ------------------------------------------------------------------ escadrille et briefing (table holographique du hangar)
   const wing = new Wingmen(ctx, { combat, flight, game, dialog });
   ctx.wing = wing;
@@ -995,6 +999,7 @@ async function boot() {
     scanner.addPoint(ctx.garden.W(0, 9, 0), 'dome', 'Le Grand Dôme');
     scanner.addPoint(ctx.garden.W(21, 3, 1), 'ferme', 'Ferme du Dôme');
     scanner.addPoint(ctx.bigship.spots.bridge.clone().add(new THREE.Vector3(0, 1.6, 0)), 'atalante', 'Frégate Atalante');
+    scanner.addPoint(ctx.bigship.spots.tubeHangar.clone().add(new THREE.Vector3(0, 2.2, 0)), 'atalante', 'Frégate Atalante · sas 3');
     const fo = flight.onEvent; flight.onEvent = (e, pad) => { fo(e, pad); if (e === 'landed' && pad?.outpost?.id === 'lys') scanner.unlock('lys'); };
     const co = combat.onEvent; combat.onEvent = (e, ...a) => { co(e, ...a); if (e === 'kill') scanner.unlock('breche'); };
   }
@@ -1073,12 +1078,18 @@ async function boot() {
         lines.push(`<b>ÉQUIPAGE</b> ${crew.members.length} · ${aboard ? `${aboard} à bord` : crew.members.map((m) => `${m.data.name.split(' ')[0]} ${crew.status(m)}`).join(' · ')}${flight.active && heronGear.meshes.dorsal ? (g ? ` · tourelle : ${g.data.name.split(' ')[0]}` : ' · tourelle sans artilleur') : ''}`);
       }
       const so = ctx.story?.objective(); if (so) lines.unshift(so);
+      const go = ctx.guide?.objective(); if (go) lines.unshift(go);
+      const side = ctx.guide?.sideObjective(); if (side) lines.push(side);
       jobsEl.innerHTML = lines.join('<br>');
     }
-    // repère d'orientation : la galerie marchande tant qu'elle n'a pas été visitée
-    if (!game.d.galleryVisited && player.pos.x < -44 && !flight.active) { game.d.galleryVisited = true; game.save(); }
-    const way = !game.d.galleryVisited && !flight.active && !ground.armed && player.pos.x > -33 ? { pos: new THREE.Vector3(-37, 1.6, -2), name: 'Galerie marchande · boutiques, recrutement' } : null;
-    const T = (flight.active ? ctx.story?.navTarget() : null) || missions.navTarget() || (flight.active ? mining.navTarget(ardent) : null) || way;
+    // repère : en vol, objectifs du récit puis fret ; à pied, premiers pas, fret, récit, puis la frégate
+    // (à pied, le guide indique l'ascenseur ou le sas à prendre quand la cible est ailleurs)
+    const G = ctx.guide;
+    G?.update();
+    const foot = !flight.active && !ground.armed && G;
+    const T = flight.active
+      ? ctx.story?.navTarget() || missions.navTarget() || mining.navTarget(ardent)
+      : (foot && G.route(player.pos, G.target())) || missions.navTarget() || (foot && G.route(player.pos, G.storyTarget() || G.sideTarget()));
     if (!T || shop.isOpen) { navEl.classList.add('hidden'); return; }
     const from = flight.active ? flight.pos : player.pos;
     const d = from.distanceTo(T.pos);
@@ -1088,10 +1099,16 @@ async function boot() {
     if (behind) { x = -x; y = -y; }
     const edge = behind || Math.abs(x) > 0.92 || Math.abs(y) > 0.86;
     if (edge) { const k = Math.max(Math.abs(x) / 0.92, Math.abs(y) / 0.86, 1e-3); x /= k; y /= k; }
-    navEl.style.left = `${(x * 0.5 + 0.5) * innerWidth}px`; navEl.style.top = `${(-y * 0.5 + 0.5) * innerHeight}px`;
     navEl.classList.toggle('edge', edge);
     navEl.classList.remove('hidden');
     navTxt.textContent = `${T.name} · ${d > 1000 ? (d / 1000).toFixed(1).replace('.', ',') + ' km' : Math.round(d) + ' m'}`;
+    // le losange reste sur le point projeté ; seul le texte est décalé pour rester entièrement à l'écran
+    const px = (x * 0.5 + 0.5) * innerWidth, hh = navEl.offsetHeight / 2 + 4;
+    const py = Math.min(innerHeight - hh, Math.max(hh, (-y * 0.5 + 0.5) * innerHeight));
+    const hw = navTxt.offsetWidth / 2, m = 8;
+    const dx = Math.max(0, m + hw - px) + Math.min(0, innerWidth - m - hw - px);
+    navEl.style.left = `${px}px`; navEl.style.top = `${py}px`;
+    navTxt.style.transform = dx ? `translateX(${dx}px)` : '';
   }
 
   // ------------------------------------------------------------------ commandes tactiles contextuelles

@@ -110,6 +110,7 @@ body.is-touch #stick { width: 112px; height: 112px; left: calc(18px + env(safe-a
 /* fret : navigation et contrats en cours */
 #nav { position: absolute; left: 0; top: 0; transform: translate(-50%, -50%); text-align: center; font-size: 12px; letter-spacing: .1em; color: #ffd27a; text-shadow: 0 0 4px #000; white-space: nowrap; }
 #nav i { display: block; width: 18px; height: 18px; margin: 0 auto 4px; border: 2px solid #ffb84a; transform: rotate(45deg); box-shadow: 0 0 8px rgba(255,184,74,.7); }
+#nav span { display: inline-block; }
 #nav.edge i { border-color: #ff8a3a; border-radius: 50% 0 50% 50%; }
 #jobs { position: absolute; left: 12px; top: 30px; font-size: 12.5px; line-height: 1.5; color: var(--fg); max-width: 46vw; text-shadow: 0 0 3px #000; }
 #jobs b { color: var(--accent); font-weight: 600; letter-spacing: .06em; }
@@ -258,7 +259,7 @@ body.is-touch #prompt { top: 21%; }
 #comm .comm-face::after { content: ''; position: absolute; inset: 0; background: repeating-linear-gradient(0deg, rgba(0,0,0,.25) 0 1px, transparent 1px 3px); }
 #comm .comm-txt b { display: block; font-size: 13px; letter-spacing: .16em; text-transform: uppercase; color: #8fe0ff; margin-bottom: 4px; }
 #comm .comm-txt span { font-size: 14px; line-height: 1.4; color: #e8f0f4; }
-#story { color: #ffd27a; }
+#story, #jobs .story { color: #ffd27a; }
 /* ------------------------------------------------------------ mode analyse et codex */
 #scan { position: fixed; inset: 0; z-index: 4; pointer-events: none; background: radial-gradient(ellipse at center, rgba(40,160,200,.05) 40%, rgba(20,120,170,.28) 100%); }
 #scan::before { content: ''; position: absolute; inset: 0; background: repeating-linear-gradient(0deg, rgba(120,220,255,.05) 0 1px, transparent 1px 4px); }

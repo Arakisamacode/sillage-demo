@@ -23,6 +23,12 @@ export class Story {
   }
   get rep() { return this.game.d.rep; }
   save() { this.game.save(); }
+  /** le joueur a entendu parler d'Iréna Solvay (Joss, Mira ou la rumeur d'un habitant) */
+  hear() {
+    if (this.s.heard) return;
+    this.s.heard = true; this.save();
+    this.toast('Nouvelle piste : Iréna Solvay, La Couronne (ascenseur panoramique du hall)');
+  }
 
   // ---------------------------------------------------------------- objectif affiché
   objective() {
@@ -31,7 +37,8 @@ export class Story {
     if (st === 1) H('L\'ÉQUATION DE HALDEN', 'porter le noyau de calcul à la station agricole Lys (se poser)');
     if (st === 2) H('L\'ÉQUATION DE HALDEN', `protéger la diffusion : abattre les intercepteurs (${this.s.kills}/3)`);
     if (st === 3) H('L\'ÉQUATION DE HALDEN', 'retrouver Iréna Solvay à La Couronne');
-    if (st === 0 && this.s.heard) H('PISTE', 'une prévisionniste cherche un pilote à La Couronne');
+    // (pendant les premiers pas, la piste est déjà l'étape affichée par le guide)
+    if (st === 0 && this.s.heard && this.game.d.guide?.done !== false) H('PISTE', 'une prévisionniste cherche un pilote à La Couronne');
     if (q.ch2 === 1) H('LES FILS DE LA BRÈCHE', 'démasquer le financier des pirates parmi la clientèle de La Couronne (mode analyse : C)');
     if (q.ch2 === 2) H('LES FILS DE LA BRÈCHE', 'décoller et intercepter le cargo pirate au rendez-vous');
     if (q.ch2 === 3) H('LES FILS DE LA BRÈCHE', 'faire votre rapport à Iréna Solvay');
@@ -189,11 +196,12 @@ export class Story {
     };
     return {
       start: () => {
+        if (!s.met) { s.met = true; me.save(); }   // première rencontre (fin des premiers pas)
         if (s.step === 0) return { say: 'Vous regardez la sphère comme tout le monde : on croit voir des lumières. Ce sont des trajectoires. Celles de cent quarante mille personnes, ici, à Halden-7. Je m\'appelle Iréna Solvay. Je calcule l\'avenir des foules.',
           choices: [
             { t: 'Vous calculez l\'avenir ? Expliquez-moi.', tone: 'enquete', next: 'how' },
             { t: 'Et que disent vos calculs ?', tone: 'neutre', next: 'verdict' },
-            { t: 'Joss m\'a dit que vous cherchiez un pilote.', tone: 'neutre', next: 'verdict', if: () => s.heard },
+            { t: 'On m\'a dit que vous cherchiez un pilote.', tone: 'neutre', next: 'verdict', if: () => s.heard },
             { t: 'Les prophètes finissent rarement bien. Au revoir.', tone: 'ferme', next: null },
           ] };
         if (s.step === 1) return { say: 'Le noyau est dans votre soute. Lys, la station agricole. Posez-vous sur leur plateforme, le relais fera le reste.', choices: [{ t: 'J\'y vais.', tone: 'neutre', next: null }, { t: 'Pourquoi Lys ?', tone: 'enquete', next: 'whylys' }] };
@@ -294,8 +302,13 @@ export class Story {
   jossTree() {
     const me = this, s = this.s;
     const DR = ['Thé fumé de Lys', 'Bière de soute', 'Café serré', 'Eau pétillante recyclée', 'Liqueur d\'aurélite (sans aurélite)'];
+    const hello = R(['Joss Varrin, pour vous servir. Vous avez la tête de quelqu\'un qui arrive de loin.', 'Ah, notre pilote. Toujours en vie, c\'est bon signe.', 'Installez-vous. Ici on ne pose pas de questions… sauf moi.']);
     return {
-      start: { say: R(['Joss Varrin, pour vous servir. Vous avez la tête de quelqu\'un qui arrive de loin.', 'Ah, notre pilote. Toujours en vie, c\'est bon signe.', 'Installez-vous. Ici on ne pose pas de questions… sauf moi.']),
+      // tant que la piste n'est pas connue, Joss la donne d'emblée : parler au barman suffit à la lancer
+      start: () => {
+        const tip = !s.heard;
+        if (tip) me.hear();
+        return { say: tip ? `${hello} Au fait, vous êtes pilote ? Il y a une femme, là-haut à La Couronne, qui en cherche un. Iréna Solvay. Demandez-moi si ça vous intrigue.` : hello,
         choices: [
           { t: 'Un verre, s\'il vous plaît. (8 ¤)', tone: 'neutre', next: 'drink', do: () => (me.game.pay(8) ? (me.audio.coffee?.(), `${R(DR)} servi`) : 'Crédits insuffisants') },
           { t: 'Quelles sont les nouvelles ?', tone: 'enquete', next: 'news' },
@@ -305,7 +318,8 @@ export class Story {
           { t: 'Vous en savez plus que vous ne dites.', tone: 'ferme', next: 'irena' },
           { t: 'Je peux vous rendre service ?', tone: 'calme', next: 'qjoss', if: () => me.q.joss === 0 },
           { t: 'Voici votre liqueur d\'aurélite.', tone: 'neutre', next: 'qjossEnd', if: () => me.q.joss === 2 },
-        ] },
+        ] };
+      },
       qjoss: { say: 'Puisque vous le proposez… La Plateforme Ardent-3 distille une liqueur d\'aurélite. La vraie, pas mon imitation. Ramenez-m\'en une bouteille : posez-vous là-bas, demandez de ma part. Je paie bien, et je n\'oublie jamais un service.',
         choices: [{ t: 'Marché conclu.', tone: 'calme', next: null, do: () => { me.q.joss = 1; me.save(); return 'Service : liqueur d\'aurélite · se poser à la Plateforme Ardent-3'; } }, { t: 'Une autre fois.', tone: 'neutre', next: 'start' }] },
       qjossEnd: { say: 'Oh, regardez-moi cette couleur… Vous êtes un ange, pilote. Voici votre dû, et à partir d\'aujourd\'hui, vous avez votre verre ici.',
@@ -319,7 +333,7 @@ export class Story {
         choices: [{ t: 'Autre chose…', tone: 'neutre', next: 'start' }, { t: 'Merci du conseil.', tone: 'calme', next: null }] },
       round: { say: 'À la santé du pilote ! … Vous venez de vous faire une vingtaine d\'amis. Ça sert, ici.', choices: [{ t: 'Autre chose…', tone: 'neutre', next: 'start' }, { t: 'À Halden !', tone: 'calme', next: null }] },
       irena: { say: 'Bon. Il y a une femme, là-haut, à La Couronne. Iréna Solvay. Elle passe ses journées devant une sphère lumineuse et dit que la station va mourir. Les riches rient. Moi, j\'ai remarqué qu\'elle ne se trompe jamais sur le prix du titane. Elle cherche un pilote.',
-        choices: [{ t: 'Je vais aller la voir.', tone: 'neutre', next: null, do: () => { if (!s.heard) { s.heard = true; me.save(); return 'Nouvelle piste : Iréna Solvay, La Couronne (ascenseur panoramique du hall)'; } } }, { t: 'Autre chose…', tone: 'neutre', next: 'start' }] },
+        choices: [{ t: 'Je vais aller la voir.', tone: 'neutre', next: null, do: () => me.hear() }, { t: 'Autre chose…', tone: 'neutre', next: 'start' }] },
     };
   }
 
@@ -348,7 +362,7 @@ export class Story {
 
   /** Conciergerie de La Couronne */
   conciergeTree() {
-    const me = this, s = this.s;
+    const me = this;
     return {
       start: { say: R(['Bienvenue à La Couronne. Je suis Mira Castel. Que puis-je pour vous ?', 'Ravie de vous revoir. La coupole est particulièrement claire aujourd\'hui.']),
         choices: [
@@ -358,7 +372,7 @@ export class Story {
           { t: 'Merci, Mira.', tone: 'calme', next: null },
         ] },
       tour: { say: 'Haute couture à la Maison Élysée, combinaisons sur mesure chez Nova Atelier, et Aérodyne présente sa Série 9. Le Zénith sert jusqu\'à l\'aube. Et la vue, bien sûr : la coupole a coûté plus cher que le reste de la station.', choices: [{ t: 'Autre chose…', tone: 'neutre', next: 'start' }, { t: 'Merci.', tone: 'neutre', next: null }] },
-      irena: { say: 'Madame Solvay. Prévisionniste. Le Conseil la trouve… inquiétante. Elle vient chaque jour parler à sa sphère, près de la galerie d\'observation, au sud. Elle a demandé si un pilote passait par ici.', choices: [{ t: 'Je vais la voir.', tone: 'neutre', next: null, do: () => { if (!s.heard) { s.heard = true; me.save(); } } }, { t: 'Autre chose…', tone: 'neutre', next: 'start' }] },
+      irena: { say: 'Madame Solvay. Prévisionniste. Le Conseil la trouve… inquiétante. Elle vient chaque jour parler à sa sphère, près de la galerie d\'observation, au sud. Elle a demandé si un pilote passait par ici.', choices: [{ t: 'Je vais la voir.', tone: 'neutre', next: null, do: () => me.hear() }, { t: 'Autre chose…', tone: 'neutre', next: 'start' }] },
       gift: { say: 'Pour vous ? Bien sûr. On parle de vous dans les coursives, vous savez. Le Zénith vous attend : la maison offre.', choices: [{ t: 'Merci, Mira.', tone: 'calme', next: null, do: () => { me.game.d.giftTaken = true; me.save(); return 'Coupe de champagne de Lys offerte par la maison'; } }] },
     };
   }

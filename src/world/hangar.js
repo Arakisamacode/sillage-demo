@@ -656,6 +656,11 @@ function floorMarkings(quality) {
   for (let z = AIRLOCK.z - 1.6; z <= AIRLOCK.z + 1.6; z += 0.8) ctx.fillRect(X(-HX + 1.6), Z(z), 7 * ppm, 0.4 * ppm);
   ctx.font = `700 ${1.0 * ppm}px ${FONT}`;
   ctx.save(); ctx.translate(X(-HX + 9.5), Z(AIRLOCK.z)); ctx.rotate(Math.PI / 2); ctx.fillText('◄ SAS 2', 0, 0); ctx.restore();
+  // passage piéton vers le sas 3 (frégate Atalante) : court, l'aire 03 est proche ; la flèche court le long
+  // de la voie piétonne est et pointe vers le sas
+  for (let z = SHIPLOCK.z - 1.6; z <= SHIPLOCK.z + 1.6; z += 0.8) ctx.fillRect(X(HX - 4.8), Z(z), 3.2 * ppm, 0.4 * ppm);
+  ctx.save(); ctx.font = `700 ${0.85 * ppm}px ${FONT}`; ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+  ctx.translate(X(HX - 2.7), Z(SHIPLOCK.z + 2.4)); ctx.rotate(-Math.PI / 2); ctx.fillText('SAS 3 · ATALANTE ►', 0, 0); ctx.restore();
   // zone de stockage hachurée
   ctx.save(); ctx.globalAlpha = 0.55; ctx.strokeStyle = '#d8a420'; ctx.lineWidth = 0.12 * ppm;
   ctx.strokeRect(X(STORAGE.x - 7), Z(STORAGE.z - 6), 13 * ppm, 10 * ppm);

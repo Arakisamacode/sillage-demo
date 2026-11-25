@@ -432,7 +432,7 @@ const ANECDOTES = [
 const RUMORS = [
   'Il paraît que Joss, le barman de La Comète, cherche quelqu\'un pour lui rapporter une bouteille d\'Ardent.',
   'Le Dr Salek manque de sérum. La coopérative de Lys en produit, mais personne ne veut faire le trajet.',
-  'Une femme parle d\'équations devant une sphère lumineuse, à La Couronne. Certains disent qu\'elle a toujours raison.',
+  'Une femme parle d\'équations devant une sphère lumineuse, à La Couronne. Certains disent qu\'elle a toujours raison. Elle cherche un pilote, paraît-il.',
   'Les Fils de la Brèche ont attaqué un convoi près d\'Ardent la semaine dernière.',
   'La Pizzeria Vesuvio offre le tiramisu pour deux pizzas, mais seulement si vous le demandez gentiment.',
   'Les ascenseurs panoramiques de La Couronne ont coûté plus cher qu\'un Mulet neuf.',
@@ -446,6 +446,7 @@ const RUMORS = [
   'Le coucher de soleil du Grand Dôme, à vingt heures. Tout le pont habitat y monte, le dimanche.',
 ];
 
+const IRENA_RUMOR = 2;   // index de la rumeur qui mène à Iréna Solvay
 /** mémoire des répliques déjà entendues, par personne */
 const MEM = new Map();
 function nextOf(list, mem, key, salt) {
@@ -547,7 +548,11 @@ export function peopleTree(person, { story }) {
       const f = (mem.favor ||= story.makeFavor(person));
       return { say: f.say, choices: [{ t: `D'accord, je m'en charge. (${f.reward} ¤)`, tone: 'calme', next: null, do: () => { mem.favor = null; return story.acceptFavor(f); } }, { t: 'Désolé, pas maintenant.', tone: 'neutre', next: 'again' }] };
     },
-    rumor: () => ({ say: mood === 'méfiant' && rep.audace < 2 ? 'Des rumeurs ? Je ne parle pas aux inconnus. Revenez quand on parlera de vous en bien.' : nextOf(RUMORS, mem, 'rumor', k), choices: [{ t: 'Vous en savez d\'autres ?', tone: 'enquete', next: 'rumor' }, ...back] }),
+    rumor: () => {
+      const say = mood === 'méfiant' && rep.audace < 2 ? 'Des rumeurs ? Je ne parle pas aux inconnus. Revenez quand on parlera de vous en bien.' : nextOf(RUMORS, mem, 'rumor', k);
+      if (say === RUMORS[IRENA_RUMOR]) story.hear?.();   // la rumeur d'Iréna lance la piste, quel que soit l'habitant
+      return { say, choices: [{ t: 'Vous en savez d\'autres ?', tone: 'enquete', next: 'rumor' }, ...back] };
+    },
     opinion: { say: opinion, choices: back },
     rude: { say: mood === 'méfiant' ? 'Je ne vous retiens pas.' : mood === 'pressé' ? 'Ça tombe bien, moi non plus je n\'ai pas le temps.' : '… Charmant. Bonne journée quand même.', choices: [{ t: '[Partir]', tone: 'neutre', next: null }] },
   };
