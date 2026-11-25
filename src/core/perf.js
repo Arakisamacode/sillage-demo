@@ -135,3 +135,58 @@ export function shrinkTextures(scene, { max = 512, maxModel = 256, modelTextures
   });
   return Math.round(saved / 1e6);
 }
+
+/**
+ * Ombres à la demande (qualités moyenne, haute, ultra). Chaque carte d'ombre n'est recalculée que lorsqu'elle peut
+ * changer à l'écran :
+ * - soleil (4096, décor statique, direction fixe) : toutes les 2 images quand la caméra est dans le hangar (personnages,
+ *   chariots et vaisseaux y projettent leur ombre), plus lentement ailleurs (galerie, frégate, étages) ;
+ * - projecteurs du hangar : seulement quand la caméra est dans le hangar (ou en approche en vol), gelés sinon. Les
+ *   projecteurs gardent castShadow (pas de recompilation de shaders) : seule la mise à jour de leur carte est suspendue ;
+ * - recalcul immédiat de tout : premier rendu, téléportation / ascenseur (saut de caméra), changement de niveau
+ *   (LevelCull), entrée dans le hangar, changement d'état du vol (décollage, atterrissage) ;
+ * - Héron en mouvement dans le hangar : toutes les cartes à chaque image (gros objet rapide).
+ * Les mises à jour du soleil et des projecteurs sont décalées d'une image pour lisser le coût.
+ */
+export class ShadowScheduler {
+  /**
+   * @param {THREE.WebGLRenderer} renderer
+   * @param {THREE.Light[]} lights lumières à ombre portée (soleil en premier)
+   * @param {object} quality préréglage
+   */
+  constructor(renderer, lights, quality) {
+    this.sm = renderer.shadowMap;
+    this.sun = lights.find((l) => l.isDirectionalLight && l.castShadow) || null;
+    this.spots = lights.filter((l) => l.isSpotLight && l.castShadow);
+    const med = quality.name === 'medium';
+    // intervalles (en images) : [soleil, projecteurs] selon la zone ; 0 = gelé
+    this.rates = {
+      hangar: [2, 2], approach: [3, 3], away: [med ? 8 : 6, 0],
+    };
+    for (const l of [this.sun, ...this.spots]) if (l) l.shadow.autoUpdate = false;
+    this.sm.autoUpdate = false;
+    this.n = 0; this.key = null; this.last = new THREE.Vector3(1e9, 0, 0);
+    this.invalidate();
+  }
+  /** Recalcule toutes les cartes au prochain rendu. */
+  invalidate() { this.force = true; }
+  /**
+   * À appeler juste avant le rendu.
+   * @param {THREE.Vector3} cam position de la caméra
+   * @param {{zone: 'hangar'|'approach'|'away', level?: string, flight?: string, fast?: boolean}} s
+   */
+  update(cam, s) {
+    const n = ++this.n;
+    const key = `${s.zone}|${s.level || ''}|${s.flight || ''}`;
+    if (key !== this.key || cam.distanceToSquared(this.last) > 64) this.force = true;
+    this.key = key; this.last.copy(cam);
+    const [rs, rp] = this.rates[s.zone] || this.rates.away;
+    const all = this.force || s.fast;
+    let any = false;
+    if (this.sun && (all || (rs && n % rs === 0))) { this.sun.shadow.needsUpdate = true; any = true; }
+    // projecteurs décalés d'une image par rapport au soleil
+    if (all || (rp && (n + 1) % rp === 0)) for (const l of this.spots) { l.shadow.needsUpdate = true; any = true; }
+    this.force = false;
+    if (any) this.sm.needsUpdate = true;
+  }
+}

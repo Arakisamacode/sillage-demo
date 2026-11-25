@@ -21,6 +21,7 @@ export class Renderer {
     r.shadowMap.autoUpdate = true;
     this.three = r;
     this.composer = null;
+    this.beforeRender = null;   // planification des ombres (voir ShadowScheduler)
   }
 
   setupPost(scene, camera) {
@@ -79,6 +80,7 @@ export class Renderer {
   }
 
   render(dt) {
+    if (this.beforeRender) this.beforeRender(dt);
     if (this.composer) this.composer.render(dt);
     else this.three.render(this.scene, this.camera);
   }

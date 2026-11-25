@@ -39,7 +39,7 @@ import { Scanner, nameFor } from './ui/scanner.js';
 import { peopleTree } from './game/chatter.js';
 import { buildBriefRoom, buildMerle } from './world/briefroom.js';
 import { buildNeon } from './world/neon.js';
-import { LightPool, LevelCull, warmShaders, shrinkTextures } from './core/perf.js';
+import { LightPool, LevelCull, ShadowScheduler, warmShaders, shrinkTextures } from './core/perf.js';
 import { Wingmen, PILOTS } from './game/wingmen.js';
 import { Briefing } from './ui/briefing.js';
 import { buildLuxury, populateLuxury } from './world/luxury.js';
@@ -578,6 +578,18 @@ async function boot() {
     renderer.three.shadowMap.autoUpdate = false;
     renderer.three.shadowMap.needsUpdate = true;
     for (const v of [scenes.forklift.obj.group, scenes.tug.obj.group]) v.traverse((o) => { o.castShadow = false; });
+  } else if (quality.shadows) {
+    // autres qualités : cartes d'ombre recalculées à la demande (soleil lent hors du hangar, projecteurs du hangar gelés ailleurs)
+    const shadows = new ShadowScheduler(renderer.three, [ctx.lights.sun, ...ctx.lights.spots], quality);
+    ctx.shadows = shadows;
+    const HC = new THREE.Vector3(0, 10, -8);
+    renderer.beforeRender = () => {
+      const c = camera.position, free = flight.active && !ctx.ground?.onFoot;
+      const inH = c.x > -HX_ - 1 && c.x < HX_ + 1 && c.z > -47 && c.z < 31 && c.y < 25;
+      const fIn = free && !flight.away && flight.insideHangar();
+      const zone = inH || fIn ? 'hangar' : free && !flight.away && c.distanceTo(HC) < 180 ? 'approach' : 'away';
+      shadows.update(c, { zone, level: ctx.levelCull?.state, flight: free ? flight.state : '', fast: fIn && flight.state !== 'parked' });
+    };
   }
   renderer.setupPost(scene, camera);
   renderer.setExposure(1.15);
@@ -1215,7 +1227,7 @@ async function boot() {
   }
 
   // ------------------------------------------------------------------ boucle
-  let last = performance.now(), t = 0, fpsAcc = 0, fpsN = 0, shadowTick = 0;
+  let last = performance.now(), t = 0, fpsAcc = 0, fpsN = 0;
   const clockEl = $('clock'), fpsEl = $('fps'), promptEl = $('prompt');
   function frame() {
     const now = performance.now();
@@ -1299,7 +1311,6 @@ async function boot() {
     if (scanner.on) scanner.update(dt, camera, scanPeople(), interactables);
     if (dialog.active) dialog.updateCamera(dt, player);
     ctx.lightPool?.update(camera.position);
-    if (quality.name === 'medium') { renderer.three.shadowMap.autoUpdate = false; renderer.three.shadowMap.needsUpdate = (++shadowTick % 2) === 0; }
     renderer.render(dt);
     fpsAcc += dt; fpsN++;
     if (fpsAcc > 0.5) { fpsEl.textContent = `${Math.round(fpsN / fpsAcc)} i/s · ${quality.name}`; fpsAcc = 0; fpsN = 0; }
@@ -1329,6 +1340,7 @@ async function boot() {
     shrinkTextures(scene, { max: touch ? 512 : 1024, maxModel: touch ? 256 : 512, modelTextures, faceTextures, maxFace: touch ? 512 : 1024 });
   }
   if (params.get('warm') !== '0') await warmShaders(renderer.three, scene, camera, () => renderer.render(1 / 30));
+  ctx.shadows?.invalidate();   // le préchauffage a rendu les objets cachés dans les cartes d'ombre
   $('loading').classList.add('hidden');
   frame();
   window.__app = ctx;
