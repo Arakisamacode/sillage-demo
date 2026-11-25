@@ -444,7 +444,7 @@ function planter(ctx, x, z) {
 function departures(ctx, x, y, z) {
   const { mats, builder: B, scene } = ctx;
   const rows = [
-    ['HL-2207', 'HÉRON', 'AIRE 02', 'À QUAI'],
+    ['HL-0907', 'HÉRON', 'AIRE 02', 'À QUAI'],
     ['MH4-0918', 'MULET H4', 'AIRE 03', 'CHARGEMENT'],
     ['ST-40', 'NAVETTE HALDEN', 'AIRE 05', 'DÉBARQUEMENT'],
     ['FC-31', 'FAUCON', 'AIRE 04', 'MAINTENANCE'],

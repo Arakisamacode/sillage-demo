@@ -106,7 +106,7 @@ export function buildFurnish(ctx) {
   {
     const diag = new Screen(320, 200, (c, w, h, t) => {
       c.fillStyle = '#06121a'; c.fillRect(0, 0, w, h);
-      c.fillStyle = '#5fe6ff'; c.font = `700 16px ${FONT}`; c.fillText('HÉRON HL-2207 · DIAGNOSTIC', 12, 24);
+      c.fillStyle = '#5fe6ff'; c.font = `700 16px ${FONT}`; c.fillText('HÉRON HL-0907 · DIAGNOSTIC', 12, 24);
       c.strokeStyle = '#5fe6ff'; c.lineWidth = 2;
       c.beginPath(); c.moveTo(160, 50); c.lineTo(200, 150); c.lineTo(160, 135); c.lineTo(120, 150); c.closePath(); c.stroke();
       c.beginPath(); c.moveTo(80, 120); c.lineTo(240, 120); c.stroke();
