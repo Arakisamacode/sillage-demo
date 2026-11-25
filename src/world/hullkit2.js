@@ -21,7 +21,7 @@ import { FONT, canvas as mkCanvas, erode, seed as seedRand } from './signage.js'
 //  nozzleMaterials(mats, o)  → matériaux de tuyère, avec setThrust(k) pilotable à l'exécution
 //  LiveryAtlas               → une texture canvas par vaisseau (bandes, immatriculation, chevrons)
 //  kitMaterials(mats, o)     → palette réaliste (coque peinte blanc cassé, composite sombre, métal nu…)
-//  détails : bevelBox, rcsBlock, antenna, radiator, lightPod, dockingClamp, landingStrut, ventPanel
+//  détails : bevelBox, rcsBlock, antenna, radiator, lightPod, dockingClamp, landingStrut, ventPanel, wingPanel
 //  addParts(add, parts, matSet, pos, rot) → pose une liste de pièces avec un jeu de matériaux
 // =====================================================================================================
 
@@ -854,6 +854,56 @@ export function landingStrut(o = {}) {
   return parts;
 }
 
+/**
+ * Panneau d'aile / de dérive à section hexagonale (bords d'attaque et de fuite biseautés, arêtes nettes),
+ * effilé en corde et en épaisseur. Envergure le long de +X (x = 0 à la racine, x = span au saumon),
+ * corde le long de Z (bord d'attaque vers -Z), épaisseur selon Y.
+ * o : { span (4), root: [zLE, zTE, t], tip: [zLE, zTE, t] (t = demi-épaisseur), dihedral (montée en y au
+ *       saumon, 0), le (biseau d'attaque, fraction de corde, 0.16), te (biseau de fuite, 0.1),
+ *       under (épaisseur relative de l'intrados, 1), seg (tranches en envergure, 1), tex (1) }
+ * Renvoie { geometry (non indexée, normales à facettes, UV métriques planaires), at(x) → { zle, zte, t, y } }.
+ * Pour une dérive : construire puis tourner (ex. rotateZ(π/2 - devers)) ; pour l'aile gauche : rotateY(π)
+ * après avoir inversé la corde (ou construire avec scale(-1) puis retourner les faces).
+ */
+export function wingPanel(o = {}) {
+  const span = o.span ?? 4, r = o.root ?? [-1, 2, 0.12], t = o.tip ?? [0.5, 1.6, 0.05];
+  const le = o.le ?? 0.16, te = o.te ?? 0.1, under = o.under ?? 1, seg = o.seg ?? 1, dih = o.dihedral ?? 0;
+  const at = (x) => {
+    const k = Math.max(0, Math.min(1, x / span));
+    return { zle: r[0] + (t[0] - r[0]) * k, zte: r[1] + (t[1] - r[1]) * k, t: r[2] + (t[2] - r[2]) * k, y: dih * k };
+  };
+  const sec = (x) => {
+    const a = at(x), c = a.zte - a.zle;
+    return [[a.zle, a.y], [a.zle + c * le, a.y + a.t], [a.zte - c * te, a.y + a.t], [a.zte, a.y], [a.zte - c * te, a.y - a.t * under], [a.zle + c * le, a.y - a.t * under]];
+  };
+  const pos = [];
+  const tri = (A, B, C, ref) => {
+    const n = new THREE.Vector3().crossVectors(B.clone().sub(A), C.clone().sub(A));
+    const m = A.clone().add(B).add(C).multiplyScalar(1 / 3).sub(ref);
+    if (n.dot(m) < 0) pos.push(...A.toArray(), ...C.toArray(), ...B.toArray()); else pos.push(...A.toArray(), ...B.toArray(), ...C.toArray());
+  };
+  for (let i = 0; i < seg; i++) {
+    const x0 = span * i / seg, x1 = span * (i + 1) / seg, s0 = sec(x0), s1 = sec(x1);
+    const a0 = at(x0), a1 = at(x1);
+    for (let k = 0; k < 6; k++) {
+      const A = V3(x0, s0[k][1], s0[k][0]), B = V3(x0, s0[(k + 1) % 6][1], s0[(k + 1) % 6][0]);
+      const C = V3(x1, s1[(k + 1) % 6][1], s1[(k + 1) % 6][0]), D = V3(x1, s1[k][1], s1[k][0]);
+      const xm = (x0 + x1) / 2, am = at(xm);
+      const ref = V3(xm, (a0.y + a1.y) / 2, (am.zle + am.zte) / 2);
+      tri(A, B, C, ref); tri(A, C, D, ref);
+    }
+  }
+  // bouchons (racine et saumon)
+  for (const [x, dir] of [[0, -1], [span, 1]]) {
+    const sc = sec(x), a = at(x), c = V3(x, a.y, (a.zle + a.zte) / 2), ref = c.clone().add(V3(-dir, 0, 0));
+    for (let k = 0; k < 6; k++) tri(c, V3(x, sc[k][1], sc[k][0]), V3(x, sc[(k + 1) % 6][1], sc[(k + 1) % 6][0]), ref);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.computeVertexNormals();
+  return { geometry: projUV(g, o.tex ?? 1), at };
+}
+
 // --------------------------------------------------------------------------------------- livrée
 
 /**
@@ -866,7 +916,7 @@ export function landingStrut(o = {}) {
  *   S.add(geo, L.material(), …)   // après avoir déclaré toutes les régions
  *
  * Primitives de dessin (coordonnées en mètres, origine en BAS à gauche de la région) :
- *   d.rect(x, y, w, h, color) · d.stripe(y, h, color) · d.text(str, x, y, size, { color, align, weight, spacing })
+ *   d.rect(x, y, w, h, color) · d.stripe(y, h, color) · d.text(str, x, y, size, { color, align, weight, spacing, fit })
  *   d.chevrons(x, y, w, h, { a, b, pitch, dir }) · d.wear(amount) · d.ctx / d.px (accès canvas brut)
  */
 export class LiveryAtlas {
@@ -916,6 +966,15 @@ export class LiveryAtlas {
           sx.textBaseline = 'bottom';
           sx.textAlign = o.align ?? 'left';
           if (sx.letterSpacing !== undefined) sx.letterSpacing = ((o.spacing ?? 0.04) * size * k) + 'px';
+          // o.fit (m) : largeur maximale — la police est réduite pour que le texte tienne dans la région
+          if (o.fit) {
+            const tw = sx.measureText(str).width;
+            if (tw > o.fit * k) {
+              const sz = size * (o.fit * k) / tw;
+              sx.font = `${o.weight ?? 700} ${Math.round(sz * k)}px ${FONT}`;
+              if (sx.letterSpacing !== undefined) sx.letterSpacing = ((o.spacing ?? 0.04) * sz * k) + 'px';
+            }
+          }
           sx.fillText(str, x * k, Y(y) + size * k * 0.12);
         },
         chevrons: (x, y, w, h, o = {}) => {
