@@ -268,6 +268,19 @@ Vue de l'espace, Halden-7 forme un ensemble porteur cohérent :
   balisage, conduites longitudinales, mâts d'antennes ; ailes de radiateurs entre les anneaux ; à l'arrière, module
   réacteur, mât et quatre ailes solaires.
 
+## Coques des vaisseaux (hullkit2)
+
+Les cinq vaisseaux (Mulet H4, Héron Mk II, Faucon FC-31, Navette ST-40 et
+frégate Atalante) sont construits avec `src/world/hullkit2.js` : coques
+lissées et chanfreinées par sections, peinture claire au-dessus et
+composite sombre en dessous, verrières encadrées, tuyères en cloche avec
+lueur liée à la poussée, blocs RCS, antennes, radiateurs, trains à vérins,
+feux de navigation et livrée dessinée dans un atlas unique (immatriculation,
+marquages de sécurité). Les baies de l'Atalante et le poste du Héron sont
+réellement percés et alignés sur l'intérieur. Le train du Héron se rentre
+en vol. Budget : moins de 120 000 triangles pour l'extérieur de la frégate,
+moins de 85 000 par petit vaisseau, une géométrie fusionnée par matériau.
+
 ## Frégate Atalante (vaisseau à trois ponts, visitable)
 
 Amarrée au sas 3 du hangar (côté tribord), reliée par une passerelle d'embarquement pressurisée. Coque de 110 m,
