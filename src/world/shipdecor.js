@@ -70,6 +70,22 @@ export function shipDecor(ctx, B) {
     put(base, cyl(r, r, len, 8), mat, new THREE.Matrix4().compose(A.add(Bv).multiplyScalar(0.5), q, new THREE.Vector3(1, 1, 1)));
   };
 
+  /** écran de borne : interface dessinée (titre, jauges, journal, schéma), une texture partagée par couleur */
+  const termScreen = (col) => memo('term' + col, () => {
+    const c = document.createElement('canvas'); c.width = 256; c.height = 192; const g = c.getContext('2d');
+    const hex = '#' + new THREE.Color(col).getHexString(), dim = '#' + new THREE.Color(col).multiplyScalar(0.35).getHexString();
+    g.fillStyle = '#04080c'; g.fillRect(0, 0, 256, 192);
+    g.fillStyle = dim; g.fillRect(0, 0, 256, 26);
+    g.fillStyle = '#e8f4ff'; g.font = '700 15px sans-serif'; g.fillText({ 0x3a8ab8: 'ATALANTE · RÉSEAU', 0x3ac870: 'SUPPORT VIE', 0xd8a62a: 'ÉNERGIE · PONT' }[col] || 'ATALANTE', 8, 18);
+    let k = col % 97; const r = () => ((k = (k * 16807 + 7) % 2147483647) / 2147483647);
+    for (let i = 0; i < 4; i++) { g.strokeStyle = dim; g.strokeRect(10, 38 + i * 22, 120, 12); g.fillStyle = hex; g.fillRect(11, 39 + i * 22, 118 * (0.3 + r() * 0.65), 10); }
+    g.strokeStyle = hex; g.lineWidth = 2; g.beginPath(); for (let x = 0; x <= 100; x += 5) g.lineTo(146 + x, 100 - Math.abs(Math.sin(x * 0.12 + r())) * 50); g.stroke();
+    g.fillStyle = '#9fb8c8'; g.font = '500 10px monospace';
+    for (let i = 0; i < 5; i++) g.fillText(`${String(8 + i).padStart(2, '0')}:${String(Math.floor(r() * 60)).padStart(2, '0')}  ${['OK', 'SYNC', 'NOMINAL', 'CYCLE', 'VÉRIF'][i]} ${Math.floor(r() * 900)}`, 10, 140 + i * 11);
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+    return new THREE.MeshBasicMaterial({ map: t, color: new THREE.Color(1.15, 1.15, 1.15) });
+  });
+
   const D = {
     M,
     /** lit (superposé si bunk) ; tête contre -z local. Couleur de la couette `col`. */
@@ -487,7 +503,8 @@ export function shipDecor(ctx, B) {
     terminal(x, y, z, yaw, col = 0x3a8ab8) {
       const b = frame(x, y, z, yaw);
       put(b, rbox(0.62, 0.9, 0.1, 0.02), M.dark(), L(0, 1.45, 0.05));
-      put(b, rbox(0.54, 0.4, 0.004, 0.002), mats.emissive(col, 1.3), L(0, 1.62, 0.102));
+      put(b, rbox(0.56, 0.42, 0.004, 0.002), M.dark(), L(0, 1.62, 0.1));
+      put(b, new THREE.PlaneGeometry(0.54, 0.4), termScreen(col), L(0, 1.62, 0.1035));
       put(b, rbox(0.5, 0.06, 0.18, 0.01, 2), M.dark(), L(0, 1.15, 0.14, 0.4));
       put(b, rbox(0.06, 0.06, 0.004, 0.002), mats.emissive(0x3ac870, 2), L(0.2, 1.33, 0.102));
     },

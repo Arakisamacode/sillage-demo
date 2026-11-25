@@ -101,7 +101,21 @@ export function buildBigShip(ctx) {
     B.colliderBox(L, 1.1, 0.1, [m[0], y + 0.55, m[2]], [0, ry + Math.PI / 2, 0]);
   };
   /** bandeau lumineux au plafond */
-  const ledStrip = (x0, x1, z0, z1, y, m = ledW) => box(Math.max(0.12, x1 - x0), 0.04, Math.max(0.12, z1 - z0), m, [(x0 + x1) / 2, y - 0.62, (z0 + z1) / 2]);
+  // éclairage de plafond : dans les coursives, pavés lumineux encastrés espacés (le plafond reste visible entre eux)
+  // plutôt qu'un seul ruban éblouissant sur toute la longueur ; ailleurs, un pavé unique cerclé
+  const ledSoft = mats.emissive(0xeaf2ff, 1.5);
+  const ledStrip = (x0, x1, z0, z1, y, m = ledSoft) => {
+    const w = x1 - x0, L = z1 - z0, yy = y - 0.62;
+    if (L > w * 3) {
+      for (let z = z0 + 1.2; z < z1 - 0.6; z += 2.5) {
+        box(Math.min(1.4, w - 0.4) + 0.1, 0.05, 0.62, trim, [(x0 + x1) / 2, yy + 0.01, z]);
+        box(Math.min(1.4, w - 0.4), 0.02, 0.5, m === ledW ? ledSoft : m, [(x0 + x1) / 2, yy - 0.02, z]);
+      }
+      return;
+    }
+    box(w + 0.1, 0.05, L + 0.1, trim, [(x0 + x1) / 2, yy + 0.01, (z0 + z1) / 2]);
+    box(w, 0.02, L, m === ledW ? ledSoft : m, [(x0 + x1) / 2, yy - 0.02, (z0 + z1) / 2]);
+  };
   /** volée d'escalier : marches visibles, rampe de collision ; de (za, ya) à (zb, yb) entre x0 et x1 */
   const flight = (x0, x1, za, ya, zb, yb) => {
     const n = Math.round(Math.abs(yb - ya) / 0.19), dz = (zb - za) / n, dy = (yb - ya) / n, w = x1 - x0;
