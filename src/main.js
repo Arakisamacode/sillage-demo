@@ -678,7 +678,7 @@ async function boot() {
   const heron = ctx.ships.heron;
   const seat = heron.interior.seat;
   const interactables = [
-    { pos: heron.interior.seatTrigger, r: 2.0, label: 'E — S\'installer aux commandes', fn: () => { player.sit(seat); toast('Héron Mk II · HL-2207 · systèmes en veille · autorisation de départ en attente'); audio.blip(); } },
+    { pos: heron.interior.seatTrigger, r: 2.0, label: 'E — S\'installer aux commandes', fn: () => { player.sit(seat); toast('Héron Mk II · HL-0907 · systèmes en veille · autorisation de départ en attente'); audio.blip(); } },
     { pos: new THREE.Vector3(-29.9, 0, 3.1), r: 1.4, label: 'E — Prendre un café (3 ¤)', fn: () => { if (game.pay(3)) { audio.coffee(); toast('Café serré · 3 ¤ débités'); } else toast('Crédits insuffisants'); } },
     { pos: new THREE.Vector3(ctx.kiosk.x, 0, ctx.kiosk.z), r: 3.7, label: 'E — Commander au kiosque (5 ¤)', fn: () => { if (game.pay(5)) { audio.coffee(); toast('« Et voilà, bonne escale ! » · 5 ¤'); } else toast('Crédits insuffisants'); } },
   ];
@@ -746,7 +746,7 @@ async function boot() {
     audio.blip();
     const sh = game.d.ship, hull = Math.round((game.d.hull ?? 6000) / 60);
     const guns = ['wingL', 'wingR', 'chin'].map((k) => sh[k] && ITEM[sh[k]].name.split('«')[0].trim()).filter(Boolean).join(', ') || 'aucune arme';
-    toast(`Héron HL-2207 · coque ${hull} % · ${ITEM[sh.shield]?.name.split('«')[0].trim() || 'bouclier'} · ${guns}${sh.dorsal ? ' · tourelle' : ''}${sh.mining ? ' · laser de minage' : ''} · soute ${cargo.holdFree()} emplacements libres`);
+    toast(`Héron HL-0907 · coque ${hull} % · ${ITEM[sh.shield]?.name.split('«')[0].trim() || 'bouclier'} · ${guns}${sh.dorsal ? ' · tourelle' : ''}${sh.mining ? ' · laser de minage' : ''} · soute ${cargo.holdFree()} emplacements libres`);
   } });
   interactables.push({ pos: F.locker.pos, r: 1.3, label: 'E — Casier personnel (tenue, équipement)', fn: () => openUI(() => shop.openInventory()) });
   const NOTICES = ['« Recherche artilleur expérimenté, convois vers Lys. Voir la Guilde des équipages. »', '« Vends pièces de canon B2, bon état. Demander Oriane, Équipement naval. »', '« Primes doublées sur les pirates de la ceinture d\'Ardent ce cycle. »', '« Colocation cabine 14, pont habitat. Calme exigé. »'];

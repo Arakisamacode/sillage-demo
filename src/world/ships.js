@@ -5,7 +5,7 @@ import { loft, wing, nozzle, flipFaces } from './shipkit.js';
 import { platedHull } from './hullkit.js';
 import {
   skinHull, nozzle as bellNozzle, nozzleMaterials, kitMaterials, LiveryAtlas, planeDecal, addParts, bevelBox, rodBetween,
-  rcsBlock, antenna, radiator, lightPod, ventPanel, dockingClamp, landingStrut,
+  rcsBlock, antenna, radiator, lightPod, ventPanel, dockingClamp, landingStrut, projUV,
 } from './hullkit2.js';
 import { PADS } from './layout.js';
 import { paintedText, decalMaterial } from './signage.js';
@@ -22,6 +22,8 @@ class ShipCtx {
     // dynamic : géométrie dans un lot propre (déplaçable en vol) ; collisions toujours dans le lot global
     this.CB = ctx.builder;
     this.B = dynamic ? new Builder(null) : ctx.builder;
+    // lot mobile : une seule cellule (un appel de rendu par matériau, le vaisseau est petit et se déplace)
+    if (dynamic) this.B.cellSize = Infinity;
     this.dynamic = dynamic;
     this.mats = ctx.mats;
     this.heading = pad.heading;
@@ -171,20 +173,349 @@ function rover(S, mats, x, y, z, ry) {
   S.cbox(2.1, 1.6, 3.6, [x, y + 0.8, z]);
 }
 
+// =============================================================================== Héron Mk II : coque extérieure
+// Cargo léger polyvalent de 35 m (hullkit2) : fuselage lissé à sections chanfreinées (peinture claire sur le
+// dos, composite sombre sous la ceinture), nez à ventre relevé (menton), verrière cerclée à vitrages réels
+// (le pilote voit au travers : la coque et sa doublure intérieure sont percées), ailes basses en caisson
+// biseauté avec pylônes d'emport et nacelles VTOL en bout d'aile, deux nacelles de propulsion d'épaule à
+// tuyères en cloche (lueur pilotée par le vol : S.engines / S.vtolEngines.setThrust), carénage dorsal à
+// couronne de tourelle, radiateurs, RCS, antennes, feux, train escamotable (S.gear) et livrée HL-0907.
+// Repère local de l'aire : nez vers -Z. Les emplacements d'armes (shipgear.js HERON_MOUNTS) tombent sur
+// les supports : ailes (±8,4 ; 3,05 ; 0,4), menton (0 ; 2,3 ; -14), dos (0 ; 8,95 ; 2,4), ventre (0 ; 1,45 ; -9,6).
+export const HERON_REG = 'HL-0907';
+
+function heronExterior(S, ctx) {
+  const { mats } = ctx;
+  const RX = Math.PI, V = (x, y, z) => new THREE.Vector3(x, y, z);
+  const K = kitMaterials(mats, { hull: 0xc8c5bb, dark: 0x2e3236, accent: 0x2c6d8c, wear: 1.1 });
+  const NZ = nozzleMaterials(mats, { glow: 0x9cc4ff, idle: 0.04, key: 'heron' });
+  const VZ = nozzleMaterials(mats, { glow: 0x8ab8ff, idle: 0.0, key: 'heronv' });
+  const M = { ...K, ...NZ, fin: mats.smooth(0x9a9c9e, 0.45, 0.9, { grime: 0.7, rust: 0.05, floor: 0 }), lens: K.lensWhite, mech: K.mech, chrome: K.chrome };
+  const VM = { ...M, outer: VZ.outer, inner: VZ.inner, lip: VZ.lip, glow: VZ.glow };
+  const frameDS = ds(K.frame);
+  const liner = ds(mats.paint(0x2b3034, { plain: true, rough: 0.6, grime: 0.3 }));
+  const glass = new THREE.MeshStandardMaterial({ color: 0x1b2730, roughness: 0.04, metalness: 0.92, transparent: true, opacity: 0.42, side: THREE.DoubleSide, envMapIntensity: 1.6, depthWrite: false });
+  const winLit = mats.emissive(0xffd6a0, 1.1);
+  const collide = (g) => { const c = (g.index ? g.toNonIndexed() : g.clone()); c.applyMatrix4(S.M); S.CB.addCollider(c); };
+  const onHull = (h, z, a, dsh = 0, lift = 0) => {
+    const q = h.point(z, a, dsh);
+    const e = new THREE.Euler().setFromQuaternion(new THREE.Quaternion().setFromUnitVectors(V(0, 1, 0), q.n));
+    return { pos: q.p.clone().addScaledVector(q.n, lift).toArray(), rot: [e.x, e.y, e.z], n: q.n, p: q.p };
+  };
+
+  // ---------------------------------------------------------------- livrée (régions déclarées d'abord)
+  const L = new LiveryAtlas({ ppm: 40, accent: '#2c6d8c', wear: 0.5, seed: 907 });
+  const rStripe = L.region(22.0, 0.46, (d) => { d.stripe(0.14, 0.3, d.accent); d.stripe(0.0, 0.07, '#25282b'); });
+  const rReg = L.region(9.6, 0.86, (d) => d.text(`HÉRON MK II · ${HERON_REG}`, 0.05, 0.12, 0.62, { color: '#26292c', spacing: 0.06 }));
+  const rOp = L.region(7.4, 0.3, (d) => d.text('ARMATEUR LIBRE · PORT D’ATTACHE HALDEN-7 · AIRE 02', 0.04, 0.05, 0.2, { color: '#3a3e42', weight: 600, spacing: 0.08 }));
+  const rNose = L.region(3.4, 1.25, (d) => {
+    const c = d.ctx, k = d.px, H = 1.25 * k;
+    c.fillStyle = d.accent; c.beginPath(); c.moveTo(0.5 * k, H); c.lineTo(3.4 * k, H); c.lineTo(3.4 * k, 0); c.lineTo(0, 0); c.fill();
+    d.text('07', 0.85, 0.16, 0.95, { color: '#e9e4d6', weight: 700 });
+    d.rect(2.25, 0.2, 0.06, 0.85, '#e9e4d6');
+  });
+  const rTop = L.region(4.6, 1.0, (d) => d.text(HERON_REG, 0.05, 0.1, 0.85, { color: '#2a2d30', weight: 700, spacing: 0.08 }));
+  const rWalk = L.region(3.2, 1.6, (d) => {
+    d.rect(0, 0, 0.06, 1.6, '#2a2d30'); d.rect(3.14, 0, 0.06, 1.6, '#2a2d30');
+    d.text('NE PAS MARCHER', 0.25, 0.62, 0.3, { color: '#2a2d30', weight: 700 });
+  });
+  const rPyl = L.region(2.0, 0.3, (d) => d.text('EMPORT · 1 200 KG', 0.03, 0.04, 0.2, { color: '#e2b83a', weight: 700 }));
+  const rChev = L.region(7.4, 0.3, (d) => d.chevrons(0, 0, 7.4, 0.3, { pitch: 0.2 }));
+  const rChevV = L.region(3.0, 0.26, (d) => d.chevrons(0, 0, 3.0, 0.26, { pitch: 0.18 }));
+  const rBlast = L.region(3.0, 0.5, (d) => { d.chevrons(0, 0, 3.0, 0.13, { pitch: 0.12 }); d.text('DANGER · SOUFFLE', 0.04, 0.16, 0.27, { color: '#e7c23a', weight: 700 }); });
+  const rCrew = L.region(2.6, 0.32, (d) => d.text('ACCÈS ÉQUIPAGE ▸', 0.03, 0.05, 0.23, { color: '#e2b83a', weight: 700 }));
+  const rRescue = L.region(2.6, 0.42, (d) => { d.rect(0, 0, 0.12, 0.42, d.accent); d.text('SECOURS ▸ ÉVACUATION', 0.22, 0.08, 0.24, { color: '#2a2d30', weight: 700 }); });
+  L.build();
+  const LM = L.material();
+  const decal = (geo) => S.add(geo, LM, [0, 0, 0], null, { cast: false, receive: true });
+
+  // ---------------------------------------------------------------- fuselage : stations
+  // sections trapèze chanfreiné-arrondi : ventre plat, flancs à peine inclinés, arêtes biseautées
+  const B = { w: 4.6, tw: 4.4, h: 3.5, y: 5.0, c: 0.65, r: 0.28 };
+  const ST = [
+    { z: -20.3, w: 0.32, tw: 0.24, h: 0.17, hb: 0.2, y: 4.22, c: 0.06, r: 0.06 },
+    { z: -19.65, w: 1.65, tw: 1.15, h: 0.85, hb: 0.85, y: 4.32, c: 0.3, r: 0.22 },
+    { z: -18.4, w: 2.75, tw: 2.0, h: 1.75, hb: 1.35, y: 4.62, c: 0.48, r: 0.28 },
+    { z: -16.6, w: 3.8, tw: 3.0, h: 2.8, hb: 1.9, y: 4.97, c: 0.6, r: 0.28 },
+    { z: -14.6, w: 4.45, tw: 3.9, h: 3.35, hb: 2.25, y: 5.0, c: 0.65, r: 0.28 },
+    { z: -12.4, ...B, tw: 4.3, hb: 2.65 },
+    { z: -10.0, ...B, hb: 3.1 },
+    { z: -8.0, ...B, hb: 3.15 },
+    { z: 12.5, ...B, hb: 3.15 },
+    { z: 15.0, w: 4.45, tw: 4.25, h: 3.4, hb: 3.1, y: 5.05, c: 0.65, r: 0.28 },
+  ];
+  const zN = ST[0].z, zT = ST[ST.length - 1].z;
+  const hold = { x: 3.62, y0: 2.02, y1: 4.98 };
+  const H = skinHull(ST, { radial: 8, steps: 2, cap0: true, cap1: { hole: [-hold.x, hold.y0, hold.x, hold.y1] } });
+  const WAIST = 0.42; // séparation peinture claire / composite (angle sous l'horizontale)
+  const arcLen = (z, a0, a1) => { const p0 = H.point(z, a0), p1 = H.point(z, a1); let d = p1.s - p0.s; if (d <= 0) d += p0.Lt; return d; };
+  const piece = (z0, z1, a0, a1, mat, o = {}) => {
+    const zm = (z0 + z1) / 2, len = Math.max(arcLen(z0, a0, a1), arcLen(z1, a0, a1), arcLen(zm, a0, a1));
+    const segS = Math.max(2, Math.ceil(len / (o.ds ?? 0.11)));
+    const segZ = Math.max(1, Math.ceil((z1 - z0) / (o.dz ?? 0.5)));
+    const g = H.patch({ z0, z1, a0, a1, off: o.off ?? 0, segZ, segS, metric: true });
+    S.add(g, mat, [0, 0, 0], null, o.opts ?? {});
+    return g;
+  };
+  // vitrages : bandes [z0, z1] × [a0, a1] (angles polaires, π/2 = dessus) — la coque et la doublure sont percées
+  const WS = { z0: -18.95, z1: -15.75, a0: 0.86, a1: RX - 0.86 };     // pare-brise
+  const SW = [{ z0: -17.5, z1: -14.1, a0: 0.3, a1: 0.76 }, { z0: -17.5, z1: -14.1, a0: RX - 0.76, a1: RX - 0.3 }];
+  const holes = [WS, ...SW];
+  // découpe en tranches de z, puis en arcs : composite sous la ceinture, peinture au-dessus (moins les vitrages)
+  const cuts = [...new Set([zN, -12.4, -8.0, 12.5, zT, ...holes.flatMap((h) => [h.z0, h.z1])])].sort((a, b) => a - b);
+  const dzOf = (z) => (z < -12.4 ? 0.28 : z < -8 ? 0.5 : z < 12.5 ? 2.05 : 0.5);
+  const NOSE_END = -8.8;
+  for (let i = 0; i < cuts.length - 1; i++) {
+    const za = cuts[i], zb = cuts[i + 1], dz = dzOf(za);
+    const inH = holes.filter((h) => h.z0 <= za + 1e-6 && h.z1 >= zb - 1e-6).sort((a, b) => a.a0 - b.a0);
+    let a = -WAIST;
+    for (const h of inH) { piece(za, zb, a, h.a0, K.hull, { dz }); a = h.a1; }
+    piece(za, zb, a, RX + WAIST, K.hull, { dz });
+    piece(za, zb, RX + WAIST, 2 * RX - WAIST, za < -12.4 - 1e-6 ? K.hull : K.hullDark, { dz, ds: 0.16 });
+    // doublure intérieure du poste (vue depuis le siège : seuls les vitrages laissent voir dehors)
+    if (zb <= NOSE_END + 1e-6 || za < NOSE_END) {
+      const z1 = Math.min(zb, NOSE_END);
+      let b = -RX / 2 + 1e-3;
+      for (const h of inH) { piece(za, z1, b, h.a0, liner, { off: -0.07, dz, ds: 0.2, opts: { cast: false } }); b = h.a1; }
+      piece(za, z1, b, 3 * RX / 2 - 1e-3, liner, { off: -0.07, dz, ds: 0.2, opts: { cast: false } });
+    }
+  }
+  S.add(H.cap0, K.hull);
+  // ventre du nez en composite (plus étroit que la ceinture : le nez reste clair vu de face), raccord cerclé
+  S.add(H.patch({ z0: -19.4, z1: -12.4, a0: RX + 0.78, a1: 2 * RX - 0.78, off: 0.006, segZ: 24, segS: 14, metric: true }), K.hullDark);
+  S.add(H.band({ z: -12.4, width: 0.26, depth: 0.04, a0: RX + WAIST - 0.04, a1: 2 * RX - WAIST + 0.04, segS: 40 }), K.service);
+  S.add(H.cap1, K.hullDark);
+  // collisions : nez (le reste du fuselage est couvert par les boîtes, la soute reste ouverte à l'arrière)
+  collide(H.patch({ z0: zN, z1: NOSE_END, a0: -RX / 2 + 1e-3, a1: 3 * RX / 2 - 1e-3, segZ: 16, segS: 28 }));
+
+  // ---------------------------------------------------------------- verrière : vitrages + cadre en relief
+  const fr = (g) => S.add(g, frameDS);
+  for (const h of holes) {
+    S.add(H.patch({ z0: h.z0, z1: h.z1, a0: h.a0, a1: h.a1, off: -0.025, segZ: Math.ceil((h.z1 - h.z0) / 0.25), segS: 14 }), glass, [0, 0, 0], null, { cast: false });
+    for (const z of [h.z0, h.z1]) fr(H.raised({ z0: z - 0.08, z1: z + 0.08, a0: h.a0 - 0.035, a1: h.a1 + 0.035, depth: 0.09, base: -0.02, segZ: 1, segS: 14 }));
+    for (const a of [h.a0, h.a1]) fr(H.strip({ z0: h.z0, z1: h.z1, angle: a, width: 0.15, depth: 0.09, base: -0.02, segZ: Math.ceil((h.z1 - h.z0) / 0.25) }));
+  }
+  // meneaux du pare-brise, traverse, montant des vitrages latéraux
+  for (const a of [RX / 2 - 0.36, RX / 2 + 0.36]) fr(H.strip({ z0: WS.z0, z1: WS.z1, angle: a, width: 0.11, depth: 0.08, base: -0.02, segZ: 12 }));
+  fr(H.raised({ z0: -17.42, z1: -17.3, a0: WS.a0, a1: WS.a1, depth: 0.07, base: -0.02, segZ: 1, segS: 12 }));
+  for (const h of SW) fr(H.raised({ z0: -15.86, z1: -15.74, a0: h.a0, a1: h.a1, depth: 0.07, base: -0.02, segZ: 1, segS: 4 }));
+  // capot de verrière : ressaut peint derrière le pare-brise, essuie-glaces / lave-vitre
+  S.add(H.raised({ z0: -15.75, z1: -15.2, a0: 0.3, a1: RX - 0.3, depth: 0.045, segZ: 2, segS: 24 }), K.service);
+
+  // ---------------------------------------------------------------- nervures, liston, trappes
+  for (const z of [-8.6, 10.6]) S.add(H.band({ z, width: 0.3, depth: 0.03, a0: -WAIST + 0.06, a1: RX + WAIST - 0.06, segS: 64 }), K.hull);
+  S.add(H.band({ z: 14.65, width: 0.5, depth: 0.08, segS: 72 }), K.service);
+  for (const a of [-WAIST, RX + WAIST]) S.add(H.strip({ z0: -12.53, z1: 14.5, angle: a, width: 0.2, depth: 0.07, segZ: 28 }), K.service);
+  for (const s of [1, -1]) {
+    const side = s > 0 ? 0 : RX;
+    // trappes de service (composite) et panneau d'accès avionique sous le poste
+    for (const [z0, z1, h, sh] of [[3.8, 5.4, 0.6, -0.75], [8.4, 10.0, 0.8, -0.6]]) {
+      S.add(H.raised({ z0, z1, angle: side, height: h, shift: sh * s, depth: 0.03, segZ: 2, segS: 3 }), K.hullDark);
+    }
+    S.add(H.raised({ z0: -10.4, z1: -8.8, angle: s > 0 ? -0.28 : RX + 0.28, height: 0.7, depth: 0.03, segZ: 3, segS: 3 }), K.hullDark);
+    // hublots du pont supérieur (vitrage éclairé de l'intérieur + cadre)
+    for (let k = 0; k < 6; k++) {
+      const z0 = -6.6 + k * 2.75, z1 = z0 + 0.7, a = s > 0 ? 0.3 : RX - 0.3;
+      S.add(H.patch({ z0, z1, angle: a, height: 0.42, off: 0.03, segZ: 2, segS: 2 }), winLit, [0, 0, 0], null, { cast: false });
+      S.add(H.raised({ z0: z0 - 0.07, z1: z1 + 0.07, angle: a, height: 0.56, depth: 0.035, segZ: 2, segS: 2, base: -0.01 }), K.frame);
+    }
+  }
+  // porte de soute : encadrement, tunnel, chevrons
+  S.add(bevelBox(7.9, 0.34, 0.3, 0.08), K.service, [0, hold.y1 + 0.17, zT + 0.05]);
+  for (const s of [-1, 1]) {
+    S.add(bevelBox(0.34, hold.y1 - hold.y0 + 0.3, 0.3, 0.08), K.service, [s * (hold.x + 0.17), (hold.y0 + hold.y1) / 2 + 0.1, zT + 0.05]);
+    S.add(bevelBox(0.06, hold.y1 - hold.y0, 0.62, 0.02), K.mech, [s * (hold.x - 0.03), (hold.y0 + hold.y1) / 2, 14.7]);
+    const v = planeDecal(3.0, 0.26, rChevV.uv); v.rotateZ(Math.PI / 2); v.translate(s * (hold.x + 0.48), 3.5, zT + 0.012); decal(v);
+  }
+  S.add(bevelBox(hold.x * 2, 0.06, 0.62, 0.02), K.mech, [0, hold.y1 - 0.03, 14.7]);
+  { const g = planeDecal(7.4, 0.3, rChev.uv); g.translate(0, hold.y1 + 0.55, zT + 0.012); decal(g); }
+  { const g = planeDecal(2.6, 0.32, rCrew.uv); g.translate(-2.2, 5.85, zT + 0.012); decal(g); }
+  // cloison arrière : grilles d'extraction, trappe de la baie machines, feux de poupe
+  for (const s of [-1, 1]) S.parts(ventPanel(1.3, 0.7, 0.06), M, [s * 2.3, 7.35, zT], [Math.PI / 2, 0, 0]);
+  S.add(bevelBox(1.2, 1.0, 0.08, 0.03), K.service, [0, 7.0, zT + 0.04]);
+  S.add(bevelBox(0.5, 0.08, 0.1, 0.02), K.hazard, [0, 7.55, zT + 0.07]);
+  for (const s of [-1, 1]) { S.parts(lightPod({ r: 0.07 }), M, [s * 3.9, 6.6, zT], [Math.PI / 2, 0, 0]); }
+
+  // ---------------------------------------------------------------- nez : menton, capteurs, phares, RCS
+  const belly = (z) => H.point(z, -RX / 2).p.y;
+  S.add(new THREE.SphereGeometry(0.3, 20, 10, 0, Math.PI * 2, 0, Math.PI / 2), K.black, [0, belly(-17.6) - 0.06, -17.6], [Math.PI, 0, 0]);
+  S.add(new THREE.CylinderGeometry(0.36, 0.4, 0.12, 20), K.mech, [0, belly(-17.6) - 0.02, -17.6]);
+  // support de menton (berceau d'arme) et carénage
+  S.add(bevelBox(1.5, 0.22, 2.4, 0.07), K.service, [0, belly(-14.0) - 0.02, -14.0], [-0.17, 0, 0]);
+  for (const s of [-1, 1]) S.add(bevelBox(0.12, 0.3, 1.9, 0.03), K.mech, [s * 0.5, belly(-14.0) - 0.12, -14.0], [-0.17, 0, 0]);
+  // phares d'atterrissage
+  for (const s of [-1, 1]) {
+    S.add(new THREE.CylinderGeometry(0.17, 0.21, 0.14, 16), K.mech, [s * 1.25, belly(-16.0) - 0.02, -16.0]);
+    S.add(new THREE.CircleGeometry(0.15, 16), K.lensWhite, [s * 1.25, belly(-16.0) - 0.095, -16.0], [Math.PI / 2, 0, 0], { cast: false });
+  }
+  // RCS avant (épaules du nez) et arrière (nacelles)
+  for (const s of [-1, 1]) {
+    const q = onHull(H, -14.9, s > 0 ? 0.55 : RX - 0.55, 0, 0.15);
+    S.parts(rcsBlock({ size: 0.42, dirs: ['+y', s > 0 ? '+x' : '-x', '-z', '+z'] }), M, q.pos, q.rot);
+    const q2 = onHull(H, -11.0, s > 0 ? -0.55 : RX + 0.55, 0, 0.15);
+    S.parts(rcsBlock({ size: 0.38, dirs: ['+y', '-z', '+z'] }), M, q2.pos, q2.rot);
+  }
+
+  // ---------------------------------------------------------------- carénage dorsal, couronne de tourelle
+  const spine = skinHull([
+    { z: -6.4, w: 0.25, tw: 0.2, h: 0.04, hb: 0.1, y: 8.48, c: 0.04, r: 0.03 },
+    { z: -4.2, w: 1.35, tw: 1.0, h: 0.42, hb: 0.1, y: 8.52, c: 0.16, r: 0.08 },
+    { z: 10.6, w: 1.35, tw: 1.0, h: 0.42, hb: 0.1, y: 8.52, c: 0.16, r: 0.08 },
+    { z: 12.9, w: 0.5, tw: 0.35, h: 0.12, hb: 0.1, y: 8.5, c: 0.08, r: 0.04 },
+  ], { radial: 28, steps: 5, smooth: true, cap1: true });
+  S.add(spine.geometry, K.hull);
+  S.add(spine.cap1, K.service);
+  for (const z of [-1.2, 6.2]) S.add(spine.band({ z, width: 0.22, depth: 0.03, a0: -0.2, a1: RX + 0.2 }), K.service);
+  // couronne (toujours présente ; la tourelle s'y pose) : anneau, capot, boulons
+  S.add(new THREE.CylinderGeometry(1.28, 1.36, 0.12, 40), K.mech, [0, 8.9, 2.4]);
+  S.add(new THREE.TorusGeometry(1.2, 0.05, 6, 40), K.bare, [0, 8.96, 2.4], [Math.PI / 2, 0, 0]);
+  S.add(new THREE.CylinderGeometry(1.08, 1.12, 0.06, 40), K.service, [0, 8.97, 2.4]);
+  for (let k = 0; k < 4; k++) { const a = k * Math.PI / 2 + 0.4; S.add(bevelBox(0.3, 0.06, 0.18, 0.02), K.hazard, [Math.cos(a) * 1.32, 8.97, 2.4 + Math.sin(a) * 1.32], [0, -a, 0]); }
+  // radiateurs d'épaule, antennes, dôme de capteurs
+  for (const s of [-1, 1]) S.parts(radiator({ len: 5.4, h: 0.34, n: 9, w: 1.25 }), M, [s * 2.55, 8.5, 8.4]);
+  S.parts(antenna({ type: 'dish', h: 0.9, r: 0.38, tilt: 0.75 }), M, [1.9, 8.5, -6.4]);
+  S.parts(antenna({ type: 'whip', h: 1.5 }), M, [-1.9, 8.5, -7.6]);
+  S.parts(antenna({ type: 'blade', h: 0.42 }), M, [0, 8.94, -2.8]);
+  S.parts(antenna({ type: 'mast', h: 1.05 }), M, [1.2, 8.5, 12.3]);
+  S.parts(ventPanel(1.6, 0.9, 0.06), M, [0, 8.5, 13.7]);
+  S.parts(antenna({ type: 'blade', h: 0.38 }), M, [0, 1.88, -3.0], [Math.PI, 0, 0]);
+  S.add(new THREE.SphereGeometry(0.42, 18, 8, 0, Math.PI * 2, 0, Math.PI / 2), mats.smooth(0x9aa4aa, 0.25, 0.4), [-1.5, 8.55, -4.4]);
+  S.add(new THREE.CylinderGeometry(0.48, 0.52, 0.1, 18), K.mech, [-1.5, 8.53, -4.4]);
+  // capot d'accès dorsal et décalcomanie d'immatriculation (lisible d'au-dessus)
+  S.add(H.raised({ z0: -10.4, z1: -9.0, angle: RX / 2, height: 1.4, depth: 0.03, segZ: 2, segS: 3 }), K.hullDark);
+  decal(H.patch({ z0: -14.4, z1: -10.0, angle: RX / 2, height: 0.96, uv: rTop.uv, readable: true, up: [0, 0, -1], segZ: 6, segS: 3 }));
+
+  // ---------------------------------------------------------------- ailes basses, pylônes d'emport, nacelles VTOL
+  const WY = 3.75, WT = 0.44, WB = 0.12;
+  for (const s of [-1, 1]) {
+    const pts = [[4.2, -3.4], [9.75, 0.0], [9.75, 6.4], [4.2, 7.6]].map(([x, z]) => new THREE.Vector2(s * x, -z));
+    const wg0 = new THREE.ExtrudeGeometry(new THREE.Shape(pts), { depth: WT - 2 * WB, bevelEnabled: true, bevelThickness: WB, bevelSize: WB, bevelOffset: -WB, bevelSegments: 1, curveSegments: 1 });
+    wg0.rotateX(-Math.PI / 2); wg0.translate(0, WY - (WT - 2 * WB) / 2, 0);
+    const wg = wg0.index ? wg0.toNonIndexed() : wg0; wg.computeVertexNormals(); projUV(wg, 1);
+    S.add(wg, K.hull);
+    collide(wg);
+    // ventre d'aile en composite
+    const ub = bevelBox(4.6, 0.04, 5.4, 0.015); ub.rotateY(0); S.add(ub, K.hullDark, [s * 6.75, WY - WT / 2 - 0.01, 3.6]);
+    // bord d'attaque en métal nu, volets de bord de fuite séparés par un jour, cloisons d'aile
+    const le = rodBetween(V(s * 4.3, WY, -3.3), V(s * 9.7, WY, 0.05), 0.13, 10); S.add(le, K.bare);
+    S.add(bevelBox(4.9, 0.12, 0.9, 0.03), K.hullDark, [s * 6.95, WY - 0.02, 7.05], [0.1, s * Math.atan2(1.2, 5.55), 0]);
+    S.add(bevelBox(0.08, 0.16, 4.4, 0.02), K.service, [s * 7.4, WY + WT / 2 + 0.06, 3.4]);
+    // pylône d'emport (point d'accrochage d'arme sous l'aile)
+    S.add(bevelBox(0.36, 0.34, 2.3, 0.07), K.service, [s * 8.4, WY - WT / 2 - 0.15, 0.6]);
+    S.add(bevelBox(0.5, 0.06, 1.5, 0.02), K.mech, [s * 8.4, WY - WT / 2 - 0.33, 0.6]);
+    for (const z of [0.05, 1.15]) S.add(new THREE.CylinderGeometry(0.05, 0.05, 0.12, 8), K.chrome, [s * 8.4, WY - WT / 2 - 0.38, z]);
+    { const g = planeDecal(2.0, 0.3, rPyl.uv); g.rotateY(s > 0 ? Math.PI / 2 : -Math.PI / 2); g.translate(s * (8.4 + 0.185), WY - WT / 2 - 0.15, 0.6); decal(g); }
+    // marquages d'extrados : bande d'accent au saumon, zone de passage
+    { const g = planeDecal(3.2, 1.6, rWalk.uv); g.rotateX(-Math.PI / 2); if (s < 0) g.rotateY(Math.PI); g.translate(s * 5.6, WY + WT / 2 + 0.006, 2.4); decal(g); }
+    S.add(bevelBox(0.5, 0.02, 6.1, 0.005), K.accent, [s * 9.35, WY + WT / 2 + 0.004, 3.25], null, { cast: false });
+    // nacelle VTOL de saumon (tuyère orientable vers le bas)
+    const vx = s * 10.3;
+    const pod = skinHull([
+      { z: -0.75, w: 0.06, h: 0.06, x: vx, y: WY, n: 2.2, steps: 2 },
+      { z: -0.4, w: 0.28, h: 0.28, x: vx, y: WY, n: 2.2, steps: 3 },
+      { z: 0.8, w: 0.78, h: 0.78, x: vx, y: WY, n: 2.4, steps: 4 },
+      { z: 6.4, w: 0.78, h: 0.78, x: vx, y: WY, n: 2.4, steps: 3 },
+      { z: 7.6, w: 0.42, h: 0.42, x: vx, y: WY, n: 2.2 },
+    ], { radial: 32, cap1: true });
+    S.add(pod.geometry, K.hull);
+    S.add(pod.cap1, K.mech);
+    S.add(pod.patch({ z0: -0.74, z1: 1.6, a0: -RX / 2 + 1e-3, a1: 3 * RX / 2 - 1e-3, off: 0.004, segZ: 8, segS: 24, metric: true }), K.accent);
+    for (const z of [1.8, 5.8]) S.add(pod.band({ z, width: 0.16, depth: 0.03 }), K.service);
+    collide(skinHull([{ z: -0.4, w: 0.3, h: 0.3, x: vx, y: WY }, { z: 0.8, w: 0.8, h: 0.8, x: vx, y: WY }, { z: 7.6, w: 0.45, h: 0.45, x: vx, y: WY }], { radial: 10, steps: 2 }).geometry);
+    S.parts(bellNozzle({ rt: 0.26, re: 0.56, len: 0.62, wall: 0.04, seg: 28, mount: 0, gimbal: false, bands: 1 }), VM, [vx, WY - 0.3, 3.8], [Math.PI / 2, 0, 0]);
+    S.add(new THREE.TorusGeometry(0.66, 0.06, 6, 28), K.mech, [vx, WY - 0.72, 3.8], [Math.PI / 2, 0, 0]);
+    // feux de navigation (bâbord rouge, tribord vert) et RCS de saumon
+    S.parts(lightPod({ r: 0.08 }), M, [s * 11.06, WY, 3.8], [0, 0, -s * Math.PI / 2]);
+    S.navLight([s * 11.2, WY, 3.8], s < 0 ? 0xff2010 : 0x20ff40, 0);
+    S.parts(rcsBlock({ size: 0.36, dirs: ['+y', '-y', '+z'] }), M, [vx, WY + 0.86, 6.2]);
+  }
+
+  // ---------------------------------------------------------------- nacelles de propulsion (épaules) + tuyères
+  const EX = 4.85, EY = 7.05;
+  for (const s of [-1, 1]) {
+    const nx = s * EX;
+    const nst = [
+      { z: 4.55, w: 0.14, tw: 0.11, h: 0.12, hb: 0.15, x: nx, y: EY, c: 0.04, r: 0.04, steps: 3 },
+      { z: 5.0, w: 0.55, tw: 0.45, h: 0.5, hb: 0.6, x: nx, y: EY, c: 0.16, r: 0.12, steps: 4 },
+      { z: 6.6, w: 1.1, tw: 0.95, h: 1.0, hb: 1.25, x: nx, y: EY, c: 0.38, r: 0.18, steps: 3 },
+      { z: 7.8, w: 1.15, tw: 1.0, h: 1.05, hb: 1.3, x: nx, y: EY, c: 0.4, r: 0.18, steps: 3 },
+      { z: 14.4, w: 1.15, tw: 1.0, h: 1.05, hb: 1.3, x: nx, y: EY, c: 0.4, r: 0.18, steps: 3 },
+      { z: 15.55, w: 0.95, tw: 0.82, h: 0.88, hb: 1.05, x: nx, y: EY, c: 0.34, r: 0.16 },
+    ];
+    const cowl = skinHull(nst.slice(0, 4), { radial: 40 });
+    const nac = skinHull(nst.slice(3), { radial: 40, cap1: true });
+    S.add(cowl.geometry, K.hull);
+    S.add(nac.geometry, K.hull);
+    S.add(nac.cap1, K.mech);
+    collide(skinHull([nst[1], nst[3], nst[5]].map((t) => ({ ...t, steps: 2 })), { radial: 12 }).geometry);
+    // anneau d'accent (seule couleur vive), cerclages, ventre composite, trappes
+    S.add(nac.band({ z: 8.2, width: 0.42, depth: 0.03 }), K.accent);
+    for (const z of [10.2, 12.6]) S.add(nac.band({ z, width: 0.2, depth: 0.045 }), K.service);
+    S.add(nac.patch({ z0: 7.9, z1: 14.3, a0: RX + 0.3, a1: 2 * RX - 0.3, off: 0.005, segZ: 10, segS: 10, metric: true }), K.hullDark);
+    S.add(nac.raised({ z0: 9.6, z1: 11.4, angle: s > 0 ? 0.25 : RX - 0.25, height: 0.8, depth: 0.03, segZ: 2, segS: 3 }), K.hullDark);
+    S.add(nac.band({ z: 15.2, width: 0.32, depth: 0.04 }), K.bare);
+    // fixation sur la coque (carénage d'épaule)
+    S.add(bevelBox(0.9, 0.5, 8.4, 0.16), K.service, [s * 4.1, 7.95, 10.6], [0, 0, -s * 0.75]);
+    S.parts(bellNozzle({ rt: 0.42, re: 0.98, len: 1.65, wall: 0.05, seg: 40, mount: 0.55, bands: 2 }), M, [nx, EY, 15.45]);
+    decal(nac.patch({ z0: 11.6, z1: 14.6, angle: s > 0 ? 0.6 : RX - 0.6, height: 0.5, uv: rBlast.uv, readable: true, segZ: 6, segS: 2 }));
+    S.parts(rcsBlock({ size: 0.42, dirs: ['+y', s > 0 ? '+x' : '-x', '+z', '-z'] }), M, [nx + s * 0.86, EY + 0.86, 13.6], [0, 0, -s * Math.PI / 4]);
+    S.cbox(2.5, 2.6, 11.6, [nx, EY - 0.1, 10.8]);
+  }
+  S.engines = NZ;          // tuyères principales : setThrust(0..1), piloté par Flight
+  S.vtolEngines = VZ;      // tuyères VTOL de saumon
+  S.thrusters = { main: [[-EX, EY, 17.1], [EX, EY, 17.1]], vtol: [[-10.3, WY - 0.92, 3.8], [10.3, WY - 0.92, 3.8]] };
+
+  // ---------------------------------------------------------------- ventre : berceaux, trappes de train
+  S.add(bevelBox(1.9, 0.12, 2.9, 0.04), K.service, [0, belly(-9.4) - 0.02, -9.4]);              // berceau du module de minage
+  for (const s of [-1, 1]) S.add(bevelBox(0.1, 0.1, 2.6, 0.02), K.chrome, [s * 0.8, belly(-9.4) - 0.1, -9.4]);
+  S.add(bevelBox(2.4, 0.04, 5.2, 0.015), K.service, [0, 1.85, 4.0]);
+  // feux : balises anticollision (dessus / dessous), feu de poupe
+  S.parts(lightPod({ r: 0.09 }), M, [0, 8.92, -4.8]);
+  S.navLight([0, 9.12, -4.8], 0xff3018, 0.3);
+  S.parts(lightPod({ r: 0.08 }), M, [0, 1.84, 0.4], [Math.PI, 0, 0]);
+  S.navLight([0, 1.66, 0.4], 0xff3018, 0.95);
+  S.parts(lightPod({ r: 0.08 }), M, [0, 8.6, 12.85]);
+  S.navLight([0, 8.78, 12.85], 0xffffff, 1.1);
+
+  // ---------------------------------------------------------------- livrée (décalcomanies conformes)
+  for (const s of [1, -1]) {
+    const side = s > 0 ? 0 : RX;
+    decal(H.patch({ z0: -12.6, z1: 13.9, angle: side, shift: s * 0.95, height: 0.46, uv: rStripe.uv, readable: true, segZ: 10, segS: 2 }));
+    decal(H.patch({ z0: -8.4, z1: 1.2, angle: side, shift: s * -0.2, height: 0.86, uv: rReg.uv, readable: true, segZ: 6, segS: 2 }));
+    decal(H.patch({ z0: -8.4, z1: -1.0, angle: side, shift: s * -0.75, height: 0.3, uv: rOp.uv, readable: true, segZ: 6, segS: 2 }));
+    decal(H.patch({ z0: -14.0, z1: -10.6, angle: side, shift: s * -0.15, height: 1.25, uv: rNose.uv, readable: true, segZ: 6, segS: 4 }));
+    decal(H.patch({ z0: 11.0, z1: 13.6, angle: side, shift: s * -0.2, height: 0.42, uv: rRescue.uv, readable: true, segZ: 3, segS: 2 }));
+  }
+
+  // ---------------------------------------------------------------- train d'atterrissage escamotable
+  // lot propre (S.gear.group) : Flight le remonte dans la coque en vol ; cales au sol visibles posé seulement
+  const GB = new Builder(null), CB = new Builder(null);
+  const gadd = (Bd) => (g, m, p, r, o = {}) => Bd.add(g, m, Builder.matrix(p, r), { ...o, parent: S.M });
+  const chock = mats.plastic(0xd4a017, 0.6);
+  for (const s of [-1, 1]) {
+    for (const [x, z, br] of [[2.4, -11.0, '+z'], [3.2, 9.5, '-z']]) {
+      const by = belly(z), h = by + 0.12;
+      addParts(gadd(GB), landingStrut({ h, r: 0.19, pad: 1.25, brace: br }), M, [s * x, 0, z]);
+      for (const k of [-1, 1]) gadd(CB)(metricBox(0.25, 0.2, 0.3, 1), chock, [s * x + k * 0.85, 0.1, z]);
+      // trappes de puits ouvertes (de part et d'autre du puits)
+      for (const k of [-1, 1]) gadd(GB)(bevelBox(0.05, 0.75, 1.5, 0.015), K.hullDark, [s * x + k * 0.62, by - 0.4, z], [0, 0, k * 0.12]);
+      S.add(bevelBox(1.3, 0.05, 1.6, 0.02), K.black, [s * x, by + 0.005, z]);
+    }
+  }
+  const gearGroup = new THREE.Group(), chocks = new THREE.Group();
+  GB.finalize(gearGroup); CB.finalize(chocks);
+  S.worldGroup.add(gearGroup, chocks);
+  S.gear = { group: gearGroup, chocks, k: 1, travel: 1.5 };
+}
+
 function buildHeron(ctx) {
   const pad = PADS.p2;
   const c0 = ctx.builder.colliders.length;
   const S = new ShipCtx(ctx, pad, 'heron', true);
   const { mats } = ctx;
   // -------------------------------------------------- matériaux
-  const hull = mats.paint(0xd2cfc7, { grime: 0.75, scratch: 0.6, rust: 0.0, plain: true, rough: 0.45 });
-  const hullDS = hull.clone(); hullDS.side = THREE.DoubleSide; hullDS.onBeforeCompile = hull.onBeforeCompile; hullDS.customProgramCacheKey = hull.customProgramCacheKey;
-
-  const trim = mats.paint(0x1e2226, { grime: 0.5, plain: true, rough: 0.45 });
-  const accent = mats.paint(0xc8561e, { grime: 0.4, plain: true, rough: 0.4 });
   const metal = mats.metal(0x55595c);
   const chrome = mats.smooth(0xc8ccce, 0.25, 1.0, { grime: 0.3, floor: 0.2 });
-  const glass = new THREE.MeshStandardMaterial({ color: 0x18242c, roughness: 0.03, metalness: 0.9, transparent: true, opacity: 0.35, side: THREE.DoubleSide, envMapIntensity: 1.7, depthWrite: false });
   // intérieur
   const deckM = mats.diamond(0x8c9093);
   const floorUp = mats.paint(0x3a3f44, { plain: true, rough: 0.55, grime: 0.3, floor: 0 });
@@ -196,93 +527,8 @@ function buildHeron(ctx) {
   const leather = mats.plastic(0x5a2f1f, 0.6);
   const light = mats.emissive(0xfff1de, 2.2);
   const blue = mats.emissive(0x3ec7ff, 2.0);
-  // -------------------------------------------------- coque blindée à facettes
-  const HM = hullMats(mats, 0xd4d1c9, 0x3e4448);
-  const ST = [
-    { z: -19.0, w: 0.5, h: 0.4, y: 5.6, n: 2.6 },
-    { z: -17.2, w: 2.4, h: 1.8, y: 5.7, n: 3.2, fb: 0.1 },
-    { z: -14.6, w: 3.8, h: 2.9, y: 5.35, n: 3.6, fb: 0.15 },
-    { z: -11.0, w: 4.45, h: 3.45, y: 5.0, n: 4, fb: 0.15 },
-    { z: -6.0, w: 4.6, h: 3.55, y: 4.95, n: 4.2, fb: 0.15 },
-    { z: 9.0, w: 4.6, h: 3.55, y: 4.95, n: 4.2, fb: 0.15 },
-    { z: 13.0, w: 4.4, h: 3.35, y: 5.0, n: 4, fb: 0.12 },
-    { z: 15.0, w: 4.1, h: 3.1, y: 5.1, n: 3.8, fb: 0.1 },
-  ];
-  const gap = 1.2;
-  const nose = ST.slice(0, 4);
-  S.plated(nose, { facets: 12, steps: 4, arc: [Math.PI / 2 + gap, Math.PI / 2 - gap + Math.PI * 2], plateEvery: [3, 1], altBelow: 3.4, altRandom: 0.03, seed: 11 }, HM);
-  S.plated(ST.slice(3), { facets: 16, steps: 5, plateEvery: [3, 1], altBelow: 3.3, altRandom: 0.03, missing: 0.03, seed: 12, collide: false }, HM);
-  // verrière à vitrages plans + montants épais sur chaque arête
-  const cg = platedHull(nose.slice(1), { facets: 4, steps: 3, arc: [Math.PI / 2 - gap, Math.PI / 2 + gap] });
-  const can = new THREE.Mesh(cg.under, glass);
-  can.renderOrder = 3;
-  S.group.add(can);
-  const P = cg.points;
-  for (let i = 0; i < P[0].length; i++) S.B.tube(P.map((r) => S.local(r[i].x, r[i].y + 0.02, r[i].z).toArray()), 0.085, trim, { radial: 6, cast: false, smooth: false });
-  for (let j = 0; j < P.length; j += 3) S.B.tube(P[j].map((p) => S.local(p.x, p.y + 0.02, p.z).toArray()), 0.07, trim, { radial: 6, cast: false, smooth: false });
-  for (const sx of [-1, 1]) {
-    // arête de chine (ressaut horizontal) + liseré
-    S.box(0.4, 0.26, 26, trim, [sx * 4.72, 4.95, 1.5], null, { tex: 2 });
-    S.box(0.04, 0.1, 25, accent, [sx * 4.93, 4.95, 1.5], null, { cast: false, tex: 1 });
-    // hublots encadrés du pont supérieur
-    for (let z = -6.5; z <= 9; z += 1.55) {
-      S.box(0.08, 0.5, 0.92, trim, [sx * 4.7, 6.45, z], null, { cast: false });
-      S.box(0.06, 0.36, 0.76, mats.emissive(0xffd9a8, 1.4), [sx * 4.75, 6.45, z], null, { cast: false });
-    }
-    // trappes de service, grilles, feux
-    for (const z of [-3, 3.5, 10]) { S.box(0.1, 0.95, 1.65, HM.alt, [sx * 4.66, 3.0, z], null, { cast: false }); S.box(0.1, 0.18, 0.3, yellow, [sx * 4.72, 3.35, z - 0.6], null, { cast: false }); }
-    S.box(0.08, 0.5, 2.6, mats.vent(), [sx * 4.62, 7.4, 6], null, { cast: false });
-    S.box(0.06, 0.14, 0.14, mats.emissive(0xffffff, 6), [sx * 4.75, 4.2, -14], null, { cast: false });
-    // propulseurs de manœuvre (RCS) : blocs de 3 tuyères
-    for (const [z, y] of [[-12, 6.6], [11.5, 3.0]]) {
-      S.box(0.3, 0.5, 0.6, HM.alt, [sx * 4.55, y, z]);
-      for (const dz of [-0.15, 0.15]) S.cyl(0.07, 0.1, 0.18, metal, [sx * 4.75, y + 0.1, z + dz], [0, 0, Math.PI / 2], { seg: 8, cast: false });
-    }
-  }
-  // dos : épine dorsale blindée, dôme de capteurs, antennes, ailerons
-  S.plated([{ z: -3, w: 0.2, h: 0.2, y: 8.5, n: 3 }, { z: -1.5, w: 0.75, h: 0.35, y: 8.6, n: 4 }, { z: 11, w: 0.75, h: 0.4, y: 8.6, n: 4 }, { z: 12.5, w: 0.3, h: 0.2, y: 8.5, n: 3 }], { facets: 8, steps: 2, plateEvery: [1, 1], seed: 13, collide: false }, HM);
-  S.cyl(0.6, 0.75, 0.45, trim, [0, 9.05, -4], null, { seg: 12 });
-  S.add(new THREE.SphereGeometry(0.55, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2), mats.smooth(0x9aa4aa, 0.2, 0.6), [0, 9.25, -4]);
-  S.cyl(0.03, 0.03, 1.6, metal, [0.5, 9.6, 6]);
-  S.cyl(0.03, 0.03, 1.1, metal, [-0.4, 9.4, 8]);
-  greebles(S, metal, -0.6, 0.6, 9.0, -1, 11, 18, 9090);
-  for (const sx of [-1, 1]) {
-    S.plated([{ z: 6.0, w: 0.12, h: 0.4, y: 9.4, x: sx * 1.6, n: 6 }, { z: 7.0, w: 0.14, h: 1.2, y: 9.9, x: sx * 1.9, n: 6 }, { z: 11.6, w: 0.14, h: 1.3, y: 10.0, x: sx * 2.1, n: 6 }, { z: 12.4, w: 0.1, h: 0.9, y: 10.1, x: sx * 2.2, n: 6 }], { facets: 6, steps: 2, plateEvery: [1, 1], seed: 14 + sx, collide: false }, HM);
-    S.navLight([sx * 2.2, 11.1, 12.0], 0xffffff, 1.0 + sx * 0.4);
-  }
-  // ailes en caisson blindé, enracinées dans la coque
-  for (const sx of [-1, 1]) {
-    S.plated([
-      { z: -3.2, w: 0.4, h: 0.12, y: 3.75, x: sx * 5.0, n: 8 },
-      { z: -1.2, w: 2.6, h: 0.26, y: 3.75, x: sx * 6.6, n: 8 },
-      { z: 4.6, w: 3.3, h: 0.3, y: 3.75, x: sx * 7.2, n: 8 },
-      { z: 6.4, w: 2.6, h: 0.18, y: 3.75, x: sx * 7.4, n: 8 },
-    ], { facets: 8, steps: 3, plateEvery: [1, 1], seed: 20 + sx, altRandom: 0.15 }, HM);
-    // volets de bord de fuite (séparés par un jour), point d'emport, feux
-    S.box(4.6, 0.12, 0.7, HM.alt, [sx * 7.6, 3.7, 6.9], [0.12, 0, 0]);
-    S.box(0.2, 0.35, 1.8, metal, [sx * 8.4, 3.38, 1.0]);
-    S.box(0.5, 0.35, 3.0, accent, [sx * 10.25, 3.75, 3.9], null, { tex: 1 });
-    // pod VTOL en bout d'aile
-    S.plated([{ z: 0.6, w: 0.35, h: 0.35, x: sx * 10.3, y: 3.75, n: 3 }, { z: 1.6, w: 0.85, h: 0.85, x: sx * 10.3, y: 3.75, n: 3 }, { z: 6.2, w: 0.85, h: 0.85, x: sx * 10.3, y: 3.75, n: 3 }, { z: 7.0, w: 0.5, h: 0.5, x: sx * 10.3, y: 3.75, n: 3 }], { facets: 10, steps: 2, plateEvery: [1, 1], seed: 30 + sx }, HM);
-    S.cyl(0.62, 0.62, 0.2, mats.metal(0x1c1e20), [sx * 10.3, 2.95, 3.8], null, { seg: 14 });
-    S.add(new THREE.CircleGeometry(0.5, 14), mats.emissive(0x7fb8ff, 0.8), [sx * 10.3, 2.84, 3.8], [Math.PI / 2, 0, 0], { cast: false });
-    S.navLight([sx * 11.2, 3.75, 3.8], sx < 0 ? 0xff2010 : 0x20ff40, 0);
-  }
-  // moteurs principaux intégrés à la coque (nacelles blindées, tuyères, suie)
-  for (const sx of [-1, 1]) {
-    const x = sx * 3.0, y = 6.6;
-    S.plated([
-      { z: 4.0, w: 0.5, h: 0.5, x, y, n: 2.6 }, { z: 6.0, w: 1.4, h: 1.4, x, y, n: 2.6 },
-      { z: 14.4, w: 1.5, h: 1.5, x, y, n: 2.6 }, { z: 16.2, w: 1.35, h: 1.35, x, y, n: 2.6 },
-    ], { facets: 12, steps: 3, plateEvery: [1, 1], seed: 40 + sx }, HM);
-    S.add(nozzle(1.15, 1.6), mats.metal(0x3a3d40, { rough: 0.45 }), [x, y, 16.0]);
-    for (let k = 0; k < 3; k++) S.cyl(1.2 - k * 0.2, 1.2 - k * 0.2, 0.06, mats.metal(0x1a1b1c), [x, y, 16.6 + k * 0.02], [Math.PI / 2, 0, 0], { seg: 16, cast: false });
-    S.add(new THREE.CircleGeometry(0.75, 20), mats.emissive(0xff7a3a, 0.9), [x, y, 16.62], null, { cast: false });
-    S.cbox(3.0, 3.0, 12, [x, y, 10.5]);
-  }
-  // marquages
-  S.decal(['HÉRON MK II'], 3.6, [-4.97, 5.6, -2.0], -Math.PI / 2, { color: '#2a2e31', size: 120, wear: 0.6 });
-  S.decal(['HL-2207'], 2.4, [4.97, 5.6, -2.0], Math.PI / 2, { color: '#2a2e31', size: 120, wear: 0.6 });
+  // -------------------------------------------------- coque extérieure (hullkit2)
+  heronExterior(S, ctx);
 
   // -------------------------------------------------- pont inférieur : soute
   const fy = 2.0, cy = 4.85, hw = 3.55;   // plancher, plafond, demi-largeur
@@ -431,13 +677,6 @@ function buildHeron(ctx) {
     const v = new THREE.CylinderGeometry(0.07, 0.07, 2.4, 16); const vm = new THREE.Mesh(v, chrome); vm.position.set(sx * (hw - 0.5), fy * 0.75 + 0.3 - fy, hz1 + 1.0 - hz1); vm.rotation.x = Math.PI / 2 - 0.85; rampPivot.add(vm);
   }
   S.ramp = { pivot: rampPivot, closed: -(rAng + Math.PI / 2), k: 0 };
-  // cadre de porte arrière (soute) et fermeture du pont supérieur
-  S.box(0.3, cy - fy + 0.4, 0.4, trim, [-hw - 0.05, (fy + cy) / 2, hz1 + 0.2]);
-  S.box(0.3, cy - fy + 0.4, 0.4, trim, [hw + 0.05, (fy + cy) / 2, hz1 + 0.2]);
-  S.box(hw * 2 + 0.4, 0.4, 0.4, trim, [0, cy + 0.15, hz1 + 0.2]);
-  S.add(new THREE.CircleGeometry(4.1, 40, 0, Math.PI), hull, [0, 5.1, 15.0], null, {});
-  // train d'atterrissage
-  for (const [x, z] of [[-2.4, -11], [2.4, -11], [-3.2, 9.5], [3.2, 9.5]]) S.gear(x, z, 1.55, mats, { r: 0.17, pad: 1.4 });
 
   // -------------------------------------------------- collisions
   const plane = (w, d, pos, rot) => { const g = new THREE.PlaneGeometry(w, d).toNonIndexed(); g.rotateX(-Math.PI / 2); g.applyMatrix4(Builder.matrix(pos, rot)); g.applyMatrix4(S.M); ctx.builder.addCollider(g); };

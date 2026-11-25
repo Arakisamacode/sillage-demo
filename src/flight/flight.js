@@ -28,8 +28,9 @@ export class Flight {
     this.camPos = new THREE.Vector3();
     this.camQ = new THREE.Quaternion();
     // sondes de collision (repère du vaisseau, aire 02 au repos) : nez, queue, ailes, ventre, dos, moteurs
+    const eng = ship.thrusters ? ship.thrusters.main : [[-3, 6.6, 16.6], [3, 6.6, 16.6]];
     this.probes = [[0, 5.6, -19, 0.8], [0, 5.0, 15.5, 1.6], [-11, 3.75, 4, 0.8], [11, 3.75, 4, 0.8], [0, 1.5, -4, 1.4], [0, 1.5, 8, 1.4],
-      [0, 9.3, 2, 0.9], [-3, 6.6, 16.6, 1.3], [3, 6.6, 16.6, 1.3], [-2.6, 0.3, -11, 0.5], [2.6, 0.3, -11, 0.5], [-3.2, 0.3, 9.5, 0.5], [3.2, 0.3, 9.5, 0.5]]
+      [0, 9.3, 2, 0.9], [eng[0][0], eng[0][1], eng[0][2] - 0.4, 1.3], [eng[1][0], eng[1][1], eng[1][2] - 0.4, 1.3], [-2.6, 0.3, -11, 0.5], [2.6, 0.3, -11, 0.5], [-3.2, 0.3, 9.5, 0.5], [3.2, 0.3, 9.5, 0.5]]
       .map(([x, y, z, r]) => ({ p: new THREE.Vector3(x, y, z), r }));
     this._plumes();
     // aires d'atterrissage connues : l'aire 02 du hangar, puis celles des avant-postes (ajoutées par addPad)
@@ -57,10 +58,12 @@ export class Flight {
     const cone = new THREE.ConeGeometry(0.85, 6, 20, 1, true); cone.translate(0, -3, 0); cone.rotateX(-Math.PI / 2);
     const core = new THREE.ConeGeometry(0.45, 3.2, 16, 1, true); core.translate(0, -1.6, 0); core.rotateX(-Math.PI / 2);
     this.plumes = [];
-    for (const sx of [-1, 1]) {
+    // sorties de tuyères (repère de l'aire) : fournies par le vaisseau, sinon positions historiques
+    const T = S.thrusters || { main: [[-3.0, 6.6, 16.7], [3.0, 6.6, 16.7]], vtol: [[-10.3, 2.85, 3.8], [10.3, 2.85, 3.8]] };
+    for (let i = 0; i < 2; i++) {
       for (const [g, m] of [[cone, mat], [core, blue]]) {
         const p = new THREE.Mesh(g, m);
-        p.position.set(sx * 3.0, 6.6, 16.7);
+        p.position.set(...T.main[i]);
         p.rotation.y = Math.PI;
         p.scale.setScalar(0.001);
         p.renderOrder = 8;
@@ -69,7 +72,7 @@ export class Flight {
       }
       // propulseurs verticaux (pods de bout d'aile)
       const v = new THREE.Mesh(core, blue);
-      v.position.set(sx * 10.3, 2.85, 3.8);
+      v.position.set(...T.vtol[i]);
       v.rotation.x = Math.PI / 2;
       v.scale.setScalar(0.001);
       S.group.add(v);
@@ -155,6 +158,18 @@ export class Flight {
       p.m.visible = t > 0.02;
     }
     this.engineLight.intensity = this.throttle * 60;
+    // lueur des tuyères (matériaux partagés du vaisseau) : veille posé, régime en vol
+    if (S.engines) S.engines.setThrust(this.state === 'parked' ? 0 : Math.min(1, this.throttle * 1.25));
+    if (S.vtolEngines) S.vtolEngines.setThrust(this.state === 'parked' ? 0 : vt * 0.8);
+    // train d'atterrissage : rentré en vol, sorti au sol, au décollage et en finale ; cales visibles posé
+    const G = S.gear;
+    if (G) {
+      const down = this.state === 'parked' || this.state === 'dead' || (this.state === 'spool' && this.timer < 4.2) || (this.state === 'landing' && this.timer > 2.5);
+      G.k += THREE.MathUtils.clamp((down ? 1 : 0) - G.k, -dt * 0.6, dt * 0.6);
+      const e = G.k * G.k * (3 - 2 * G.k);
+      G.group.position.y = (1 - e) * G.travel;
+      G.chocks.visible = this.state === 'parked';
+    }
     // rampe arrière : relevée en vol, abaissée posé
     const R = S.ramp;
     if (R) {
