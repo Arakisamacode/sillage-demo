@@ -22,10 +22,10 @@ export function buildSuperstructure(ctx) {
   const { mats, scene } = ctx;
   const B = new Builder(null); B.cellSize = 1000;   // peu de lots : un appel de rendu par matériau
   const R = rng(4242);
-  const hull = mats.paint(0x5d6368, { grime: 0.8, scratch: 0.6, rust: 0.1 });
-  const hullD = mats.paint(0x464b50, { grime: 0.9, scratch: 0.7, rust: 0.12 });
-  const hullL = mats.paint(0x7b8187, { grime: 0.7, scratch: 0.5, rust: 0.06 });
-  const hullW = mats.paint(0xa9aeb2, { grime: 0.6, scratch: 0.4, rust: 0.04 });
+  const hull = mats.paint(0x5d6368, { kind: 'hull', uv: 6, grime: 0.8, scratch: 0.6, rust: 0.1 });
+  const hullD = mats.paint(0x464b50, { kind: 'hull', uv: 6, grime: 0.9, scratch: 0.7, rust: 0.12 });
+  const hullL = mats.paint(0x7b8187, { kind: 'hull', uv: 6, grime: 0.7, scratch: 0.5, rust: 0.06 });
+  const hullW = mats.paint(0xa9aeb2, { kind: 'hull', uv: 6, grime: 0.6, scratch: 0.4, rust: 0.04 });
   const dark = mats.metal(0x24272a, { rough: 0.7 });
   const steel = mats.metal(0x8a9094, { rough: 0.35 });
   const ochre = mats.paint(0xb8862a, { grime: 0.8, scratch: 0.8, rust: 0.1 });

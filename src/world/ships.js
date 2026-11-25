@@ -113,8 +113,8 @@ function interpStation(st, z) {
 
 const ds = (m) => { const c = m.clone(); c.side = THREE.DoubleSide; c.onBeforeCompile = m.onBeforeCompile; c.customProgramCacheKey = m.customProgramCacheKey; return c; };
 const hullMats = (mats, plate, alt) => ({
-  plate: ds(mats.paint(plate, { grime: 0.85, scratch: 0.9, rust: 0.05 })),
-  alt: ds(mats.paint(alt, { grime: 0.9, scratch: 0.9, rust: 0.08 })),
+  plate: ds(mats.paint(plate, { kind: 'hull', uv: 2.5, grime: 0.85, scratch: 0.9, rust: 0.05 })),
+  alt: ds(mats.paint(alt, { kind: 'hull', uv: 2.5, grime: 0.9, scratch: 0.9, rust: 0.08 })),
   under: ds(mats.metal(0x24282b, { rough: 0.6, grime: 0.9 })),
 });
 

@@ -22,8 +22,10 @@ export function buildGallery(ctx) {
   seed(4242);
   const G = GALLERY;
   const cx = (G.x0 + G.x1) / 2, cz = (G.z0 + G.z1) / 2, W = G.x1 - G.x0, D = G.z1 - G.z0;
-  const wall = mats.paint(0xd4d9dd, { grime: 0.3, scratch: 0.3, rust: 0, rough: 0.6 });
-  const wallDark = mats.paint(0x3a3e42, { grime: 0.6 });
+  // grands panneaux composites (murs), panneaux laqués (façade des boutiques)
+  const wall = mats.paint(0xd4d9dd, { kind: 'wide', grime: 0.3, scratch: 0.3, rust: 0, rough: 0.6 });
+  const wallFront = mats.paint(0xd4d9dd, { kind: 'smooth', grime: 0.2, scratch: 0.2, rust: 0, rough: 0.6, paint: 0.3 });
+  const wallDark = mats.paint(0x3a3e42, { kind: 'wide', grime: 0.6 });
   const trim = mats.metal(0x8c9094, { rough: 0.35, grime: 0.3 });
   const dark = mats.paint(0x24282b);
 
@@ -37,7 +39,7 @@ export function buildGallery(ctx) {
     B.add(floorG, mats.grating(), fm, { collide: true, cast: false });
     B.box(len, 0.1, w, mats.metal(0x202325), [xc, -0.06, z], null, { cast: false });
     for (const s of [-1, 1]) {
-      B.box(len, h, 0.4, mats.paint(0x6a7075, { grime: 0.7 }), [xc, h / 2, z + s * (w / 2 + 0.2)], null, { collide: true, tex: 2 });
+      B.box(len, h, 0.4, mats.paint(0x6a7075, { kind: 'service', uv: 2, grime: 0.7 }), [xc, h / 2, z + s * (w / 2 + 0.2)], null, { collide: true, tex: 2 });
       // buses de décontamination et bandeaux lumineux
       for (let k = 0; k < 4; k++) B.cyl(0.06, 0.09, 0.15, mats.smooth(0x999999, 0.3, 1), [x1 + 2 + k * 1.8, 2.6, z + s * (w / 2 - 0.05)], [Math.PI / 2, 0, 0], { cast: false });
       B.box(len - 1, 0.06, 0.05, mats.emissive(0xffa040, 3), [xc, 3.6, z + s * (w / 2 - 0.02)], null, { cast: false });
@@ -91,7 +93,7 @@ export function buildGallery(ctx) {
     // joints transversaux tous les 6 m (alignés sur les caissons du plafond)
     for (let x = G.x0 + 6; x < G.x1; x += 6) B.box(0.04, 0.01, D - 1, mats.metal(0x4a4f54, { rough: 0.4 }), [x, 0.005, cz], null, { cast: false });
     // plafond à caissons + gorges lumineuses
-    B.box(W, 0.4, D, mats.paint(0x3c4044), [cx, G.h + 0.2, cz], null, { cast: false, tex: 4 });
+    B.box(W, 0.4, D, mats.paint(0x3c4044, { kind: 'wide', uv: 4 }), [cx, G.h + 0.2, cz], null, { cast: false, tex: 4 });
     for (let x = G.x0 + 3; x < G.x1; x += 6) {
       B.box(0.5, 0.7, D, wallDark, [x, G.h - 0.35, cz], null, { cast: false });
     }
@@ -162,15 +164,15 @@ export function buildGallery(ctx) {
   ctx.doors.push(ctx.habitatDoor);
 
   // ------------------------------------------------------------------ boutiques (nord)
-  for (const s of SHOPS) shop(ctx, s, wall, wallDark, trim);
+  for (const s of SHOPS) shop(ctx, s, wallFront, wallDark, trim);
   // trumeaux entre boutiques
   for (let x = G.x0; x <= G.x1; x += 10) {
-    if (x > G.x0 + 1 && x < G.x1 - 1) B.box(2.0, G.h, 0.6, wall, [x, G.h / 2, G.z1 + 0.3], null, { collide: true, tex: 3 });
+    if (x > G.x0 + 1 && x < G.x1 - 1) B.box(2.0, G.h, 0.6, wallFront, [x, G.h / 2, G.z1 + 0.3], null, { collide: true, tex: 3 });
   }
-  B.box(4, G.h, 0.6, wall, [G.x0 + 2, G.h / 2, G.z1 + 0.3], null, { collide: true, tex: 3 });
-  B.box(8, G.h, 0.6, wall, [G.x1 - 4, G.h / 2, G.z1 + 0.3], null, { collide: true, tex: 3 });
+  B.box(4, G.h, 0.6, wallFront, [G.x0 + 2, G.h / 2, G.z1 + 0.3], null, { collide: true, tex: 3 });
+  B.box(8, G.h, 0.6, wallFront, [G.x1 - 4, G.h / 2, G.z1 + 0.3], null, { collide: true, tex: 3 });
   // bandeau haut au-dessus des boutiques
-  B.box(W, G.h - 4.6, 0.6, wall, [cx, 4.6 + (G.h - 4.6) / 2, G.z1 + 0.3], null, { tex: 3 });
+  B.box(W, G.h - 4.6, 0.6, wallFront, [cx, 4.6 + (G.h - 4.6) / 2, G.z1 + 0.3], null, { tex: 3 });
 
   // ------------------------------------------------------------------ kiosque café central
   kiosk(ctx, -72, -7);
@@ -270,7 +272,7 @@ function shop(ctx, s, wall, wallDark, trim) {
   const L = new Local(B, x, 0, z0, 0, scene);
   // ambiance propre à chaque boutique (murs intérieurs)
   const tint = { armes: 0x3c4146, pieces: 0x56606a, pharma: 0xdfece4, combis: 0xb59c82, nouilles: 0x7a4030 }[s.id];
-  if (tint) wall = mats.paint(tint, { grime: 0.35, scratch: 0.3, rust: 0, rough: 0.6 });
+  if (tint) wall = mats.paint(tint, { kind: 'smooth', grime: 0.35, scratch: 0.3, rust: 0, rough: 0.6, paint: 0.3 });
   const floorM = s.id === 'pieces' ? mats.metal(0x55595c, { rough: 0.6 }) : mats.tiles(s.id === 'pharma' ? 0xe8efe8 : 0xb8b0a4);
   L.box(w, 0.05, depth + 0.6, floorM, [0, 0.025, depth / 2 - 0.3], null, { cast: false, tex: 2, collide: true });
   L.box(w, h, 0.3, wall, [0, h / 2, depth + 0.15], null, { tex: 3 });

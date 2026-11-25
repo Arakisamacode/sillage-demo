@@ -518,13 +518,14 @@ function exterior(B, mats) {
   // grands bras de la station, vus dans l'encadrement de la baie
   const hull = mats.paint(0x5d6368, { grime: 0.8, scratch: 0.6, rust: 0.1 });
   const hullD = mats.paint(0x464b50, { grime: 0.9, scratch: 0.7, rust: 0.12 });
+  const hullP = mats.paint(0x5d6368, { kind: 'hull', uv: 6, grime: 0.8, scratch: 0.6, rust: 0.1 });   // caissons (UV 6 m)
   const dark = mats.metal(0x202427, { rough: 0.8 });
   const steel = mats.metal(0x6a7074, { rough: 0.45, grime: 0.5 });
   const lamp = mats.emissive(0xffc070, 5), red = mats.emissive(0xff2a10, 8), white = mats.emissive(0xffffff, 6);
   const o = { cast: false };
   const rod = (a, b, r = 0.18, m = steel) => B.tube([a, b], r, m, { smooth: false, radial: 6, segments: 1, cast: false });
   // structure en surplomb au-dessus de la baie (caisson plaqué, nervures, feux de bord)
-  B.box(90, 6, 30, hull, [0, H + 3, Z_BAY - 15], null, { cast: true, receive: true, tex: 6 });
+  B.box(90, 6, 30, hullP, [0, H + 3, Z_BAY - 15], null, { cast: true, receive: true, tex: 6 });
   for (let x = -42; x <= 42; x += 7) B.box(0.6, 6.4, 30.4, hullD, [x, H + 3, Z_BAY - 15], null, o);
   for (let x = -40; x <= 40; x += 10) B.box(0.5, 0.3, 0.5, lamp, [x, H - 0.1, Z_BAY - 29.9], null, o);
   // pylônes d'approche en treillis (4 membrures, cadres tous les 6 m, croisillons), bras d'amarrage en poutre Warren
@@ -537,7 +538,7 @@ function exterior(B, mats) {
       if (y + 6 <= y1) for (let k = 0; k < 4; k++) { const [ax, az] = C[k], [bx, bz] = C[(k + 1) % 4]; rod([cx + ax, y, cz + az], [cx + bx, y + 6, cz + bz]); rod([cx + bx, y, cz + bz], [cx + ax, y + 6, cz + az]); }
     }
     // nœud de tête, local technique, balise et antenne
-    B.box(11, 3, 11, hull, [cx, y1 + 1.5, cz], null, { cast: false, tex: 6 });
+    B.box(11, 3, 11, hullP, [cx, y1 + 1.5, cz], null, { cast: false, tex: 6 });
     B.box(6, 2.2, 5, hullD, [cx, y1 + 4.1, cz], null, o);
     for (const dz of [-1.5, 0, 1.5]) B.box(0.05, 0.4, 0.9, mats.emissive(0xffd9a8, 2.2), [cx - s * 3.03, y1 + 4.2, cz + dz], null, o);
     B.cyl(0.12, 0.12, 9, dark, [cx, y1 + 9.7, cz], null, { cast: false, seg: 6 });
@@ -557,7 +558,7 @@ function exterior(B, mats) {
     for (const dx of [-1, 1]) B.box(0.5, 0.5, 0.5, white, [cx + dx * 1.2, ya, z0 - 1.2], null, o);
   }
   // anneau d'amarrage en contrebas : caisson plaqué, pinces d'amarrage, rampes lumineuses
-  B.box(200, 4, 20, hull, [0, -26, Z_BAY - 40], null, { cast: false, tex: 6 });
+  B.box(200, 4, 20, hullP, [0, -26, Z_BAY - 40], null, { cast: false, tex: 6 });
   for (let x = -96; x <= 96; x += 8) B.box(0.6, 4.4, 20.4, hullD, [x, -26, Z_BAY - 40], null, o);
   for (const z of [Z_BAY - 49.5, Z_BAY - 30.5]) B.box(200, 0.6, 0.6, hullD, [0, -23.9, z], null, o);
   for (let x = -90; x <= 90; x += 15) {

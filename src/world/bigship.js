@@ -28,13 +28,14 @@ export function buildBigShip(ctx) {
   const deckOf = (y) => (y < 4.4 ? 'A' : y < 9.0 ? 'B' : 'C');
   B.tagFn = (c) => (c.x > S.x0 - 0.6 && c.x < S.x1 + 0.6 && c.z > S.zBow - 0.6 && c.z < S.zEnd + 0.6 && c.y > -0.5 && c.y < 14 ? 'ship' + deckOf(c.y) : null);
   // ---------------------------------------------------------------- matériaux
-  const wallM = mats.paint(0xc9ced3, { grime: 0.35, scratch: 0.3, rust: 0, rough: 0.6 });
-  const wallLow = mats.paint(0x4a5058, { grime: 0.6, scratch: 0.5, rust: 0.05 });
+  // familles de panneaux (UV des boîtes de la frégate : 1 unité = 2 m)
+  const wallM = mats.paint(0xc9ced3, { kind: 'wide', uv: 2, grime: 0.35, scratch: 0.3, rust: 0, rough: 0.6 });
+  const wallLow = mats.paint(0x4a5058, { kind: 'service', uv: 2, grime: 0.6, scratch: 0.5, rust: 0.05 });
   const wallWarm = mats.paint(0x8a7a66, { plain: true, rough: 0.7, grime: 0.2 });
-  const hullIn = mats.paint(0x5d6368, { grime: 0.8, scratch: 0.6, rust: 0.1 });
+  const hullIn = mats.paint(0x5d6368, { kind: 'hull', uv: 2, grime: 0.8, scratch: 0.6, rust: 0.1 });
   const floorM = mats.diamond ? mats.diamond(0x9a9ea2) : wallLow;
   const floorTile = mats.ph('large_grey_tiles', 0xb8bcc0, { rough: 1, metal: 0, grime: 0.3, scratch: 0.2, floor: 0.5 });
-  const ceilM = mats.paint(0x2c3136, { grime: 0.5 });
+  const ceilM = mats.paint(0x2c3136, { kind: 'service', uv: 3, grime: 0.5 });   // dalles : UV 3 m
   const trim = mats.metal(0x8c9094, { rough: 0.35, grime: 0.3 });
   const dark = mats.metal(0x24272a, { rough: 0.7 });
   const yellow = mats.paint(0xd8a62a, { grime: 0.6, scratch: 0.6 });
@@ -591,7 +592,7 @@ export function buildBigShip(ctx) {
     const L = xb - xa, xc = (xa + xb) / 2;
     box(L, 0.1, w, floorM, [xc, -0.05, z], true, null, 3);
     box(L, 0.4, w + 0.6, dark, [xc, -0.3, z]);
-    for (const s of [-1, 1]) { box(L, hh, 0.12, mats.paint(0x6a7076, { grime: 0.5 }), [xc, hh / 2, z + s * w / 2], true); box(L, 0.12, 0.2, ledW, [xc, hh - 0.2, z + s * (w / 2 - 0.12)]); }
+    for (const s of [-1, 1]) { box(L, hh, 0.12, mats.paint(0x6a7076, { kind: 'service', uv: 2, grime: 0.5 }), [xc, hh / 2, z + s * w / 2], true); box(L, 0.12, 0.2, ledW, [xc, hh - 0.2, z + s * (w / 2 - 0.12)]); }
     box(L, 0.15, w, mats.paint(0x3a3e42, { grime: 0.5 }), [xc, hh, z]);
     // hublots du tube (un sur deux allumé côté extérieur)
     for (let x = xa + 3; x < xb - 2; x += 4) for (const s of [-1, 1]) { box(1.4, 0.6, 0.04, glass, [x, 1.6, z + s * (w / 2 - 0.07)]); }
@@ -615,7 +616,9 @@ export function buildBigShip(ctx) {
   const E = new Builder(null); E.cellSize = 1000;
   {
     const ds = (m) => { const c = m.clone(); c.side = THREE.DoubleSide; c.onBeforeCompile = m.onBeforeCompile; c.customProgramCacheKey = m.customProgramCacheKey; return c; };
-    const hm = { plate: mats.paint(0x7a8086, { grime: 0.7, scratch: 0.6, rust: 0.08 }), alt: mats.paint(0x4e545a, { grime: 0.8, scratch: 0.6, rust: 0.1 }), under: ds(mats.metal(0x1d2023, { rough: 0.7 })) };
+    // tôles lourdes rivetées : UV des plaques de platedHull = 2,5 m, boîtes du château = 6 m
+    const hw = (c, o, uv = 2.5) => mats.paint(c, { kind: 'hull', uv, ...o });
+    const hm = { plate: hw(0x7a8086, { grime: 0.7, scratch: 0.6, rust: 0.08 }), alt: hw(0x5c6268, { grime: 0.8, scratch: 0.6, rust: 0.1 }), under: ds(mats.metal(0x1d2023, { rough: 0.7 })) };
     const hull = platedHull([
       { z: -54, w: 3, h: 3, y: 7, n: 2.2 }, { z: -48, w: 12, h: 8, y: 7.5, n: 2.4 }, { z: -43, w: 17, h: 11, y: 7.5, n: 2.6 }, { z: -34, w: 20, h: 13, y: 6.6, n: 2.8 },
       { z: 58, w: 20, h: 13, y: 6.6, n: 2.8 }, { z: 70, w: 17, h: 11, y: 6, n: 2.6 }, { z: 128, w: 17, h: 11, y: 6, n: 2.6 }, { z: 138, w: 12, h: 9, y: 6, n: 2.4 },
@@ -624,8 +627,8 @@ export function buildBigShip(ctx) {
     const shift = new THREE.Matrix4().makeTranslation(S.cx, 0, 0);
     E.add(hull.under, hm.under, shift, { cast: false }); E.add(hull.plates, hm.plate, shift, { cast: false }); E.add(hull.alt, hm.alt, shift, { cast: false });
     // dorsale : château de commandement (verrière avant éclairée), antennes, radiateurs
-    E.box(26, 4.5, 34, hm.plate, [S.cx, 18.5, -20], null, { cast: false, tex: 6 });
-    E.box(22, 0.6, 30, hm.alt, [S.cx, 21, -20], null, { cast: false, tex: 6 });
+    E.box(26, 4.5, 34, hw(0x7a8086, { grime: 0.7, scratch: 0.6, rust: 0.08 }, 6), [S.cx, 18.5, -20], null, { cast: false, tex: 6 });
+    E.box(22, 0.6, 30, hw(0x4e545a, { grime: 0.8, scratch: 0.6, rust: 0.1 }, 6), [S.cx, 21, -20], null, { cast: false, tex: 6 });
     E.box(20, 2.6, 0.2, mats.emissive(0x9fd8ff, 1.4), [S.cx, 12.2, -51.5], null, { cast: false });
     for (let k = 0; k < 12; k++) E.box(1.6, 0.6, 0.1, mats.emissive(0xffd9a8, 2.2), [S.cx - 9 + k * 1.6, 7.8, -50.2 + Math.abs(k - 5.5) * 0.15], null, { cast: false });
     for (const s of [-1, 1]) for (let z = -30; z < 40; z += 3.5) if ((z * 7) % 3 < 2) E.box(0.1, 0.5, 1.4, mats.emissive(0xffd9a8, 2.2), [S.cx + s * 20.05, 6.8, z], null, { cast: false });

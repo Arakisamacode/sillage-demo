@@ -1,7 +1,12 @@
 """Génère les textures PBR procédurales du projet (toutes tuilables).
 
-Usage : python3 tools/gen_textures.py public/assets/textures/gen
+Usage : python3 tools/gen_textures.py public/assets/textures/gen [générateurs...]
+  sans liste : tout est régénéré ; sinon p. ex. « kinds » (familles de panneaux seules) ou « panels deck ».
 Sorties (JPG) : <nom>_albedo, <nom>_normal (OpenGL, +Y), <nom>_orm (R=AO, G=rugosité, B=métal).
+Familles de panneaux de `Materials.paint(color, { kind })` (gen_kinds, 1024², niveaux de gris teintés par la couleur) :
+  pwide (6 m : grands panneaux composites 3 x 1,2 m), pservice (2,4 m : bandes techniques, grilles, trappes),
+  psmooth (6 m : panneaux laqués 1,5 x 3 m), phull (6 m : tôles lourdes rivetées et soudées).
+  Normale = Sobel de la carte de hauteur ; ORM = AO / rugosité / « métal à nu » (écaillures, cf. addWear).
 Ces textures sont des créations originales du projet (CC0).
 """
 import sys, os
@@ -9,6 +14,7 @@ import numpy as np
 from PIL import Image
 
 OUT = sys.argv[1] if len(sys.argv) > 1 else 'public/assets/textures/gen'
+ONLY = set(sys.argv[2:])
 os.makedirs(OUT, exist_ok=True)
 rng = np.random.default_rng(7)
 
@@ -315,6 +321,302 @@ def gen_vent(n=512):
     save('vent_normal', nrm, 93)
 
 
+# ---------------------------------------------------------------- familles de panneaux (paint kind)
+def sobel_normal(h, strength):
+    """Normale OpenGL (+Y) par filtre de Sobel (tuilable : convolution circulaire)."""
+    R = lambda a, dy, dx: np.roll(np.roll(a, dy, 0), dx, 1)
+    gx = (R(h, 1, -1) + 2 * R(h, 0, -1) + R(h, -1, -1) - R(h, 1, 1) - 2 * R(h, 0, 1) - R(h, -1, 1)) / 8
+    gy = (R(h, -1, 1) + 2 * R(h, -1, 0) + R(h, -1, -1) - R(h, 1, 1) - 2 * R(h, 1, 0) - R(h, 1, -1)) / 8
+    nx = -gx * strength; ny = gy * strength; nz = np.ones_like(h)
+    l = np.sqrt(nx * nx + ny * ny + nz * nz)
+    return np.stack([nx / l, ny / l, nz / l], -1) * 0.5 + 0.5
+
+
+class Canvas:
+    """Plan de travail tuilable : rectangles « modulo n », hauteur, identifiants de panneaux, masques."""
+    def __init__(self, n):
+        self.n = n
+        self.yy, self.xx = np.mgrid[0:n, 0:n].astype(np.float32)
+        self.H = np.zeros((n, n), np.float32)      # hauteur
+        self.pid = np.zeros((n, n), np.int32)
+        self.seam = np.zeros((n, n), np.float32)   # 1 dans les joints
+        self.cav = np.zeros((n, n), np.float32)    # cavités (AO / crasse)
+        self.alb = np.zeros((n, n), np.float32)    # retouches d'albédo (additif)
+        self.rough = np.zeros((n, n), np.float32)  # retouches de rugosité (additif)
+        self.wear = np.zeros((n, n), np.float32)   # zones exposées (écaillures)
+        self.k = 0
+
+    def local(self, x0, y0):
+        return (self.xx - x0) % self.n, (self.yy - y0) % self.n
+
+    def rect_d(self, x0, y0, w, h):
+        """Distance (px) au bord le plus proche, négative hors du rectangle."""
+        dx, dy = self.local(x0, y0)
+        d = np.minimum(np.minimum(dx, w - 1 - dx), np.minimum(dy, h - 1 - dy))
+        return np.where((dx < w) & (dy < h), d, -1.0)
+
+    def panel(self, x0, y0, w, h, seam=1.5, bevel=2.5, lvl=1.0):
+        d = self.rect_d(x0, y0, w, h)
+        inside = d >= 0
+        prof = np.clip((d - seam + 0.5) / bevel, 0, 1)
+        self.k += 1
+        self.H = np.where(inside, prof * lvl, self.H)
+        self.pid = np.where(inside, self.k, self.pid)
+        self.seam = np.where(inside, np.maximum(self.seam, 1 - np.clip(d - seam + 1, 0, 1)), self.seam)
+        return d
+
+    def groove(self, x0, y0, w, h, width=1.5, depth=0.5):
+        """Rainure en anneau rectangulaire (contour de trappe)."""
+        d = self.rect_d(x0, y0, w, h)
+        g = np.clip(1 - np.abs(d - width) / width, 0, 1) * (d >= 0)
+        self.H -= g * depth
+        self.cav = np.maximum(self.cav, g)
+
+    def inset(self, x0, y0, w, h, depth, bevel=2.0):
+        d = self.rect_d(x0, y0, w, h)
+        m = np.clip((d + 0.5) / bevel, 0, 1) * (d >= 0)
+        self.H -= m * depth
+        return d, m
+
+    def screw(self, px, py, r=3.0, slot=True):
+        dx, dy = self.local(px, py)
+        dx = np.where(dx > self.n / 2, dx - self.n, dx); dy = np.where(dy > self.n / 2, dy - self.n, dy)
+        sl = (slice(None), slice(None))
+        rr = np.sqrt(dx * dx + dy * dy)
+        head = np.clip(1 - rr / r, 0, 1)
+        ring = np.clip(1 - np.abs(rr - r) / 1.0, 0, 1)
+        self.H += np.sqrt(head) * 0.18 - ring * 0.25
+        if slot:
+            s = (np.abs(dx + dy) < 0.8) & (rr < r * 0.8)
+            self.H -= s * 0.12
+        self.cav = np.maximum(self.cav, ring * 0.6)
+        self.wear = np.maximum(self.wear, np.clip(1 - rr / (r * 2.2), 0, 1))
+        return sl
+
+    def rivet(self, px, py, r=3.0):
+        """Rivet à tête ronde (pochoir local, plus rapide que screw sur toute l'image)."""
+        n = self.n
+        R = int(r) + 2
+        ys = (np.arange(-R, R + 1) + int(py)) % n; xs = (np.arange(-R, R + 1) + int(px)) % n
+        oy, ox = np.mgrid[-R:R + 1, -R:R + 1].astype(np.float32)
+        rr = np.sqrt(ox * ox + oy * oy)
+        head = np.sqrt(np.clip(1 - (rr / r) ** 2, 0, 1))
+        ring = np.clip(1 - np.abs(rr - r - 0.5) / 1.0, 0, 1)
+        ix = np.ix_(ys, xs)
+        self.H[ix] = np.maximum(self.H[ix], self.H[ix] + head * 0.35) - ring * 0.05
+        self.cav[ix] = np.maximum(self.cav[ix], ring * 0.7)
+        self.wear[ix] = np.maximum(self.wear[ix], head)
+
+    def stamp_screw(self, px, py, r=3.0):
+        n = self.n
+        R = int(r) + 2
+        ys = (np.arange(-R, R + 1) + int(py)) % n; xs = (np.arange(-R, R + 1) + int(px)) % n
+        oy, ox = np.mgrid[-R:R + 1, -R:R + 1].astype(np.float32)
+        rr = np.sqrt(ox * ox + oy * oy)
+        head = np.clip(1 - rr / r, 0, 1)
+        ring = np.clip(1 - np.abs(rr - r) / 0.9, 0, 1)
+        slot = ((np.abs(ox - oy) < 0.7) & (rr < r * 0.75)).astype(np.float32)
+        ix = np.ix_(ys, xs)
+        self.H[ix] += np.sqrt(head) * 0.06 - ring * 0.18 - slot * 0.1
+        self.cav[ix] = np.maximum(self.cav[ix], ring * 0.5 + slot * 0.3)
+        self.alb[ix] += (head > 0) * 0.04
+        self.wear[ix] = np.maximum(self.wear[ix], np.clip(1 - rr / (r * 1.6), 0, 1))
+
+
+def finish(name, C, rng_, seed, height_scale, nstr, base, tone, rough0, rough_var, grime_amt, chip_amt,
+           grain=0.01, seam_dark=0.35, ao_seam=0.55):
+    """Assemble albédo / normale / ORM à partir du plan de travail."""
+    n = C.n
+    pv = rng_.random(C.k + 2)[C.pid].astype(np.float32)          # teinte par panneau
+    pr = rng_.random(C.k + 2)[C.pid].astype(np.float32)          # rugosité par panneau
+    grime = fbm(n, 4, 6, seed + 1)
+    fine = fbm(n, 64, 3, seed + 2)
+    scr = scratches(n, 260, seed + 3, 0.08, horiz_bias=0.6)
+    height = C.H * height_scale + fine * grain - scr * 0.01
+    nrm = sobel_normal(blur(height, 1), nstr)
+    seam_soft = blur(C.seam, 3)
+    cav_soft = blur(C.cav, 2)
+    near = np.clip(blur(C.seam + C.cav, 8) * 2.5, 0, 1)
+    chips = np.clip((fbm(n, 24, 4, seed + 4) - 0.58) * 5, 0, 1) * np.clip(near + C.wear * 0.8, 0, 1) * chip_amt
+    chips = np.clip(chips + scr * 0.2 * chip_amt, 0, 1)
+    alb = base + (pv - 0.5) * tone + C.alb
+    alb = alb * (1 - grime_amt * 0.18 * grime) * (1 - near * 0.08 * grime_amt) * (1 - C.seam * seam_dark) * (1 - cav_soft * 0.3)
+    alb = alb * (0.985 + 0.03 * fine)
+    ao = np.clip(1 - C.seam * ao_seam - seam_soft * 0.25 - cav_soft * 0.45, 0, 1)
+    rough = np.clip(rough0 + (pr - 0.5) * rough_var + grime * 0.12 * grime_amt + near * 0.06 + C.rough - chips * 0.1 - scr * 0.08, 0.06, 1)
+    save(name + '_albedo', alb)
+    save(name + '_normal', nrm, 93)
+    save(name + '_orm', np.stack([ao, rough, chips], -1))
+
+
+def gen_wide(n=1024):
+    """Grands panneaux composites horizontaux (texture = 6 m) : 3 x 1,2-1,5 m, joints fins en creux,
+    fixations discrètes, bandeau technique nervuré, légère variation de teinte par panneau."""
+    print('pwide')
+    r = np.random.default_rng(101)
+    C = Canvas(n)
+    px = n / 6.0                                   # px par mètre
+    rows = [(0.0, 0.3, 'band'), (0.3, 1.5, 'p'), (1.8, 1.2, 'p'), (3.0, 1.5, 'p'), (4.5, 1.5, 'p')]
+    for (y, h, kind) in rows:
+        y0, hh = int(round(y * px)), int(round((y + h) * px)) - int(round(y * px))
+        if kind == 'band':
+            for x0 in (0, n // 2):
+                C.panel(x0, y0, n // 2, hh, seam=1.5, bevel=2.0, lvl=0.85)
+                for k in range(4):                 # nervures horizontales
+                    gy = y0 + int(hh * (0.22 + 0.19 * k))
+                    C.H[gy % n, :] -= 0.18; C.H[(gy + 1) % n, :] -= 0.1
+                    C.cav[gy % n, :] = np.maximum(C.cav[gy % n, :], 0.35)
+            continue
+        # rangées alignées (pas d'appareil décalé, qui ferait « briques ») ; une rangée recoupée à 1,5 m
+        cuts = [0, n // 2, n // 2 + n // 4, n] if h < 1.4 else [0, n // 2, n]
+        for a, b in zip(cuts[:-1], cuts[1:]):
+            C.panel(a, y0, b - a, hh, seam=1.4, bevel=3.0, lvl=1.0)
+            m = 0.05 * px                           # fixations à 5 cm des coins + milieu des grands bords
+            pts = [(a + m, y0 + m), (b - m, y0 + m), (a + m, y0 + hh - m), (b - m, y0 + hh - m)]
+            if b - a > n / 3: pts += [((a + b) / 2, y0 + m), ((a + b) / 2, y0 + hh - m)]
+            for (sx, sy) in pts: C.stamp_screw(sx, sy, 2.6)
+            if r.random() < 0.45:                   # double filet décoratif (composite moulé)
+                ly = y0 + int(hh * r.choice([0.2, 0.8]))
+                C.H[ly % n, int(a + 0.15 * px):int(b - 0.15 * px)] -= 0.12
+                C.H[(ly + 4) % n, int(a + 0.15 * px):int(b - 0.15 * px)] -= 0.12
+            if r.random() < 0.3:                    # petite plaque d'identification
+                w, h2 = int(0.22 * px), int(0.07 * px)
+                ex, ey = int(a + 0.2 * px), int(y0 + 0.15 * px)
+                d, mm = C.inset(ex, ey, w, h2, -0.15, 1.0)
+                C.alb += (d >= 0) * 0.06
+                C.rough -= (d >= 0) * 0.15
+    finish('pwide', C, r, 110, 0.9, 7.0, base=0.74, tone=0.07, rough0=0.5, rough_var=0.12, grime_amt=0.6, chip_amt=0.5,
+           grain=0.006, seam_dark=0.45, ao_seam=0.6)
+
+
+def gen_service(n=1024):
+    """Bandes techniques verticales (texture = 2,4 m) : grilles de ventilation, trappes d'accès, tôles vissées."""
+    print('pservice')
+    r = np.random.default_rng(202)
+    C = Canvas(n)
+    px = n / 2.4
+    widths = [0.6, 0.3, 0.6, 0.45, 0.45]
+    x = 0.0
+    for wi, w in enumerate(widths):
+        x0, x1 = int(round(x * px)), int(round((x + w) * px)); x += w
+        y = 0.0
+        while y < 2.39:
+            h = min(r.choice([0.3, 0.4, 0.6, 0.8, 1.2]), 2.4 - y)
+            if 2.4 - y - h < 0.25: h = 2.4 - y
+            y0, y1 = int(round(y * px)), int(round((y + h) * px)); y += h
+            W, Hh = x1 - x0, y1 - y0
+            C.panel(x0, y0, W, Hh, seam=2.0, bevel=2.5, lvl=1.0 if r.random() < 0.7 else 0.8)
+            m = int(0.035 * px)
+            for (sx, sy) in [(x0 + m, y0 + m), (x1 - m, y0 + m), (x0 + m, y1 - m), (x1 - m, y1 - m)]: C.stamp_screw(sx, sy, 3.0)
+            t = r.random()
+            if w <= 0.3:                            # bande étroite : perforations ou gaine
+                if t < 0.5:
+                    for yy in range(y0 + 3 * m, y1 - 3 * m, 18):
+                        for xx in range(x0 + 2 * m, x1 - 2 * m + 1, 18):
+                            C.inset(xx - 4, yy - 4, 8, 8, 0.6, 2.0); C.cav[yy % n, xx % n] = 1
+                else:
+                    C.inset(x0 + W // 2 - 12, y0 + m * 2, 24, Hh - m * 4, -0.25, 3.0)  # gaine en relief
+            elif t < 0.35 and Hh > 80:              # grille de ventilation
+                gx0, gy0, gw, gh = x0 + int(0.06 * px), y0 + int(0.06 * px), W - int(0.12 * px), Hh - int(0.12 * px)
+                d, mm = C.inset(gx0, gy0, gw, gh, 0.6, 2.0)
+                inside = d > 3
+                ly = (C.yy - gy0) % n
+                slat = np.clip(np.abs(((ly % 14) / 14) - 0.5) * 4 - 0.8, 0, 1)   # fentes
+                C.H -= inside * slat * 0.5
+                C.cav = np.maximum(C.cav, inside * slat * 0.9)
+                C.alb -= inside * slat * 0.25
+            elif t < 0.7 and Hh > 80:               # trappe d'accès
+                hx0, hy0 = x0 + int(0.05 * px), y0 + int(0.05 * px)
+                hw, hh = W - int(0.1 * px), Hh - int(0.1 * px)
+                C.groove(hx0, hy0, hw, hh, 1.6, 0.6)
+                for k in (0.3, 0.7):                # loquets
+                    lx, ly2 = hx0 + hw - 14, hy0 + int(hh * k)
+                    C.inset(lx - 6, ly2 - 10, 12, 20, 0.35, 1.5)
+                    C.inset(lx - 2, ly2 - 6, 4, 12, -0.4, 1.0)
+                lw, lh = min(int(0.16 * px), hw - 30), int(0.05 * px)   # étiquette claire
+                d, mm = C.inset(hx0 + 14, hy0 + 14, lw, lh, -0.08, 1.0)
+                C.alb += (d >= 0) * 0.12; C.rough -= (d >= 0) * 0.12
+            else:                                   # tôle à bossages (raidisseurs)
+                if Hh > 120 and W > 120:
+                    C.inset(x0 + int(0.08 * px), y0 + int(0.08 * px), W - int(0.16 * px), Hh - int(0.16 * px), -0.3, 6.0)
+    finish('pservice', C, r, 220, 0.9, 6.0, base=0.7, tone=0.08, rough0=0.52, rough_var=0.12, grime_amt=1.0, chip_amt=0.9,
+           grain=0.008, seam_dark=0.5, ao_seam=0.65)
+
+
+def gen_smooth(n=1024):
+    """Panneaux laqués lisses (texture = 6 m) : 1,5 x 3 m, joints très fins, aucune fixation visible."""
+    print('psmooth')
+    r = np.random.default_rng(303)
+    C = Canvas(n)
+    cw, rh = n // 4, n // 2
+    for j in range(2):
+        for i in range(4):
+            C.panel(i * cw, j * rh, cw, rh, seam=0.8, bevel=1.6, lvl=1.0)
+    # filet horizontal décoratif à 1/3 de la hauteur d'un panneau sur deux
+    for i in range(4):
+        if i % 2 == 0:
+            ly = int(rh * 0.18)
+            C.H[ly, i * cw + 8:(i + 1) * cw - 8] -= 0.25; C.cav[ly, i * cw + 8:(i + 1) * cw - 8] = 0.3
+    finish('psmooth', C, r, 330, 0.7, 6.0, base=0.78, tone=0.04, rough0=0.36, rough_var=0.06, grime_amt=0.25, chip_amt=0.15,
+           grain=0.002, seam_dark=0.5, ao_seam=0.6)
+
+
+def gen_hull(n=1024):
+    """Tôles de coque lourdes (texture = 6 m) : plaques chevauchantes, rangées de rivets, cordons de soudure,
+    renforts rapportés."""
+    print('phull')
+    r = np.random.default_rng(404)
+    C = Canvas(n)
+    px = n / 4.0                                    # plan dessiné en « 4 unités » (1 unité = 1,5 m réel)
+    rows = [0.0, 1.25, 2.0, 3.25, 4.0]               # hauteurs de tôles variées (1,25 / 0,75 m)
+    weld = np.zeros((n, n), np.float32)
+    plates = []
+    for j in range(4):
+        y0, y1 = int(rows[j] * px), int(rows[j + 1] * px)
+        widths = [[2.5, 1.5], [4.0], [1.5, 2.5], [2.0, 2.0]][j]
+        x = [0.0, 0.6, 0.6, 1.2][j]
+        for w in widths:
+            x0 = int(x * px); W = int(w * px); x += w
+            lvl = 1.0 if r.random() < 0.6 else 0.75
+            C.panel(x0, y0, W, y1 - y0, seam=1.5, bevel=4.0, lvl=lvl)
+            plates.append((x0, y0, W, y1 - y0))
+            is_weld = len(widths) > 1 and r.random() < 0.5
+            if is_weld:                             # cordon de soudure sur le bord gauche
+                dx, dy = C.local(x0, y0)
+                dxw = np.where(dx > n / 2, dx - n, dx)
+                band = (np.abs(dxw) < 5) & (dy < y1 - y0)
+                ripple = 0.5 + 0.5 * np.sin(dy * 1.4)
+                bead = np.clip(1 - np.abs(dxw) / 5, 0, 1) * band
+                C.H += bead * (0.4 + 0.15 * ripple)
+                weld = np.maximum(weld, np.clip(1 - np.abs(dxw) / 14, 0, 1) * band)
+                C.seam = np.where(band, 0, C.seam)
+            # rivets : double rangée le long du bord haut, simple sur les côtés (pas de 6 cm)
+            pitch = 0.06 * px
+            for off in (0.03, 0.075):
+                for k in range(int(W / pitch)):
+                    C.rivet(x0 + (k + 0.5) * pitch, y0 + off * px, 2.6)
+            for k in range(int((y1 - y0) / pitch)):
+                C.rivet(x0 + W - 0.03 * px, y0 + (k + 0.5) * pitch, 2.6)
+                if not is_weld and len(widths) > 1: C.rivet(x0 + 0.03 * px, y0 + (k + 0.5) * pitch, 2.6)
+    for pi in r.choice(len(plates), 3, replace=False):   # renforts rapportés (doublers) dans une tôle
+        px0, py0, pw, ph = plates[pi]
+        w, h = int(r.integers(90, 170)), int(min(r.integers(60, 110), ph - 60))
+        x0, y0 = px0 + int(r.integers(40, pw - w - 40)), py0 + int(r.integers(40, ph - h - 20))
+        d, mm = C.inset(x0, y0, w, h, -0.35, 3.0)
+        C.seam = np.maximum(C.seam, ((d >= 0) & (d < 1.5)) * 0.6)
+        for k in range(int(w / 15)):
+            C.rivet(x0 + 7 + k * 15, y0 + 7, 2.2); C.rivet(x0 + 7 + k * 15, y0 + h - 8, 2.2)
+    C.alb -= weld * 0.1 + blur(weld, 6) * 0.06
+    C.rough += weld * 0.15
+    C.wear = np.maximum(C.wear, weld * 0.6)
+    finish('phull', C, r, 440, 1.0, 5.0, base=0.68, tone=0.06, rough0=0.55, rough_var=0.16, grime_amt=1.1, chip_amt=1.0,
+           grain=0.012, seam_dark=0.4, ao_seam=0.55)
+
+
+def gen_kinds():
+    gen_wide(); gen_service(); gen_smooth(); gen_hull()
+
+
 # ---------------------------------------------------------------- bruit pour les nuages/planète (non utilisé en temps réel lourd)
 def gen_noise_rgba(n=512):
     print('noise')
@@ -329,4 +631,7 @@ if __name__ == '__main__':
         im = Image.open(cpath).convert('L').resize((2048, 2048), Image.BILINEAR)
         conc = np.asarray(im, np.float32) / 255.0
         conc = (conc - conc.mean()) / (conc.std() * 6) + 0.5
-    gen_grunge(); gen_panels(); gen_cladding(); gen_deck(concrete=conc); gen_grating(); gen_vent(); gen_noise_rgba()
+    gens = {'grunge': gen_grunge, 'panels': gen_panels, 'cladding': gen_cladding, 'deck': lambda: gen_deck(concrete=conc),
+            'grating': gen_grating, 'vent': gen_vent, 'noise': gen_noise_rgba, 'kinds': gen_kinds}
+    for k, f in gens.items():
+        if not ONLY or k in ONLY: f()

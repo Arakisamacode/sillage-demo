@@ -5,6 +5,18 @@ import * as THREE from 'three';
 
 const BASE = import.meta.env.BASE_URL + 'assets/textures/';
 
+/**
+ * Familles de panneaux de `paint(color, { kind })` (textures procédurales de tools/gen_textures.py, gen_kinds) :
+ * tex = préfixe des fichiers gen/<tex>_albedo|normal|orm.jpg, size = mètres couverts par une répétition.
+ * Sans `kind`, `paint` garde les tôles historiques « panels » (2 m de module, UV de la géométrie).
+ */
+export const PANEL_KINDS = {
+  wide: { tex: 'pwide', size: 6 },       // grands panneaux composites 3 x 1,2-1,5 m (galerie, murs de la frégate)
+  service: { tex: 'pservice', size: 2.4 }, // bandes techniques : grilles, trappes (coursives, soubassements)
+  smooth: { tex: 'psmooth', size: 6 },   // panneaux laqués 1,5 x 3 m, joints très fins (devantures)
+  hull: { tex: 'phull', size: 6 },       // tôles lourdes rivetées / soudées (coques, structure)
+};
+
 export class Materials {
   constructor(renderer, quality, manager) {
     this.renderer = renderer;
@@ -12,6 +24,7 @@ export class Materials {
     this.loader = new THREE.TextureLoader(manager);
     this.tex = {};
     this.cache = {};
+    this.clones = {};   // nom -> clones (répétition propre) à marquer pour envoi au chargement de l'image
     this.shared = {
       uGrunge: { value: null },
       uChips: { value: null },
@@ -20,7 +33,7 @@ export class Materials {
   }
 
   load(name, path, srgb, repeat = true) {
-    const t = this.loader.load(BASE + path);
+    const t = this.loader.load(BASE + path, () => { for (const c of this.clones[name] || []) c.needsUpdate = true; });
     t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace;
     if (repeat) t.wrapS = t.wrapT = THREE.RepeatWrapping;
     t.anisotropy = this.q.anisotropy;
@@ -35,6 +48,11 @@ export class Materials {
     L('panels_a', 'gen/panels_albedo.jpg', true);
     L('panels_n', 'gen/panels_normal.jpg', false);
     L('panels_orm', 'gen/panels_orm.jpg', false);
+    for (const { tex } of Object.values(PANEL_KINDS)) {
+      L(tex + '_a', `gen/${tex}_albedo.jpg`, true);
+      L(tex + '_n', `gen/${tex}_normal.jpg`, false);
+      L(tex + '_orm', `gen/${tex}_orm.jpg`, false);
+    }
     L('clad_a', 'gen/cladding_albedo.jpg', true);
     L('clad_n', 'gen/cladding_normal.jpg', false);
     L('clad_orm', 'gen/cladding_orm.jpg', false);
@@ -148,15 +166,44 @@ export class Materials {
 
   // ---- fabriques de matériaux --------------------------------------------------------------
 
-  /** Tôle peinte (murs, structures, coques). La texture couvre 2 m. */
+  /**
+   * Textures d'une famille de panneaux pour une géométrie dont 1 unité d'UV = `uv` mètres : clones (même
+   * source d'image, donc une seule copie en mémoire graphique et un seul passage dans shrinkTextures)
+   * dont la répétition ramène la texture à sa taille réelle.
+   */
+  kindTex(kind, uv = 3) {
+    const K = PANEL_KINDS[kind];
+    if (!K) throw new Error('paint: kind inconnu ' + kind);
+    const key = K.tex + '@' + uv;
+    if (this.tex[key]) return this.tex[key];
+    const r = uv / K.size, set = {};
+    for (const s of ['a', 'n', 'orm']) {
+      const name = K.tex + '_' + s, src = this.tex[name];
+      const t = src.clone();
+      t.repeat.set(r, r);
+      // un clone n'hérite pas du numéro de version : sans ceci il ne serait jamais envoyé à la carte graphique
+      if (src.version > 0) t.needsUpdate = true;
+      (this.clones[name] ||= []).push(t);
+      set[s] = t;
+    }
+    return (this.tex[key] = set);
+  }
+
+  /**
+   * Tôle peinte (murs, structures, coques). Sans `kind` : tôles « panels », la texture couvre une unité d'UV.
+   * opts.kind : 'wide' | 'service' | 'smooth' | 'hull' (PANEL_KINDS) ; opts.uv : mètres par unité d'UV de la
+   * géométrie (3 = défaut de Builder.box, 2 pour les boîtes de la frégate, 2,5 pour les plaques de platedHull).
+   */
   paint(color, opts = {}) {
-    const key = 'paint_' + color + JSON.stringify(opts);
+    const kind = opts.plain ? null : opts.kind ?? null;
+    const key = 'paint_' + color + '|' + (kind ?? 'panels') + '|' + JSON.stringify(opts);
     if (this.cache[key]) return this.cache[key];
+    const T = kind ? this.kindTex(kind, opts.uv ?? 3) : { a: this.tex.panels_a, n: this.tex.panels_n, orm: this.tex.panels_orm };
     const m = opts.plain
       ? new THREE.MeshStandardMaterial({ color: new THREE.Color(color), roughness: opts.rough ?? 0.6, metalness: 0.0 })
       : new THREE.MeshStandardMaterial({
-        color: new THREE.Color(color), map: this.tex.panels_a, normalMap: this.tex.panels_n,
-        roughnessMap: this.tex.panels_orm, metalnessMap: this.tex.panels_orm, aoMap: this.tex.panels_orm,
+        color: new THREE.Color(color), map: T.a, normalMap: T.n,
+        roughnessMap: T.orm, metalnessMap: T.orm, aoMap: T.orm,
         roughness: opts.rough ?? 1.0, metalness: 1.0, aoMapIntensity: 0.8,
         normalScale: new THREE.Vector2(opts.ns ?? 1, opts.ns ?? 1),
       });

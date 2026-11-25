@@ -19,7 +19,12 @@ export function buildExterior(ctx) {
   const dark = mats.metal(0x26292c, { rough: 0.7 });
   const win = mats.emissive(0xffd9a8, 2.2);
   const winCold = mats.emissive(0xbfe0ff, 2.0);
-  const add = (h) => { B.add(h.under, hm.under, new THREE.Matrix4(), { cast: false }); B.add(h.plates, hm.plate, new THREE.Matrix4(), { cast: false }); B.add(h.alt, hm.alt, new THREE.Matrix4(), { cast: false }); };
+  // plaques de platedHull : tôles lourdes rivetées (UV des plaques = 2,5 m)
+  const hp = {
+    plate: ds(mats.paint(0x6e747a, { kind: 'hull', uv: 2.5, grime: 0.8, scratch: 0.7, rust: 0.1 })),
+    alt: ds(mats.paint(0x3a3f44, { kind: 'hull', uv: 2.5, grime: 0.9, scratch: 0.7, rust: 0.15 })),
+  };
+  const add = (h) => { B.add(h.under, hm.under, new THREE.Matrix4(), { cast: false }); B.add(h.plates, hp.plate, new THREE.Matrix4(), { cast: false }); B.add(h.alt, hp.alt, new THREE.Matrix4(), { cast: false }); };
   // ---------------------------------------------------------------- enveloppe du hangar
   const zc = (Z_BAY + Z_BACK) / 2, L = Z_BACK - Z_BAY + 4;
   B.box(HX * 2 + 7, 3.5, L, shell, [0, H + 2.2, zc], null, { tex: 8, cast: false });
