@@ -29,8 +29,11 @@ export class Flight {
     this.camQ = new THREE.Quaternion();
     // sondes de collision (repère du vaisseau, aire 02 au repos) : nez, queue, ailes, ventre, dos, moteurs
     const eng = ship.thrusters ? ship.thrusters.main : [[-3, 6.6, 16.6], [3, 6.6, 16.6]];
+    // nacelles d'épaule (x ±4,85 ; y 7,05 ; z 5 à 15,5), flancs (x ±4,6), saumons, train avant (x ±2,4)
+    const side = [];
+    for (const s of [-1, 1]) side.push([s * 4.85, 7.05, 8, 1.2], [s * 4.85, 7.05, 12.5, 1.2], [s * 4.2, 5.0, -12, 0.9], [s * 4.2, 5.0, 4, 0.9], [s * 7, 3.75, 2, 0.6]);
     this.probes = [[0, 5.6, -19, 0.8], [0, 5.0, 15.5, 1.6], [-11, 3.75, 4, 0.8], [11, 3.75, 4, 0.8], [0, 1.5, -4, 1.4], [0, 1.5, 8, 1.4],
-      [0, 9.3, 2, 0.9], [eng[0][0], eng[0][1], eng[0][2] - 0.4, 1.3], [eng[1][0], eng[1][1], eng[1][2] - 0.4, 1.3], [-2.6, 0.3, -11, 0.5], [2.6, 0.3, -11, 0.5], [-3.2, 0.3, 9.5, 0.5], [3.2, 0.3, 9.5, 0.5]]
+      [0, 9.3, 2, 0.9], [eng[0][0], eng[0][1], eng[0][2] - 0.4, 1.3], [eng[1][0], eng[1][1], eng[1][2] - 0.4, 1.3], [-2.4, 0.3, -11, 0.5], [2.4, 0.3, -11, 0.5], [-3.2, 0.3, 9.5, 0.5], [3.2, 0.3, 9.5, 0.5], ...side]
       .map(([x, y, z, r]) => ({ p: new THREE.Vector3(x, y, z), r }));
     this._plumes();
     // aires d'atterrissage connues : l'aire 02 du hangar, puis celles des avant-postes (ajoutées par addPad)
@@ -53,18 +56,25 @@ export class Flight {
 
   _plumes() {
     const S = this.ship;
-    const mat = new THREE.MeshBasicMaterial({ color: new THREE.Color(1.6, 0.8, 0.35), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
-    const blue = new THREE.MeshBasicMaterial({ color: new THREE.Color(0.5, 0.9, 2.2), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
-    const cone = new THREE.ConeGeometry(0.85, 6, 20, 1, true); cone.translate(0, -3, 0); cone.rotateX(-Math.PI / 2);
-    const core = new THREE.ConeGeometry(0.45, 3.2, 16, 1, true); core.translate(0, -1.6, 0); core.rotateX(-Math.PI / 2);
+    const mat = new THREE.MeshBasicMaterial({ color: new THREE.Color(1.6, 0.8, 0.35), vertexColors: true, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+    const blue = new THREE.MeshBasicMaterial({ color: new THREE.Color(0.5, 0.9, 2.2), vertexColors: true, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+    // jet : large à la sortie de tuyère (z = 0), effilé vers l'arrière (+z), intensité qui s'éteint en bout (couleurs de sommet)
+    const jet = (r, len, seg) => {
+      const g = new THREE.ConeGeometry(r, len, seg, 4, true); g.translate(0, len / 2, 0); g.rotateX(Math.PI / 2);
+      const p = g.attributes.position, c = new Float32Array(p.count * 3);
+      for (let i = 0; i < p.count; i++) { const f = Math.pow(1 - Math.min(1, p.getZ(i) / len), 1.6); c[i * 3] = c[i * 3 + 1] = c[i * 3 + 2] = f; }
+      g.setAttribute('color', new THREE.BufferAttribute(c, 3));
+      return g;
+    };
+    const cone = jet(0.85, 6, 20), core = jet(0.45, 3.2, 16);
     this.plumes = [];
     // sorties de tuyères (repère de l'aire) : fournies par le vaisseau, sinon positions historiques
     const T = S.thrusters || { main: [[-3.0, 6.6, 16.7], [3.0, 6.6, 16.7]], vtol: [[-10.3, 2.85, 3.8], [10.3, 2.85, 3.8]] };
     for (let i = 0; i < 2; i++) {
       for (const [g, m] of [[cone, mat], [core, blue]]) {
         const p = new THREE.Mesh(g, m);
+        // le cône est construit vers +z (arrière du vaisseau) : sommet à la tuyère, traînée derrière la cloche
         p.position.set(...T.main[i]);
-        p.rotation.y = Math.PI;
         p.scale.setScalar(0.001);
         p.renderOrder = 8;
         S.group.add(p);
@@ -79,7 +89,7 @@ export class Flight {
       this.plumes.push({ m: v, k: 0.6, vtol: true });
     }
     this.engineLight = new THREE.PointLight(0xff9a50, 0, 30, 2);
-    this.engineLight.position.set(0, 6.6, 19);
+    this.engineLight.position.set(0, 7.0, 19);
     S.group.add(this.engineLight);
   }
 
@@ -167,7 +177,12 @@ export class Flight {
       const down = this.state === 'parked' || this.state === 'dead' || (this.state === 'spool' && this.timer < 4.2) || (this.state === 'landing' && this.timer > 2.5);
       G.k += THREE.MathUtils.clamp((down ? 1 : 0) - G.k, -dt * 0.6, dt * 0.6);
       const e = G.k * G.k * (3 - 2 * G.k);
-      G.group.position.y = (1 - e) * G.travel;
+      if (G.legs) {
+        // jambes télescopiques : écrasées vers le ventre (pivot = plafond du puits), puis trappes refermées
+        const sy = Math.max(0.02, e);
+        for (const L of G.legs) { L.group.scale.y = sy; L.group.position.y = L.pivot * (1 - sy); L.group.visible = G.k > 0.03; }
+        if (G.doors) G.doors.visible = G.k <= 0.03;
+      } else G.group.position.y = (1 - e) * G.travel;
       G.chocks.visible = this.state === 'parked';
     }
     // rampe arrière : relevée en vol, abaissée posé
@@ -177,6 +192,7 @@ export class Flight {
       R.k += THREE.MathUtils.clamp((close ? 1 : 0) - R.k, -dt * 0.45, dt * 0.45);
       const e = R.k * R.k * (3 - 2 * R.k);
       R.pivot.rotation.x = R.closed * e;
+      if (R.update) R.update();
     }
     this._camera(dt);
   }
