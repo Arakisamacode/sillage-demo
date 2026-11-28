@@ -62,6 +62,74 @@ export class LightPool {
   }
 }
 
+/**
+ * Masquage par zone, le temps d'une image : depuis le hangar, on ne voit hors du hangar que par la baie spatiale
+ * (z < -45) et par les deux sas. Les objets entièrement côté galerie (x < -41) qui ne sont pas dans le cône de
+ * vue du sas ouest (passage 4,2 × 4,2 m entre x -32 et -42), et ceux entièrement au-dessus du toit du hangar
+ * (y > 25) en arrière de la baie, ne sont pas dessinés. Personnages (SkinnedMesh) : testés à leur position.
+ * La visibilité est rétablie juste après le rendu → aucun conflit avec les autres systèmes qui règlent `visible`.
+ */
+export class ZoneCull {
+  constructor(scene, { hx = 32, zBay = -45, zBack = 31, roof = 25, lock = { z: -2, w: 4.2, h: 4.2, x0: -32, x1: -42 } } = {}) {
+    this.scene = scene; this.o = { hx, zBay, zBack, roof, lock };
+    this.static = []; this.dynamic = []; this.n = 0; this.hidden = [];
+    this.scan();
+  }
+  /** (re)classe les objets de premier niveau de la scène */
+  scan() {
+    this.static.length = 0; this.dynamic.length = 0;
+    const b = new THREE.Box3();
+    for (const o of this.scene.children) {
+      if (o.isLight || o.isCamera) continue;
+      let skinned = false;
+      o.traverse((c) => { if (c.isSkinnedMesh) skinned = true; });
+      if (skinned) { this.dynamic.push(o); continue; }
+      if (!o.isMesh || !o.geometry) continue;
+      const g = o.geometry; if (!g.boundingBox) { if (!g.attributes.position?.array) continue; g.computeBoundingBox(); }
+      o.updateMatrixWorld();
+      b.copy(g.boundingBox).applyMatrix4(o.matrixWorld);
+      const side = b.max.x < this.o.lock.x1 + 1, above = b.min.y > this.o.roof && b.min.z > this.o.zBay;
+      if (side || above) this.static.push({ o, b: b.clone(), above });
+    }
+  }
+  /** caméra dans le hangar ? */
+  inHangar(c) { const o = this.o; return Math.abs(c.x) < o.hx && c.z > o.zBay - 1 && c.z < o.zBack && c.y < o.roof - 1; }
+  /** le segment caméra → (boîte) peut-il passer par le sas ouest ? (test conservatif sur les coins) */
+  throughLock(c, b) {
+    const L = this.o.lock, zA = L.z - L.w / 2 - 0.3, zB = L.z + L.w / 2 + 0.3;
+    if (b.max.x > L.x1 - 0.5) return true;
+    for (const X of [L.x0, L.x1]) {
+      let z0 = Infinity, z1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+      for (const gx of [b.min.x, b.max.x]) for (const gz of [b.min.z, b.max.z]) for (const gy of [b.min.y, b.max.y]) {
+        const t = (X - c.x) / (gx - c.x);
+        if (!(t > 0)) return true;
+        const z = c.z + (gz - c.z) * t, y = c.y + (gy - c.y) * t;
+        z0 = Math.min(z0, z); z1 = Math.max(z1, z); y0 = Math.min(y0, y); y1 = Math.max(y1, y);
+      }
+      if (z1 < zA || z0 > zB || y1 < 0 || y0 > L.h + 0.3) return false;
+    }
+    return true;
+  }
+  /** à appeler juste avant le rendu : masque, renvoie la fonction qui rétablit */
+  apply(cam) {
+    if (++this.n % 240 === 0) this.scan();
+    const hid = this.hidden; hid.length = 0;
+    if (!this.inHangar(cam)) return null;
+    for (const s of this.static) if (s.o.visible && (s.above || !this.throughLock(cam, s.b))) { s.o.visible = false; hid.push(s.o); }
+    const pb = new THREE.Box3();
+    for (const o of this.dynamic) {
+      if (!o.visible) continue;
+      const p = o.position;
+      if (p.y > this.o.roof + 1 && p.z > this.o.zBay) { o.visible = false; hid.push(o); continue; }
+      if (p.x < this.o.lock.x1 + 0.5) {
+        pb.min.set(p.x - 0.6, p.y, p.z - 0.6); pb.max.set(p.x + 0.6, p.y + 2, p.z + 0.6);
+        if (!this.throughLock(cam, pb)) { o.visible = false; hid.push(o); }
+      }
+    }
+    return () => { for (const o of hid) o.visible = true; hid.length = 0; };
+  }
+}
+
 /** Classe les maillages statiques par niveau d'après leur boîte englobante. */
 export class LevelCull {
   constructor(meshes) {

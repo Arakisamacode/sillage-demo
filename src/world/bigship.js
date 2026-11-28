@@ -3,6 +3,7 @@ import { Builder } from './builder.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import {
   skinHull, nozzle, nozzleMaterials, kitMaterials, LiveryAtlas, addParts, bevelBox, rodBetween, rcsBlock, antenna, radiator, lightPod, ventPanel, dockingClamp,
+  planeDecal, bakeOcclusion,
 } from './hullkit2.js';
 import { HX, SHIPLOCK } from './layout.js';
 import { keepFromPlayer, targetBlocked } from '../ai/keepout.js';
@@ -95,6 +96,27 @@ export function buildBigShip(ctx) {
       if (under) box(b - a, 0.5, d - c, ceilM, [(a + b) / 2, y - 0.35, (c + d) / 2], false, null, 3);
     }
   };
+  /**
+   * Remplissage plein (tableaux de baie, allèges) : polygone [[a, y], …] extrudé de e0 à e1.
+   * axis 'z' : a = x, extrusion le long de z ; axis 'x' : a = z, extrusion le long de x.
+   */
+  const fill = (axis, pts, e0, e1, m = hullIn) => {
+    const g = new THREE.ExtrudeGeometry(new THREE.Shape(pts.map(([a, y]) => new THREE.Vector2(a, y))), { depth: e1 - e0, bevelEnabled: false, curveSegments: 1 });
+    g.translate(0, 0, e0);
+    let q = g.index ? g.toNonIndexed() : g;
+    if (axis === 'x') {
+      // (a, y, t) → (t, y, a) : symétrie (déterminant -1) → on retourne l'ordre des sommets
+      q.applyMatrix4(new THREE.Matrix4().set(0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1));
+      const P = q.attributes.position.array, U = q.attributes.uv.array;
+      for (let i = 0; i < P.length; i += 9) for (let k = 0; k < 3; k++) { const t = P[i + 3 + k]; P[i + 3 + k] = P[i + 6 + k]; P[i + 6 + k] = t; }
+      for (let i = 0; i < U.length; i += 6) for (let k = 0; k < 2; k++) { const t = U[i + 2 + k]; U[i + 2 + k] = U[i + 4 + k]; U[i + 4 + k] = t; }
+      q.computeVertexNormals();
+    }
+    const uv = q.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) / 2, uv.getY(i) / 2);
+    B.add(q, m, new THREE.Matrix4(), { cast: false });
+  };
+  // peau extérieure (demi-largeur) : coque principale et château, pour caler les remplissages sous la peau
+  const hwMain = (y) => 17.2 - (0.2 * (y + 2.6)) / 12.4, hwSup = (y) => 15.9 - (1.65 * (y - 8.8)) / 5.8;
   /** garde-corps le long d'un segment */
   const rail = (a, b, y) => {
     const dx = b[0] - a[0], dz = b[1] - a[1], L = Math.hypot(dx, dz), ry = Math.atan2(dx, dz);
@@ -363,7 +385,13 @@ export function buildBigShip(ctx) {
   wallZ(S.x1, S.zA, -14, yB, S.h, [[-28, -16, 2.8]], hullIn);    // baies du salon d'observation (tribord)
   wallZ(S.x1, -14, S.zEnd, yB, S.h, [], hullIn);
   wallZ(S.x0, 38.1, S.zEnd, yB, S.h, [], hullIn);
-  for (const [x, z0, z1] of [[S.x0, 19, 35], [S.x1, -28, -16]]) box(0.04, 2.2, z1 - z0, glass, [x, yB + 0.6 + 1.1, (z0 + z1) / 2], true);
+  // baies du pont B : allège pleine sous la baie (de la peau à la cloison, sous le plancher compris), vitrage
+  // intérieur aligné sur la baie extérieure (y 4,85 → haut de l'ouverture) ; l'embrasure rejoint la cloison
+  for (const [x, z0, z1, hh, s] of [[S.x0, 19, 35, 2.6, -1], [S.x1, -28, -16, 2.8, 1]]) {
+    const yS = 4.83, xin = x - s * 0.11, sk = (y) => S.cx + s * (hwMain(y) - 0.03);
+    fill('z', [[sk(yB - 0.5), yB - 0.5], [xin, yB - 0.5], [xin, yS], [sk(yS), yS]], z0, z1);
+    box(0.04, yB + hh - yS, z1 - z0, glass, [x, (yS + yB + hh) / 2, (z0 + z1) / 2], true);
+  }
   wallX(38.1, S.x0, S.x1, yB, S.h, [[81.1, 82.9, DH]]);
   dressCorridor(CX0, CX1, S.zA, -14, yB, [-28.6, -20.6]); dressCorridor(CX0, CX1, -14, 38, yB, [-13.6, -5.3, 2.9, 11.2, 20.4, 32.9]);
   // coursive au-dessus de la soute : garde-corps, éclairage
@@ -494,7 +522,15 @@ export function buildBigShip(ctx) {
   // enveloppe du pont C
   wallZ(68, -31, -2, yC, S.h, [[-29, -20, 2.8]], hullIn);  // baie de la cabine du capitaine
   wallZ(96, -31, -2, yC, S.h, [[-29, -5, 2.9]], hullIn);   // grande baie du salon panoramique
-  for (const [x, z0, z1] of [[68, -29, -20], [96, -29, -5]]) box(0.04, 2.4, z1 - z0, glass, [x, yC + 0.4 + 1.2, (z0 + z1) / 2], true);
+  // baies du pont C (flanc rentrant du château) : allège de la peau à la cloison, linteau sous l'embrasure,
+  // joues de part et d'autre (le volume entre la peau et la cloison n'est plus visible), vitrage aligné
+  for (const [x, z0, z1, hh, s] of [[68, -29, -20, 2.8, -1], [96, -29, -5, 2.9, 1]]) {
+    const yS = 9.93, yL = 11.74, xin = x - s * 0.11, sk = (y) => S.cx + s * (hwSup(y) - 0.04);
+    fill('z', [[sk(yS), yC - 0.5], [xin, yC - 0.5], [xin, yS], [sk(yS), yS]], z0 - 0.02, z1 + 0.02);
+    box(0.22, yC + hh - yL, z1 - z0, hullIn, [x, (yL + yC + hh) / 2, (z0 + z1) / 2], true);
+    for (const [a, b] of [[z0 - 0.14, z0 - 0.02], [z1 + 0.02, z1 + 0.14]]) fill('z', [[sk(yS), yS - 0.05], [xin, yS - 0.05], [xin, yC + hh + 0.1], [sk(yC + hh + 0.1), yC + hh + 0.1]], a, b);
+    box(0.04, yL - yS, z1 - z0, glass, [x, (yS + yL) / 2, (z0 + z1) / 2], true);
+  }
   wallX(-2, 68, 96, yC, S.h, [], hullIn);
   wallZ(CX0, -31, -2, yC, S.h, [[-19, -17.2, DH], [-10, -8.2, DH]]);
   wallZ(CX1, -31, -2, yC, S.h, [[-12, -10.2, DH]]);
@@ -514,6 +550,12 @@ export function buildBigShip(ctx) {
     for (const [a, b] of [[68, 72], [92, 96]]) wallX(S.zBow, a, b, yC, S.h, [], hullIn);
     wallZ(68, S.zBow, -31, yC, S.h, [], hullIn); wallZ(96, S.zBow, -31, yC, S.h, [], hullIn);
     box(20, S.h - 0.9, 0.05, glass, [82, yC + 0.9 + (S.h - 0.9) / 2, S.zBow + 0.05], true);
+    // volume entre la cloison avant et la verrière inclinée : tablette d'appui, joues latérales et plafond qui
+    // rejoignent la face inclinée (y = 9,9 + 1,741·(z + 45,2)) sous la peau → plus de coque vue de dos
+    const zr = (y) => -45.2 + (y - 9.9) / 1.741 + 0.05;
+    fill('x', [[-41.9, yC + 0.4], [-41.9, 10.33], [zr(10.33), 10.33], [-45.12, 9.95], [-45.12, yC + 0.4]], 71.9, 92.1);
+    for (const [a, b] of [[71.75, 71.95], [92.05, 92.25]]) fill('x', [[-41.9, 10.2], [-41.9, 13.35], [zr(13.35), 13.35], [zr(10.2), 10.2]], a, b);
+    fill('x', [[-41.9, 13.2], [-41.9, 13.42], [zr(13.42), 13.42], [zr(13.2), 13.2]], 71.9, 92.1);
     for (let x = 72; x <= 92; x += 4) box(0.18, S.h - 0.9, 0.22, dark, [x, yC + 0.9 + (S.h - 0.9) / 2, S.zBow + 0.1]);
     box(28, 0.02, 11, floorTile, [82, yC + 0.012, -36.5]);
     // estrade, pupitres en arc, écrans
@@ -635,6 +677,7 @@ export function buildBigShip(ctx) {
   out.exterior = atalanteExterior(ctx, E);
   const em = E.finalize(scene);
   for (const m of em) { m.castShadow = false; m.receiveShadow = false; }
+  out.extMeshes = em;
 
   out.inside = (p) => p.x > S.x0 - 1 && p.x < S.x1 + 1 && p.z > S.zBow - 1 && p.z < S.zEnd + 1 && p.y > -1 && p.y < 15;
   out.near = (p) => (p.x > HX - 4 && p.x < S.x1 + 6 && p.z > S.zBow - 10 && p.z < S.zEnd + 10 && p.y > -2 && p.y < 18);
@@ -650,6 +693,27 @@ export function buildBigShip(ctx) {
     for (const k of ['A', 'B', 'C']) for (const m of out.interior[k]) m.visible = show.includes(k);
   };
   ctx.updaters.push(() => out.updateCull(ctx.cullFromCamera ? ctx.camera.position : ctx.player?.pos));
+  // masquage de l'extérieur (QA 8) : invisible depuis le hangar et la galerie (sauf ligne de vue par la baie
+  // spatiale vers la proue) et depuis les pièces aveugles du bord ; visible dans le tube, à l'approche, en vol,
+  // et dans les pièces à baies (réfectoire, salon d'observation, pont C, cage d'escalier, sas)
+  const inBox = (c, x0, x1, z0, z1, y0, y1) => c.x > x0 && c.x < x1 && c.z > z0 && c.z < z1 && c.y > y0 && c.y < y1;
+  out.extVisible = (c) => {
+    if (out.inside(c)) {
+      if (inBox(c, 73, 81, -31, -16, -1, 15)) return true;                           // cage d'escalier
+      if (c.y >= 9.0) return !inBox(c, 68.2, 79.8, -16.8, -2.2, 9, 15);              // pont C sauf salle de briefing
+      if (c.y >= 4.4) return inBox(c, 66, 83, 12, 41, 4.4, 9) || inBox(c, 81, 98, -33, -11, 4.4, 9);
+      return inBox(c, 66, 83, -16, -2, -1, 4.4);                                      // sas et vestibule
+    }
+    const hangar = Math.abs(c.x) < HX && c.z > -46 && c.z < 31 && c.y < 25, gallery = c.x < -40 && c.x > -103 && c.z > -25 && c.z < 11;
+    if (gallery) return false;
+    if (hangar) return c.z < -44.9 || c.x + (63 - c.x) * (-45 - c.z) / (-78 - c.z) < HX - 1.2;   // vue de la proue par la baie
+    return true;
+  };
+  let extShown = true;
+  ctx.updaters.push(() => {
+    const v = out.extVisible(ctx.camera.position);
+    if (v !== extShown) { extShown = v; for (const m of em) m.visible = v; }
+  });
   for (const l of out.lights) l.userData.ship = true;
   ctx.updaters.push((dt, t) => { if (out.holo) { out.holo.rotation.y += dt * 0.3; out.holo.visible = out.near(ctx.player?.pos || new THREE.Vector3(1e9, 0, 0)); } });
   void airlock; void neonTexture; void neonMaterial; void low;
@@ -668,9 +732,15 @@ function atalanteExterior(ctx, E) {
   const { mats } = ctx;
   const PI = Math.PI, TAU = PI * 2, CX = S.cx;
   const V = (x, y, z) => new THREE.Vector3(x, y, z);
-  const K = kitMaterials(mats, { hull: 0x9ea19f, dark: 0x2e3236, accent: 0x8f2f20, service: 0x63686d });
-  const NZ = nozzleMaterials(mats, { glow: 0x9cc4ff, idle: 0.3, key: 'atalante' });
-  const fin = mats.smooth(0xb9bcbd, 0.36, 0.85, { grime: 0.5, scratch: 0.4, rust: 0, floor: 0 });
+  // palette propre à la frégate : jamais posée (floor 0), tôle 2× plus grande (uv 0,5 : module de 12 m au lieu
+  // de 6 → moins de « carrelage » sur 145 m), crasse à grande échelle (taches de 15-20 m), couleurs de sommet
+  // (occlusion précalculée, voir la fusion finale)
+  const ATA = { hull: 0x9ea19f, dark: 0x2e3236, accent: 0x8f2f20, service: 0x63686d, floor: 0, uv: 0.5, scale: 0.06, grime: 1.15, top: 0.25, vertexColors: true, key: 'ata' };
+  const K = kitMaterials(mats, ATA);
+  const hullB = kitMaterials(mats, { ...ATA, hull: 0x939694, key: 'ataB' }).hull;   // panneaux de ton voisin (damier irrégulier)
+  const NZ = nozzleMaterials(mats, { glow: 0x9cc4ff, idle: 0.12, key: 'atalante' });
+  const fin = mats.smooth(0xb9bcbd, 0.36, 0.85, { grime: 0.5, scratch: 0.4, rust: 0, floor: 0, k: 'ata_vc' });
+  fin.vertexColors = true;
   const M = { ...K, ...NZ, fin, lens: K.lensWhite };
   // vitrages : verre fumé épais, lueur intérieure (dégradé : plafonniers en haut, quelques stores baissés)
   const glassMat = (key, em, ei, seed) => {
@@ -695,6 +765,7 @@ function atalanteExterior(ctx, E) {
   // ------------------------------------------------ collecte par matériau (fusion finale : un lot par matériau)
   const bag = new Map();
   let tris = 0;
+  let aoId = 'hull';   // composant courant : pas d'auto-occlusion par sa propre boîte (bakeOcclusion)
   const put = (g, m, mtx) => {
     let q = g.index ? g.toNonIndexed() : g.clone();
     for (const k of Object.keys(q.attributes)) if (!['position', 'normal', 'uv'].includes(k)) q.deleteAttribute(k);
@@ -702,6 +773,7 @@ function atalanteExterior(ctx, E) {
     if (!q.attributes.normal) q.computeVertexNormals();
     if (mtx) q.applyMatrix4(mtx);
     q.morphAttributes = {};
+    q.userData.aoId = aoId;
     tris += q.attributes.position.count / 3;
     (bag.get(m) || bag.set(m, []).get(m)).push(q);
   };
@@ -735,8 +807,8 @@ function atalanteExterior(ctx, E) {
         const a = as[k], b = as[k + 1], am = (a + b) / 2;
         if (hs.some((h) => zm > h.z0 && zm < h.z1 && am > h.a0 && am < h.a1)) continue;
         const n = Math.max(2, Math.ceil(((b - a) / TAU) * (o.rad ?? 120)));
-        const h = skinHull(st, { arc: [a, b], radial: n, smooth: o.smooth ?? false, steps: o.steps ?? 1, cap0: k === 0 && !!o.cap0, cap1: k === 0 && !!o.cap1 });
-        offsetV(h.geometry, za);
+        const h = skinHull(st, { arc: [a, b], radial: n, smooth: o.smooth ?? false, steps: o.steps ?? 1, crease: o.crease, uvMode: o.uvMode, cap0: k === 0 && !!o.cap0, cap1: k === 0 && !!o.cap1 });
+        if (o.uvMode !== 'planar') offsetV(h.geometry, za);
         add(h.geometry, matOf(am));
         if (h.cap0) add(h.cap0, o.capMat);
         if (h.cap1) add(h.cap1, o.capMat);
@@ -784,11 +856,13 @@ function atalanteExterior(ctx, E) {
   const mainHoles = [...mainWins, tubeHole];
   const breaksM = [-W, TOPA, PI - TOPA, PI + W, ...mainHoles.flatMap((h) => [h.a0, h.a1])];
   const matM = (am) => { const a = ((am % TAU) + TAU) % TAU; return a > PI + W - 1e-4 && a < TAU - W + 1e-4 ? K.hullDark : K.hull; };
+  // proue facettée : grands chanfreins à arêtes vives (normales cassées) → plans de lumière nets au lieu d'un nez
+  // de savon ; les arêtes s'élargissent vers l'avant comme une étrave blindée
   const bowSt = [
-    { x: CX, z: -76, y: 5.6, w: 0.5, tw: 0.9, h: 1.4, hb: 2.6, c: 0.2, r: 0.15, steps: 5 },
-    { x: CX, z: -70, y: 5.0, w: 3.6, tw: 5.2, h: 3.0, hb: 4.6, c: 0.7, r: 0.3, steps: 7 },
-    { x: CX, z: -62, y: 4.3, w: 9.2, tw: 11.0, h: 4.4, hb: 5.9, c: 1.0, r: 0.35, steps: 7 },
-    { x: CX, z: -54, y: 3.8, w: 14.2, tw: 15.2, h: 5.6, hb: 6.3, c: 1.2, r: 0.35, steps: 5 },
+    { x: CX, z: -76, y: 5.6, w: 0.5, tw: 0.9, h: 1.4, hb: 2.6, c: 0.35, r: 0.02, steps: 4 },
+    { x: CX, z: -70, y: 5.0, w: 3.6, tw: 5.2, h: 3.0, hb: 4.6, c: 1.5, r: 0.04, steps: 5 },
+    { x: CX, z: -62, y: 4.3, w: 9.2, tw: 11.0, h: 4.4, hb: 5.9, c: 2.2, r: 0.06, steps: 5 },
+    { x: CX, z: -54, y: 3.8, w: 14.2, tw: 15.2, h: 5.6, hb: 6.3, c: 1.6, r: 0.2, steps: 4 },
     { ...SEC, z: -48, steps: 2 }, { ...SEC, z: -46, steps: 1 }, { ...SEC, z: -45 },
   ];
   const aftSt = [
@@ -797,7 +871,7 @@ function atalanteExterior(ctx, E) {
     { x: CX, z: 63, y: 3.8, w: 14.6, tw: 13.8, h: 5.0, hb: 5.4, c: 1.2, r: 0.35, steps: 4 },
     { x: CX, z: 67.5, y: 3.9, w: 12.6, tw: 11.6, h: 4.3, hb: 4.7, c: 1.1, r: 0.3 },
   ];
-  holed(bowSt, -W, TAU - W, [], breaksM, matM, { smooth: true, cap0: true, capMat: K.hullDark });
+  holed(bowSt, -W, TAU - W, [], breaksM, matM, { smooth: true, cap0: true, capMat: K.hullDark, crease: 0.32, uvMode: 'planar' });
   holed([{ ...SEC, z: -45 }, { ...SEC, z: -42.2 }], -W, TAU - W, mainHoles, breaksM, matM);
   holed([{ ...SEC, z: -42.2 }, { ...SEC, z: -1.85 }], PI - TOPA, TAU + TOPA, mainHoles, breaksM, matM);   // sous le château : pas de pont
   holed([{ ...SEC, z: -1.85 }, { ...SEC, z: 56 }], -W, TAU - W, mainHoles, breaksM, matM);
@@ -806,9 +880,11 @@ function atalanteExterior(ctx, E) {
   const refM = skinHull([{ ...SEC, z: -46 }, { ...SEC, z: 57 }], { radial: 96, smooth: false, steps: 1 });
   const bowRef = skinHull(bowSt, { radial: 96 });
   const aftRef = skinHull(aftSt, { radial: 96 });
-  for (const w of mainWins) windowAt(refM, w, w.glass, 0.92, w.step);
+  // embrasures jusqu'à la face intérieure des cloisons (x 66,11 / 97,89) : plus de jour entre peau et cloison
+  for (const w of mainWins) windowAt(refM, w, w.glass, 1.12, w.step);
 
   // ================================================================ château de commandement (pont C)
+  aoId = 'castle';
   const SUP = { x: CX, y: 11.7, w: 15.9, tw: 14.25, h: 2.9, hb: 2.9, c: 0.7, r: 0.25 };
   const LOW = { x: CX, y: 9.35, w: 15.5, tw: 14.6, h: 0.55, hb: 0.55, c: 0.4, r: 0.2 };
   const hwS = (y) => 15.9 - (1.65 * (y - 8.8)) / 5.8;
@@ -837,6 +913,19 @@ function atalanteExterior(ctx, E) {
     // visière pare-soleil et ses consoles
     add(bevelBox(25.4, 0.32, 1.9, 0.1), K.service, [CX, 14.83, -42.95], [-0.1, 0, 0]);
     for (const dx of [-11.6, -4, 4, 11.6]) add(bevelBox(0.3, 0.5, 1.2, 0.06), K.mech, [CX + dx, 14.72, -42.6]);
+    // sous-face claire (la visière ne se lit plus comme une dalle noire flottante) et deux joues-goussets qui la
+    // relient au toit du château
+    add(bevelBox(24.6, 0.05, 1.7, 0.02), K.hull, [CX, 14.645, -42.97], [-0.1, 0, 0]);
+    for (const s2 of [-1, 1]) {
+      const sh = new THREE.Shape([new THREE.Vector2(-42.3, 14.62), new THREE.Vector2(-43.92, 14.72), new THREE.Vector2(-43.6, 14.45), new THREE.Vector2(-42.75, 13.85)]);
+      const g = new THREE.ExtrudeGeometry(sh, { depth: 0.36, bevelEnabled: false });
+      g.translate(0, 0, -0.18);
+      g.applyMatrix4(new THREE.Matrix4().set(0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1));
+      const P2 = g.attributes.position.array;
+      for (let i = 0; i < P2.length; i += 9) for (let k = 0; k < 3; k++) { const t = P2[i + 3 + k]; P2[i + 3 + k] = P2[i + 6 + k]; P2[i + 6 + k] = t; }
+      g.computeVertexNormals();
+      add(g, K.service, [CX + s2 * 12.45, 0, 0]);
+    }
   }
   // nervures du château, liston haut, trappes et grilles du toit
   for (const z of [-31, -2.6]) add(refS.band({ z, width: 0.45, depth: 0.12, a0: SA0 + 0.05, a1: SA1 - 0.05, segS: 160 }), K.service);
@@ -849,6 +938,7 @@ function atalanteExterior(ctx, E) {
   for (const [x, z, w, d] of [[-6, -26, 3.0, 2.2], [6, -26, 3.0, 2.2], [0, -12, 4.0, 3.0]]) add(bevelBox(w, 0.12, d, 0.04), K.hullDark, [CX + x, 14.64, z]);
 
   // ---------------------------------------------------------------- mât de détection (sur le toit du château)
+  aoId = 'mast';
   const ctSt = [
     { x: CX, z: -39.4, y: 14.85, w: 4.0, tw: 3.0, h: 0.35, hb: 0.6, c: 0.25, r: 0.12, steps: 3 },
     { x: CX, z: -36.6, y: 15.9, w: 5.2, tw: 4.2, h: 1.5, hb: 1.6, c: 0.45, r: 0.18, steps: 1 },
@@ -869,6 +959,7 @@ function atalanteExterior(ctx, E) {
   partsM(lightPod({ r: 0.14 }), new THREE.Matrix4().makeTranslation(CX, 17.38 + 6.5, -29), { mech: K.mech, lens: strobe });
 
   // ================================================================ quille ventrale
+  aoId = 'keel';
   const keelSt = [
     { x: CX, z: -53, y: -2.3, w: 2.4, tw: 3.0, h: 0.4, hb: 0.6, c: 0.2, r: 0.1, steps: 4 },
     { x: CX, z: -47, y: -3.0, w: 7.6, tw: 8.6, h: 0.8, hb: 1.5, c: 0.6, r: 0.2, steps: 1 },
@@ -881,6 +972,7 @@ function atalanteExterior(ctx, E) {
   for (const [z0, z1] of [[-36, -26], [-18, -8], [18, 28]]) add(keel.raised({ z0, z1, angle: -PI / 2, height: 5.6, depth: 0.06, segZ: 2, segS: 3 }), K.service);   // trappes de soute ventrale
 
   // ================================================================ blindage, nervures, liston, panneaux
+  aoId = 'spn';
   // bulbes blindés (sponsons) du bas des flancs : peau ouverte côté coque, plaques de blindage en relief ;
   // interrompus à bâbord au droit du tube d'abordage
   const SPN = (s, z, k) => ({ x: CX + s * 16.4, z, y: 0.9, w: 2.0 * k + 0.05, tw: 2.8 * k + 0.05, h: 2.7 * (0.35 + 0.65 * k), hb: 2.9 * (0.35 + 0.65 * k), c: 0.9 * k + 0.05, r: 0.25 });
@@ -907,16 +999,18 @@ function atalanteExterior(ctx, E) {
       parts(ventPanel(1.4, 0.9, 0.1), [CX + s * 17.13, 6.0, z1 - 1.4], [0, 0, -s * PI / 2]);
     }
   }
+  aoId = 'hull';
   // couples (nervures transversales) : interrompus sous le château
   for (const z of [-38, -31, -14, 0, 17, 36.5, 54]) {
     const under = z > -42.2 && z < -1.85;
     add(refM.band({ z, width: 0.5, depth: 0.12, a0: under ? PI - TOPA + 0.03 : -PI / 2 + 0.001, a1: under ? TAU + TOPA - 0.03 : 1.5 * PI - 0.001, segS: 240 }), K.service);
   }
-  for (const z of [-67, -56.5, -50.5]) add(bowRef.band({ z, width: 0.45, depth: 0.12, segS: 200 }), K.service);
+  for (const z of [-67, -56.5, -50.5, -45.4]) add(bowRef.band({ z, width: 0.45, depth: 0.12, segS: 200 }), K.service);
   for (const z of [57.6]) add(aftRef.band({ z, width: 0.45, depth: 0.12, segS: 200 }), K.service);
   add(aftRef.band({ z: 67.1, width: 0.7, depth: 0.14, segS: 200 }), K.bare);   // bouclier thermique arrière
 
   // ---------------------------------------------------------------- pont arrière : cellules de lancement, dorsale, radiateurs
+  aoId = 'spine';
   for (let i = 0; i < 5; i++) for (const s of [-1, 1]) {
     add(bevelBox(1.5, 0.14, 1.5, 0.04), K.hullDark, [CX + s * 0.95, 9.86, 7.6 + i * 1.85]);
     add(bevelBox(1.2, 0.05, 0.12, 0.01), K.hazard, [CX + s * 0.95, 9.95, 7.0 + i * 1.85]);
@@ -935,23 +1029,43 @@ function atalanteExterior(ctx, E) {
   for (const s of [-1, 1]) for (const z of [26.5, 37.5, 48.5]) parts(radiator({ len: 9.6, h: 1.6, n: 14, w: 4.2 }), [CX + s * 6.6, 9.8, z]);
   parts(antenna({ type: 'dish', h: 2.2, r: 2.4, tilt: 0.9 }), [CX, 11.8, 54.5]);
   // ailerons radiateurs déployés (en V, depuis l'arête du pont)
+  // ailerons agrandis (5,2 → 8 m : élément de silhouette « hard SF » le plus lisible), vérins de déploiement
+  aoId = 'fin';
   for (const s of [-1, 1]) {
-    const ang = s * 0.42, h = 5.2, x0 = CX + s * 15.2, y0 = 9.75;
+    const ang = s * 0.42, h = 8.0, x0 = CX + s * 15.2, y0 = 9.75;
     const cx = x0 + s * Math.sin(0.42) * h / 2, cy = y0 + Math.cos(0.42) * h / 2;
-    add(bevelBox(0.22, h, 19, 0.06), M.fin, [cx, cy, 38], [0, 0, -ang]);
+    add(bevelBox(0.24, h, 19, 0.06), M.fin, [cx, cy, 38], [0, 0, -ang]);
     for (let z = 29.5; z <= 46.6; z += 1.9) add(bevelBox(0.34, h - 0.3, 0.12, 0.03), K.mech, [cx, cy, z], [0, 0, -ang]);
     add(bevelBox(0.5, 0.36, 19.4, 0.08), K.service, [x0 + s * Math.sin(0.42) * (h - 0.1), y0 + Math.cos(0.42) * (h - 0.1), 38], [0, 0, -ang]);
     add(rodBetween(V(x0, y0 + 0.2, 28.2), V(x0, y0 + 0.2, 47.8), 0.28, 12), K.mech);
     for (const z of [29.2, 38, 46.8]) add(bevelBox(1.1, 0.7, 0.9, 0.08), K.service, [x0 - s * 0.3, y0 + 0.3, z]);
+    // vérins : du pont (côté intérieur) vers le tiers de l'aileron ; fût sombre, tige chromée, chapes
+    for (const z of [31.5, 44.5]) {
+      const A = V(x0 - s * 3.2, y0 + 0.15, z), Bp = V(x0 + s * Math.sin(0.42) * h * 0.42, y0 + Math.cos(0.42) * h * 0.42, z);
+      add(rodBetween(A, A.clone().lerp(Bp, 0.6), 0.16, 10), K.mech);
+      add(rodBetween(A.clone().lerp(Bp, 0.55), Bp, 0.09, 8), K.chrome);
+      add(bevelBox(0.6, 0.3, 0.6, 0.06), K.service, [A.x, A.y, A.z]);
+    }
   }
 
   // ================================================================ tuyères (trois principales, quatre verniers)
+  aoId = 'stern';
   parts(nozzle({ rt: 1.4, re: 3.6, len: 7.6, wall: 0.14, seg: 56, mount: 1.6, bands: 3 }), [CX, 4.4, 67.6]);
   for (const s of [-1, 1]) parts(nozzle({ rt: 1.0, re: 2.6, len: 5.8, wall: 0.11, seg: 44, mount: 1.2 }), [CX + s * 8.0, 3.0, 67.6]);
   for (const [x, y] of [[-9.4, 7.0], [9.4, 7.0], [-4.6, -0.1], [4.6, -0.1]]) parts(nozzle({ rt: 0.3, re: 0.75, len: 1.4, wall: 0.04, seg: 24, mount: 0.4, bands: 1, gimbal: false }), [CX + x, y, 67.55]);
   for (const [x, y, r] of [[0, 4.4, 2.15], [-8.0, 3.0, 1.55], [8.0, 3.0, 1.55]]) add(new THREE.TorusGeometry(r, 0.16, 8, 40), K.bare, [CX + x, y, 67.55]);
   for (const s of [-1, 1]) add(bevelBox(0.5, 8.0, 0.5, 0.08), K.mech, [CX + s * 4.9, 3.9, 67.6]);
   add(bevelBox(20, 0.5, 0.5, 0.08), K.mech, [CX, 8.05, 67.6]);
+  // poutres de poussée diagonales (bâti → carter central) et boîtiers de pompes / conduites autour du carter
+  for (const s of [-1, 1]) {
+    const A = V(CX + s * 4.9, 7.6, 67.9), Bp = V(CX + s * 1.5, 5.3, 68.6), dir = Bp.clone().sub(A), L = dir.length();
+    const q = new THREE.Quaternion().setFromUnitVectors(V(0, 1, 0), dir.normalize());
+    put(bevelBox(0.42, L, 0.42, 0.06), K.mech, new THREE.Matrix4().compose(A.clone().lerp(Bp, 0.5), q, V(1, 1, 1)));
+  }
+  for (const [dx, dy] of [[-2.3, 1.9], [2.3, 1.9], [-2.4, -1.6], [2.4, -1.6]]) {
+    add(bevelBox(0.9, 0.8, 1.3, 0.08), K.mech, [CX + dx, 4.4 + dy, 68.35]);
+    add(rodBetween(V(CX + dx * 0.9, 4.4 + dy * 0.9, 68.9), V(CX + dx * 0.55, 4.4 + dy * 0.55, 69.2), 0.09, 8), K.bare);
+  }
   // conduites d'ergols : du bouclier arrière vers les carters de pompe
   for (const [x, y, r] of [[0, 4.4, 1.4], [-8, 3.0, 1.0], [8, 3.0, 1.0]]) {
     for (const a of [0.6, 2.5, 4.4]) {
@@ -962,6 +1076,7 @@ function atalanteExterior(ctx, E) {
   }
 
   // ================================================================ amarrage : collier du tube, pinces, bras, ombilicaux
+  aoId = 'dock';
   {
     const zt = SHIPLOCK.z;
     // collier : linteau, seuil et jambages entre la peau et la cloison intérieure (le tube et la porte restent libres)
@@ -982,12 +1097,14 @@ function atalanteExterior(ctx, E) {
     for (const dz of [-4.7, 4.7]) partsM(dockingClamp({ size: 0.9 }), new THREE.Matrix4().makeTranslation(64.4, 1.4, zt + dz).multiply(rz));
     for (const dz of [-3.3, 3.3]) partsM(lightPod({ r: 0.12 }), new THREE.Matrix4().makeTranslation(64.2, 5.5, zt + dz).multiply(rz), { mech: K.mech, lens: navGreen });
     // bras de maintien (station → frégate) : poutre, vérin, patin sur la coque
+    // patin d'appui posé à plat sur le flanc vertical (y 6,3 → 8,5, sous le chanfrein) avec semelle caoutchouc
     for (const z of [-22, 2, 50]) {
-      add(bevelBox(27.8, 1.2, 1.4, 0.12), K.mech, [50.3, 8.8, z]);
+      add(bevelBox(27.0, 1.2, 1.4, 0.12), K.mech, [49.9, 8.8, z]);
       add(bevelBox(2.6, 1.8, 1.9, 0.16), K.service, [38.0, 8.8, z]);
       add(rodBetween(V(40, 7.9, z + 0.9), V(62.5, 8.3, z + 0.9), 0.14, 10), K.chrome);
-      add(bevelBox(0.9, 2.6, 2.6, 0.12), K.hazard, [64.4, 8.8, z]);
-      add(bevelBox(0.5, 3.4, 3.4, 0.1), K.service, [65.05, 8.6, z], [0, 0, 0.18]);
+      add(bevelBox(0.9, 2.4, 2.6, 0.12), K.hazard, [63.85, 8.2, z]);
+      add(bevelBox(0.42, 2.2, 3.2, 0.08), K.service, [64.6, 7.4, z]);
+      add(bevelBox(0.09, 2.1, 3.1, 0.02), K.rubber, [64.86, 7.4, z]);
     }
     for (const z of [-30, 12]) {
       add(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([V(37.2, 12.5, z), V(48, 9.2, z + 1.2), V(58, 8.9, z + 2.2), V(64.4, 7.4, z + 2.6)]), 40, 0.24, 8), K.rubber);
@@ -996,6 +1113,7 @@ function atalanteExterior(ctx, E) {
   }
 
   // ================================================================ tourelles de défense rapprochée
+  aoId = 'turret';
   const turret = (mtx) => {
     const L = [];
     L.push({ geo: new THREE.CylinderGeometry(1.25, 1.45, 0.42, 28).translate(0, 0.21, 0), role: 'service' });
@@ -1017,6 +1135,7 @@ function atalanteExterior(ctx, E) {
   for (const z of [-30, 34]) turret(new THREE.Matrix4().compose(V(CX, -4.5, z), new THREE.Quaternion().setFromEuler(new THREE.Euler(PI, z > 0 ? 0 : PI, 0)), V(1, 1, 1)));
 
   // ================================================================ RCS, feux, nez
+  aoId = 'hull';
   for (const s of [-1, 1]) {
     for (const [z, hull] of [[-47.5, bowRef], [58.5, aftRef]]) {
       const fore = z < 0 ? '-z' : '+z';
@@ -1044,6 +1163,40 @@ function atalanteExterior(ctx, E) {
     for (const z of [25.2, 29.7, 34.2]) add(bevelBox(0.4, 0.5, 1.0, 0.06), K.mech, [CX + 17.2, 7.85, z]);
   }
 
+  // ================================================================ panneaux de ton voisin (damier irrégulier, A-2)
+  for (const s of [-1, 1]) {
+    for (const [z0, z1, k] of [[6.5, 15, 0], [16, 27.5, 1], [29, 40.5, 0], [43.5, 53, 1]]) if ((k + (s > 0 ? 1 : 0)) % 2 === 0) add(refM.raised({ z0, z1, angle: PI / 2, shift: -s * 11.6, height: 4.4, depth: 0.025, segZ: 3, segS: 3 }), hullB);
+    for (const [z0, z1] of s > 0 ? [[-19.5, -11], [-36, -28]] : [[-8, -3.4], [-27, -19.5]]) add(refS.raised({ z0, z1, angle: PI / 2, shift: -s * 11.5, height: 2.6, depth: 0.025, segZ: 2, segS: 2 }), hullB);
+  }
+  add(bowRef.raised({ z0: -58, z1: -52.5, angle: PI / 2, height: 7, depth: 0.025, segZ: 4, segS: 4 }), hullB);
+
+  // ================================================================ repères d'échelle (A-4) : trappes EVA, mains courantes
+  const eva = [];
+  {
+    const hatch = (hull, zc, ang, n) => {
+      const z0 = zc - 0.5, z1 = zc + 0.5;
+      add(hull.patch({ z0: z0 - 0.07, z1: z1 + 0.07, angle: ang, height: 1.94, off: 0.008, segZ: 2, segS: 3 }), K.black);   // joint
+      add(hull.raised({ z0, z1, angle: ang, height: 1.8, depth: 0.05, segZ: 2, segS: 3 }), K.service);
+      partsM([{ geo: bevelBox(0.08, 0.06, 0.32, 0.015), role: 'hazard' }], onHull(hull, zc + 0.3, ang, 0.55, 0.07));
+      // main courante : deux pieds et une barre, le long de z, au-dessus de la trappe (le long du contour)
+      const a = hull.point(z0 - 0.35, ang, 1.25), b = hull.point(z1 + 0.35, ang, 1.25);
+      const ta = a.p.clone().addScaledVector(a.n, 0.16), tb = b.p.clone().addScaledVector(b.n, 0.16);
+      add(rodBetween(a.p, ta, 0.025, 6), K.hazard); add(rodBetween(b.p, tb, 0.025, 6), K.hazard); add(rodBetween(ta, tb, 0.025, 6), K.hazard);
+      eva.push({ hull, z: z1 + 0.25, ang, n });
+    };
+    hatch(refM, -18, aM(-1, 4.6), 1); hatch(refM, 10, aM(-1, 4.6), 2);
+    hatch(refM, 20, aM(1, 4.6), 3); hatch(refM, -42, aM(1, 4.6), 4);
+    hatch(refS, -12, aS(-1, 12.2), 5);
+    for (const s of [-1, 1]) hatch(refM, 24, Math.atan2(6.2, s * 11), s > 0 ? 6 : 7);
+    hatch(bowRef, -52, PI / 2, 8);
+    // mains courantes de la dorsale (pieds tous les 1,2 m), en jaune sécurité
+    for (const s of [-1, 1]) {
+      const x = CX + s * 1.35, y = 11.8;
+      for (let z = 23; z <= 51.2; z += 1.2) add(rodBetween(V(x, y, z), V(x, y + 0.34, z), 0.022, 6), K.hazard);
+      add(rodBetween(V(x, y + 0.34, 23), V(x, y + 0.34, 51.2), 0.025, 6), K.hazard);
+    }
+  }
+
   // ================================================================ livrée (atlas unique)
   const Lv = new LiveryAtlas({ ppm: 30, accent: '#8f2f20', wear: 0.5, seed: 4471 });
   const ink = '#25282b';
@@ -1056,6 +1209,13 @@ function atalanteExterior(ctx, E) {
   const rDock = Lv.region(8, 0.5, (d) => { d.rect(0, 0, 8, 0.5, ink); d.text('SAS 3 · ARRIMAGE ÉQUIPAGE', 4, 0.07, 0.34, { color: '#e7c23a', align: 'center', spacing: 0.1 }); });
   const rThr = Lv.region(9, 0.62, (d) => { d.chevrons(0, 0, 9, 0.16, { pitch: 0.14 }); d.rect(0, 0.18, 9, 0.44, ink); d.text('DANGER · SOUFFLE DES TUYÈRES', 4.5, 0.24, 0.32, { color: '#e7c23a', align: 'center', spacing: 0.08 }); });
   const rRcs = Lv.region(1.6, 0.42, (d) => { d.rect(0, 0, 1.6, 0.42, ink); d.text('RCS', 0.8, 0.07, 0.3, { color: '#e7c23a', align: 'center' }); });
+  // petits marquages (sans usure : texte < 0,25 m) : trappes EVA, numéros de couple
+  const rEva = eva.map((e) => Lv.region(1.5, 0.34, (d) => { d.chevrons(0, 0, 0.34, 0.34, { pitch: 0.1 }); d.rect(0.38, 0, 1.12, 0.34, ink); d.text(`SAS EVA ${e.n}`, 0.94, 0.07, 0.2, { color: '#e7c23a', align: 'center', fit: 1.05 }); }));
+  const frames = [-38, -31, -14, 0, 17, 36.5, 54];
+  const rFrame = frames.map((z) => Lv.region(1.0, 0.26, (d) => d.text(`COUPLE ${String(Math.round(z + 80)).padStart(3, '0')}`, 0.5, 0.04, 0.17, { color: '#2c2f32', align: 'center', weight: 600, fit: 0.95 })));
+  const rStep = Lv.region(2.2, 0.3, (d) => d.text('NE PAS MARCHER', 1.1, 0.05, 0.2, { color: '#7a2a20', align: 'center', fit: 2.1 }));
+  // suie (A-6) : taches radiales autour des tuyères et des RCS
+  const rSoot = Lv.sootRegion(4, 4, { radial: true, alpha: 0.85 });
   Lv.build();
   const LM = Lv.material();
   const decal = (g) => add(g, LM);
@@ -1066,12 +1226,22 @@ function atalanteExterior(ctx, E) {
     decal(refM.patch({ z0: nz0, z1: nz1, ...R(4.95, 7.45), uv: rName.uv, readable: true, segZ: 6, segS: 2, off: 0.02 }));
     decal(refM.patch({ z0: nz0, z1: nz1, ...R(4.35, 4.85), uv: rNavy.uv, readable: true, segZ: 6, segS: 2, off: 0.02 }));
     decal(refS.patch({ z0: -41.2, z1: -31.8, ...RS(10.45, 11.95), uv: rReg.uv, readable: true, segZ: 6, segS: 2, off: 0.09 }));
-    decal(bowRef.patch({ z0: -64.8, z1: -59.4, angle: s > 0 ? 0 : PI, shift: s * 1.1, height: 4.2, uv: rNum.uv, readable: true, segZ: 10, segS: 6, off: 0.02 }));
+    decal(bowRef.patch({ z0: -64.4, z1: -60.3, angle: s > 0 ? 0 : PI, shift: s * -0.1, height: 3.2, uv: rNum.uv, readable: true, segZ: 10, segS: 6, off: 0.02 }));
     decal(refM.patch({ z0: -45.6, z1: 56.4, ...R(7.8, 8.4), uv: rStripe.uv, readable: true, segZ: 40, segS: 2, off: 0.02 }));
     decal(aftRef.patch({ z0: 58.4, z1: 66.6, angle: s > 0 ? 0 : PI, shift: s * -1.6, height: 0.62, uv: rThr.uv, readable: true, segZ: 10, segS: 2, off: 0.02 }));
     for (const [z, h] of [[-47.5, bowRef], [58.5, aftRef]]) decal(h.patch({ z0: z - 0.8, z1: z + 0.8, angle: s > 0 ? 0 : PI, shift: s * 3.5, height: 0.42, uv: rRcs.uv, readable: true, segZ: 2, segS: 2, off: 0.02 }));
   }
   decal(bowRef.patch({ z0: -49.9, z1: -45.9, angle: PI / 2, height: 4.2, uv: rNum.uv, readable: true, up: [0, 0, -1], segZ: 6, segS: 6, off: 0.02 }));
+  eva.forEach((e, i) => decal(e.hull.patch({ z0: e.z, z1: e.z + 1.5, angle: e.ang, shift: 0.55, height: 0.34, uv: rEva[i].uv, readable: true, segZ: 2, segS: 1, off: 0.02 })));
+  for (const s of [-1, 1]) {
+    frames.forEach((z, i) => decal(refM.patch({ z0: z + 0.4, z1: z + 1.4, ...(s > 0 ? { a0: aM(1, 8.55), a1: aM(1, 8.81) } : { a0: aM(-1, 8.81), a1: aM(-1, 8.55) }), uv: rFrame[i].uv, readable: true, segZ: 2, segS: 1, off: 0.02 })));
+    // « NE PAS MARCHER » sur les ailerons radiateurs (face intérieure, près de l'emplanture)
+    const g = planeDecal(2.2, 0.3, rStep.uv); g.rotateY(-s * PI / 2); g.rotateZ(-s * 0.42);
+    add(g, LM, [CX + s * (15.2 + Math.sin(0.42) * 1.2) - s * 0.135, 9.75 + Math.cos(0.42) * 1.2, 38]);
+    for (const [z, h] of [[-47.5, bowRef], [58.5, aftRef]]) for (const a of s > 0 ? [0.33, -0.33] : [PI - 0.33, PI + 0.33]) decal(h.patch({ z0: z - 0.95, z1: z + 0.95, angle: a, height: 1.9, uv: rSoot.uv, segZ: 3, segS: 3, off: 0.015 }));
+  }
+  // bouclier arrière : suie autour de chaque tuyère (décalcomanies planes sur le culot, z 67,5)
+  for (const [x, y, w] of [[0, 4.4, 7.2], [-8, 3.0, 5.4], [8, 3.0, 5.4], [-9.4, 7.0, 2.2], [9.4, 7.0, 2.2], [-4.6, -0.1, 2.2], [4.6, -0.1, 2.2]]) add(planeDecal(w, w, rSoot.uv), LM, [CX + x, y, 67.53]);
   // marquage du sas : chevrons autour du collier, plaque d'identification
   {
     const zt = SHIPLOCK.z;
@@ -1080,11 +1250,31 @@ function atalanteExterior(ctx, E) {
   }
 
   // ------------------------------------------------ fusion finale
+  // occlusion ambiante précalculée (A-1) : boîtes d'occultation des volumes principaux, dégradé de hauteur et
+  // variation de ton lente (taches de 20-40 m) dans les couleurs de sommet des matériaux de la frégate
+  const occ = [
+    { id: 'castle', min: [CX - 15.9, 8.8, -45.2], max: [CX + 15.9, 14.6, 5.5], r: 6, k: 0.8 },
+    { id: 'mast', min: [CX - 5.2, 14.6, -39.4], max: [CX + 5.2, 17.4, -21.2], r: 3.5, k: 0.6 },
+    { id: 'keel', min: [CX - 8.6, -4.5, -53], max: [CX + 8.6, -2.2, 52], r: 3, k: 0.6 },
+    { id: 'spine', min: [CX - 4.2, 9.8, 19], max: [CX + 4.2, 11.8, 57.5], r: 3, k: 0.6 },
+    { id: 'spine', min: [CX - 8.7, 9.8, 21.7], max: [CX - 4.5, 11.6, 53.3], r: 2, k: 0.5 },
+    { id: 'spine', min: [CX + 4.5, 9.8, 21.7], max: [CX + 8.7, 11.6, 53.3], r: 2, k: 0.5 },
+    { id: 'fin', min: [CX - 18.5, 9.75, 28.5], max: [CX - 15.2, 17.1, 47.5], r: 3, k: 0.5 },
+    { id: 'fin', min: [CX + 15.2, 9.75, 28.5], max: [CX + 18.5, 17.1, 47.5], r: 3, k: 0.5 },
+    { id: 'stern', min: [CX - 11, -1.2, 67.5], max: [CX + 11, 8.3, 70], r: 3, k: 0.6 },
+    { id: 'dock', min: [63, -1.8, -14], max: [65.8, 5.6, -4], r: 2.5, k: 0.6 },
+    ...[-22, 2, 50].map((z) => ({ id: 'dock', min: [36, 6.3, z - 1.6], max: [64.9, 9.4, z + 1.6], r: 2, k: 0.5 })),
+    ...[[1, -40, 50]].concat([[-1, -40, -21], [-1, -2, 50]]).map(([s, a, b]) => ({ id: 'spn', min: [CX + s * 16.4 - 2.8, -1.9, a], max: [CX + s * 16.4 + 2.8, 3.6, b], r: 2.5, k: 0.55 })),
+  ];
+  const tone = (x, y, z) => 1 + 0.035 * Math.sin(z * 0.11 + Math.sin(x * 0.07) * 2.1) + 0.025 * Math.sin(z * 0.043 - y * 0.2 + 1.3);
+  const t0 = performance.now();
+  for (const [m, list] of bag) if (m.vertexColors) for (const g of list) bakeOcclusion(g, occ, { y0: -4.5, y1: 12, floor: 0.7, strength: 0.7, min: 0.4, tone });
+  const aoMs = Math.round(performance.now() - t0);
   for (const [m, list] of bag) E.add(list.length > 1 ? mergeGeometries(list, false) : list[0], m, new THREE.Matrix4(), { cast: false, receive: true });
   // feux à éclats (stroboscopes blancs)
   let clock = 0;
   ctx.updaters.push((dt) => { clock += dt; const k = clock % 1.7; strobe.color.setScalar(k < 0.07 || (k > 0.24 && k < 0.3) ? 14 : 0.15); });
-  return { engines: NZ, tris: Math.round(tris) };
+  return { engines: NZ, tris: Math.round(tris), aoMs };
 }
 
 // ------------------------------------------------------------------ équipage de l'Atalante

@@ -81,7 +81,11 @@ export class Renderer {
 
   render(dt) {
     if (this.beforeRender) this.beforeRender(dt);
-    if (this.composer) this.composer.render(dt);
-    else this.three.render(this.scene, this.camera);
+    // masquage de visibilité le temps d'une image (voir ZoneCull) : appliqué puis rétabli autour du rendu
+    const undo = this.cull ? this.cull() : null;
+    try {
+      if (this.composer) this.composer.render(dt);
+      else this.three.render(this.scene, this.camera);
+    } finally { if (undo) undo(); }
   }
 }

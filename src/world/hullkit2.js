@@ -23,10 +23,25 @@ import { FONT, canvas as mkCanvas, erode, seed as seedRand } from './signage.js'
 //  kitMaterials(mats, o)     → palette réaliste (coque peinte blanc cassé, composite sombre, métal nu…)
 //  détails : bevelBox, rcsBlock, antenna, radiator, lightPod, dockingClamp, landingStrut, ventPanel, wingPanel
 //  addParts(add, parts, matSet, pos, rot) → pose une liste de pièces avec un jeu de matériaux
+//  sootDecal(hull, region, o)  → trace de suie conforme (région dessinée par LiveryAtlas.soot / sootRegion)
+//  bakeOcclusion(geo, boxes, o) → occlusion ambiante analytique (boîtes d'occultation) en couleurs de sommet
+//  setKitDetail(k)           → finesse globale des tuyères / jambes de train (0,7 en qualité basse)
+//
+// Ombres : les petits détails (reliefs, bandes, nervures, décalcomanies, petites boîtes, tiges fines, pièces
+// de moins de ~1 m posées par addParts) sont marqués `geo.userData.castShadow = false` ; Builder.add n'en fait
+// pas projeter l'ombre (sauf opts.cast explicite). La peau principale et les grosses pièces projettent toujours.
 // =====================================================================================================
 
 const TAU = Math.PI * 2;
 const V3 = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
+
+/** finesse globale des pièces tournées (tuyères, train) : 1 = nominal ; main.js passe 0,7 en qualité basse */
+let DETAIL = 1;
+export function setKitDetail(k) { DETAIL = Math.max(0.4, Math.min(1.5, k)); }
+const segOf = (n, min = 8) => Math.max(min, Math.round(n * DETAIL));
+
+/** marque une géométrie de détail : pas d'ombre portée (Builder.add respecte geo.userData.castShadow) */
+export function noShadow(g) { g.userData.castShadow = false; return g; }
 
 // ----------------------------------------------------------------------------------------- sections
 
@@ -207,7 +222,16 @@ const cr = (p0, p1, p2, p3, t) => 0.5 * ((2 * p1) + (-p0 + p2) * t + (2 * p0 - 5
  *  bias (0.45)      : répartition des sommets : 0 = longueur pure, 1 = courbure pure (angles plus fins)
  *  crease (0)       : angle (rad) au-delà duquel les normales sont cassées (arêtes biseautées nettes) ;
  *                     0 = normales entièrement lisses
- *  texSize (1)      : mètres par unité d'UV (u = périmètre depuis le milieu du ventre, v = longueur)
+ *  texSize (1)      : mètres par unité d'UV (u = périmètre, v = longueur)
+ *  uvAnchor (π/2)   : angle polaire où u = 0 (π/2 = arête dorsale) : les joints longitudinaux de la texture
+ *                     restent symétriques et parallèles au dos, même sur un nez qui s'effile (avant : mesuré
+ *                     depuis le ventre → joints en diagonale). null = ancien comportement (u depuis le ventre).
+ *  uvFit (0.35)     : 0 = u purement métrique ; 1 = u proportionnel au périmètre (les joints suivent l'effilement
+ *                     du nez comme des fuseaux) ; entre les deux, compromis (densité de texture peu déformée).
+ *                     Sans effet sur un tronçon prismatique.
+ *  uvMode ('arc')   : 'planar' → UV projetées par facette selon l'axe dominant de la normale (z/y sur les flancs,
+ *                     z/x dessus-dessous, x/y en bout) : bordés droits et horizontaux sur une proue facettée
+ *                     (à utiliser avec `crease`) ; 'arc' = UV le long du contour (défaut).
  *  arc [a0, a1]     : ne génère qu'une portion de la section (angles polaires, CCW, ex. [-0.3, π+0.3] = dessus)
  *  cap0, cap1       : bouchons plats aux extrémités (true, ou { hole: [x0, y0, x1, y1] } en coordonnées locales)
  */
@@ -215,6 +239,7 @@ export function skinHull(stations, opts = {}) {
   const S = stations.map(normStation);
   const radial = opts.radial ?? 40, bias = opts.bias ?? 0.45, tex = opts.texSize ?? 1;
   const smooth = opts.smooth ?? true;
+  const uvA = opts.uvAnchor === undefined ? Math.PI / 2 : opts.uvAnchor, uvFit = opts.uvFit ?? 0.35;
   // paramètres interpolés à une position z quelconque
   const at = (z) => {
     let i = 0;
@@ -239,8 +264,10 @@ export function skinHull(stations, opts = {}) {
   };
   // anneaux
   const zs = [];
+  const same = (a, b) => KEYS.every((k) => Math.abs(a[k] - b[k]) < 1e-6) && a.poly === b.poly;
   for (let i = 0; i < S.length - 1; i++) {
-    const st = stations[i].steps ?? opts.steps ?? 6;
+    // tronçon prismatique (deux stations identiques) sans pas imposé : la section ne varie pas, un seul pas suffit
+    const st = stations[i].steps ?? opts.steps ?? (same(S[i], S[i + 1]) ? 1 : 6);
     for (let k = 0; k < st; k++) zs.push(S[i].z + (S[i + 1].z - S[i].z) * (k / st));
   }
   zs.push(S[S.length - 1].z);
@@ -279,13 +306,18 @@ export function skinHull(stations, opts = {}) {
   const pos = [], uv = [], idx = [];
   let vacc = 0, prevC = null;
   const ringsP = [];
+  // périmètre de référence (plus grande station) pour uvFit
+  let Lref = 0;
+  if (uvA !== null && uvFit > 0) for (const st of S) Lref = Math.max(Lref, infoAt(st.z).Lt);
+  const uMap = uvMapper(uvA, uvFit, Lref);
   for (let j = 0; j < zs.length; j++) {
     const z = zs[j], r = ringPts(z), inf = infoAt(z);
     const c = [inf.cx, inf.cy, z];
     if (prevC) vacc += Math.hypot(c[0] - prevC[0], c[1] - prevC[1], c[2] - prevC[2]);
     prevC = c;
     ringsP.push(r);
-    for (const [x, y, s] of r) { pos.push(x, y, z); uv.push(s / tex, vacc / tex); }
+    const um = uMap(inf, r.length ? (r[0][2] + r[r.length - 1][2]) / 2 : 0, !opts.arc);
+    for (const [x, y, s] of r) { pos.push(x, y, z); uv.push(um(s) / tex, vacc / tex); }
   }
   const cols = radial + 1;
   for (let j = 0; j < zs.length - 1; j++) {
@@ -310,7 +342,8 @@ export function skinHull(stations, opts = {}) {
     }
   }
   if (opts.crease) g = creased(g, opts.crease);
-  const hull = { geometry: g, zs, rings: ringsP, at, info: infoAt, texSize: tex, cap0: null, cap1: null };
+  if (opts.uvMode === 'planar') g = planarUV(g, tex);
+  const hull = { geometry: g, zs, rings: ringsP, at, info: infoAt, texSize: tex, cap0: null, cap1: null, uMap };
   // bouchons
   const cap = (z, spec, front) => {
     const inf = infoAt(z);
@@ -364,7 +397,7 @@ export function skinHull(stations, opts = {}) {
     const segZ = o.segZ ?? Math.max(2, Math.ceil(Math.abs(o.z1 - o.z0) / 0.5));
     const segS = o.segS ?? Math.max(2, Math.ceil((o.height ?? 2) / 0.35));
     const off = o.off ?? 0.012;
-    const P = [], N = [], UV = [];
+    const P = [], N = [], UV = [], SV = [];
     const [u0, v0, u1, v1] = o.uv ?? [0, 0, 1, 1];
     const sRange = (z) => {
       const inf = infoAt(z);
@@ -387,8 +420,10 @@ export function skinHull(stations, opts = {}) {
     for (let j = 0; j <= segZ; j++) {
       const z = o.z0 + (o.z1 - o.z0) * j / segZ;
       const [s0, s1] = sRange(z);
+      const um = o.metric ? uMap(infoAt(z), (s0 + s1) / 2, false) : null;
       for (let i = 0; i <= segS; i++) {
         const s = s0 + (s1 - s0) * i / segS, q = surf(z, s);
+        if (um) SV.push(um(s));
         P.push(q.p.x + q.n.x * off, q.p.y + q.n.y * off, q.p.z + q.n.z * off);
         N.push(q.n.x, q.n.y, q.n.z);
         const tu = fu ? 1 - j / segZ : j / segZ, tv = fv ? 1 - i / segS : i / segS;
@@ -405,7 +440,9 @@ export function skinHull(stations, opts = {}) {
     pg.setAttribute('normal', new THREE.Float32BufferAttribute(N, 3));
     pg.setAttribute('uv', new THREE.Float32BufferAttribute(UV, 2));
     pg.setIndex(idx2);
-    if (o.metric) metricPatchUV(pg, segZ, segS, tex);
+    if (o.metric) metricPatchUV(pg, segZ, segS, tex, uvA !== null ? SV : null);
+    // pièce rapportée (décalcomanie, panneau, verrière posés au-dessus de la peau) : pas d'ombre portée
+    if (off > 0.004 || o.shadow === false) pg.userData.castShadow = false;
     return pg;
   };
   /**
@@ -450,7 +487,10 @@ export function skinHull(stations, opts = {}) {
     wg.computeVertexNormals();
     fixOutward(wg, top);
     const t2 = top.toNonIndexed();
-    return mergeGeometries([t2, wg], false);
+    const out = mergeGeometries([t2, wg], false);
+    // relief de quelques centimètres : son ombre est invisible, on ne la calcule pas (o.shadow: true pour forcer)
+    if (o.shadow !== true) out.userData.castShadow = false;
+    return out;
   };
   /** nervure / cadre transversal à z (largeur le long de Z = width), entre les angles a0 et a1 */
   hull.band = (o) => hull.raised({ z0: o.z - o.width / 2, z1: o.z + o.width / 2, a0: o.a0 ?? -Math.PI / 2 + 0.001, a1: o.a1 ?? 3 * Math.PI / 2 - 0.001, depth: o.depth ?? 0.06, segZ: 1, segS: o.segS ?? radial, base: o.base });
@@ -459,8 +499,25 @@ export function skinHull(stations, opts = {}) {
   return hull;
 }
 
-/** UV métriques d'une grille de patch (u le long de Z, v le long du contour) */
-function metricPatchUV(g, segZ, segS, tex) {
+/**
+ * Abscisse de texture u le long du contour, ancrée à l'angle polaire `anchor` (u = 0 sur l'ancre) et
+ * éventuellement proportionnelle au périmètre (fit). Renvoie (inf, sMid, closed) → (s → u) ; sMid sert à
+ * choisir le tour (±Lt) pour qu'un arc ne soit jamais coupé par un saut d'UV.
+ */
+function uvMapper(anchor, fit, Lref) {
+  return (inf, sMid, closed) => {
+    if (anchor === null) return (s) => s;
+    const sA = arcOfAngle(inf, anchor), Lt = inf.Lt;
+    const k = fit > 0 && Lref > 0 ? Math.pow(Lref / Lt, fit) : 1;
+    // contour complet : la couture reste au milieu du ventre (u continu de -sA à Lt - sA)
+    let shift = 0;
+    if (!closed) { const d = sMid - sA; shift = -Math.round(d / Lt) * Lt; }
+    return (s) => (s - sA + shift) * k;
+  };
+}
+
+/** UV métriques d'une grille de patch (u le long de Z, v le long du contour ; sv : abscisses ancrées) */
+function metricPatchUV(g, segZ, segS, tex, sv = null) {
   const p = g.attributes.position, uv = g.attributes.uv, cs = segS + 1;
   const a = V3(), b = V3();
   for (let j = 0; j <= segZ; j++) {
@@ -468,7 +525,7 @@ function metricPatchUV(g, segZ, segS, tex) {
     for (let i = 0; i <= segS; i++) {
       const k = j * cs + i;
       if (i > 0) { a.fromBufferAttribute(p, k - 1); b.fromBufferAttribute(p, k); s += a.distanceTo(b); }
-      uv.setXY(k, p.getZ(k) / tex, s / tex);
+      uv.setXY(k, p.getZ(k) / tex, (sv ? sv[k] : s) / tex);
     }
   }
 }
@@ -499,6 +556,25 @@ function fixOutward(g, ref) {
   g.computeVertexNormals();
 }
 
+/** UV planaires par triangle (axe dominant de la normale de face) : géométrie non indexée */
+function planarUV(g, tex = 1) {
+  if (g.index) g = g.toNonIndexed();
+  const p = g.attributes.position, uv = g.attributes.uv, A = V3(), B = V3(), C = V3(), n = V3();
+  for (let i = 0; i < p.count; i += 3) {
+    A.fromBufferAttribute(p, i); B.fromBufferAttribute(p, i + 1); C.fromBufferAttribute(p, i + 2);
+    n.crossVectors(B.clone().sub(A), C.clone().sub(A));
+    const ax = Math.abs(n.x), ay = Math.abs(n.y), az = Math.abs(n.z);
+    for (let k = 0; k < 3; k++) {
+      const x = p.getX(i + k), y = p.getY(i + k), z = p.getZ(i + k);
+      if (ax >= ay && ax >= az) uv.setXY(i + k, z / tex, y / tex);
+      else if (ay >= az) uv.setXY(i + k, x / tex, z / tex);
+      else uv.setXY(i + k, x / tex, y / tex);
+    }
+  }
+  uv.needsUpdate = true;
+  return g;
+}
+
 /** normales cassées au-delà d'un angle (garde les UV) */
 function creased(g, angle) {
   const r = toCreasedNormals(g, angle);
@@ -509,35 +585,113 @@ function creased(g, angle) {
 
 /**
  * Palette réaliste d'un vaisseau (matériaux mis en cache par Materials : appeler plusieurs fois est gratuit).
- * o : { hull (blanc cassé 0xc4c2b8), dark (composite 0x34383b), accent (0xd86a1c), wear (1), uv (1) }
+ * o : { hull (blanc cassé 0xc4c2b8), dark (composite 0x34383b), accent (0xd86a1c), service, bare, wear (1), uv (1) }
+ * Options ajoutées (toutes facultatives, défauts compatibles) :
+ *  floor (null)     : salissure « pied de mur » (y monde < 1,1 m). null = réglages historiques par rôle
+ *                     (0,5 coque…) ; 0 pour un vaisseau qui n'est jamais posé (frégate dans l'espace).
+ *  albedoMax (0.71) : plafond de la composante sRGB la plus forte des peintures claires (hull, accent) : les
+ *                     blancs cassés ne saturent plus sous les rampes du hangar (0xc8c5bb → 0xb5b2a9). 1 = aucun.
+ *  rough (0.45)     : rugosité minimale des peintures (hull, hullDark, accent, service) : pas de reflet brûlé.
+ *  top (0.35)       : crasse supplémentaire sur les surfaces horizontales tournées vers le haut (dépôts).
+ *  scale (null)     : échelle de la crasse procédurale (addWear.scale, 0,33 par défaut ; 0,06 → taches de
+ *                     15-20 m pour un grand vaisseau).
+ *  grime (1)        : multiplicateur de crasse des peintures.
+ *  vertexColors     : matériaux distincts qui lisent la couleur de sommet (occlusion précalculée, bakeOcclusion).
+ *  key ('')         : suffixe de cache (palette propre à un vaisseau).
  * Rôles : hull, hullDark, service, accent, bare (métal nu), mech (mécanique sombre), chrome, black,
- *         frame (cadres de verrière), glass, rubber, vent, hazard (jaune), lens
+ *         frame (cadres de verrière), glass (verrière opaque), glassClear (vitrage voyant : intérieur modélisé),
+ *         rubber, vent, hazard (jaune), lensWhite
  */
 export function kitMaterials(mats, o = {}) {
-  const wear = o.wear ?? 1, uv = o.uv ?? 1;
+  const wear = o.wear ?? 1, uv = o.uv ?? 1, F = o.floor ?? null, gm = o.grime ?? 1;
+  const vc = !!o.vertexColors, key = (o.key ?? '') + (vc ? '|vc' : '');
+  const fl = (d) => (F === null ? d : F);
+  const amax = o.albedoMax ?? 0.71, rmin = o.rough ?? 0.45, top = o.top ?? 0.35;
+  const ext = { k: key || undefined, scale: o.scale ?? undefined, r: rmin, t: top };
+  const paint = (c, opts, light = false) => finishPaint(mats.paint(light ? capAlbedo(c, amax) : c, { ...opts, ...ext }), { vc, rough: rmin, top, scale: o.scale });
+  const smooth = (c, r, m, w) => finishPaint(mats.smooth(c, r, m, { ...w, k: key || undefined }), { vc });
   return {
-    hull: mats.paint(o.hull ?? 0xc4c2b8, { kind: 'hull', uv, grime: 0.75 * wear, scratch: 0.7 * wear, rust: 0.04 * wear, floor: 0.5, ns: 0.8 }),
-    hullDark: mats.paint(o.dark ?? 0x34383b, { kind: 'wide', uv, grime: 0.8 * wear, scratch: 0.8 * wear, rust: 0.02, floor: 0.6, ns: 0.8 }),
-    service: mats.paint(o.service ?? 0x5d6266, { kind: 'service', uv, grime: 0.9 * wear, scratch: 0.8 * wear, rust: 0.08 * wear, floor: 0.6 }),
-    accent: mats.paint(o.accent ?? 0xd86a1c, { kind: 'hull', uv, grime: 0.8 * wear, scratch: 0.9 * wear, rust: 0.03, floor: 0.5 }),
-    bare: mats.smooth(o.bare ?? 0x8a8c8d, 0.42, 1.0, { grime: 0.7 * wear, scratch: 1.0, rust: 0.05, floor: 0.3 }),
-    mech: mats.smooth(0x2e3134, 0.6, 0.85, { grime: 0.8, scratch: 0.6, rust: 0.05, floor: 0.4 }),
-    chrome: mats.smooth(0xcfd3d5, 0.16, 1.0, { grime: 0.3, floor: 0.2, rust: 0 }),
-    black: mats.smooth(0x111315, 0.7, 0.3, { grime: 0.4, rust: 0, floor: 0.2 }),
-    frame: mats.smooth(0x23262a, 0.5, 0.7, { grime: 0.6, rust: 0, floor: 0.2 }),
+    hull: paint(o.hull ?? 0xc4c2b8, { kind: 'hull', uv, grime: 0.75 * wear * gm, scratch: 0.7 * wear, rust: 0.04 * wear, floor: fl(0.5), ns: 0.8 }, true),
+    hullDark: paint(o.dark ?? 0x34383b, { kind: 'wide', uv, grime: 0.8 * wear * gm, scratch: 0.8 * wear, rust: 0.02, floor: fl(0.6), ns: 0.8 }),
+    service: paint(o.service ?? 0x5d6266, { kind: 'service', uv, grime: 0.9 * wear * gm, scratch: 0.8 * wear, rust: 0.08 * wear, floor: fl(0.6) }),
+    accent: paint(o.accent ?? 0xd86a1c, { kind: 'hull', uv, grime: 0.8 * wear * gm, scratch: 0.9 * wear, rust: 0.03, floor: fl(0.5) }, true),
+    bare: smooth(o.bare ?? 0x8a8c8d, 0.42, 1.0, { grime: 0.7 * wear, scratch: 1.0, rust: 0.05, floor: fl(0.3) }),
+    mech: smooth(0x2e3134, 0.6, 0.85, { grime: 0.8, scratch: 0.6, rust: 0.05, floor: fl(0.4) }),
+    chrome: smooth(0xcfd3d5, 0.16, 1.0, { grime: 0.3, floor: fl(0.2), rust: 0 }),
+    black: smooth(0x111315, 0.7, 0.3, { grime: 0.4, rust: 0, floor: fl(0.2) }),
+    frame: smooth(0x23262a, 0.5, 0.7, { grime: 0.6, rust: 0, floor: fl(0.2) }),
     glass: canopyGlass(mats),
-    rubber: mats.rubber(),
-    vent: mats.vent(),
-    hazard: mats.paint(0xc9961c, { plain: true, rough: 0.6 }),
+    glassClear: canopyGlass(mats, { clear: true }),
+    rubber: vc ? vcClone(mats, 'rubber', () => mats.rubber()) : mats.rubber(),
+    vent: vc ? vcClone(mats, 'vent', () => mats.vent()) : mats.vent(),
+    hazard: finishPaint(mats.paint(0xc9961c, { plain: true, rough: 0.6, k: key || undefined }), { vc }),
     lensWhite: mats.emissive(0xfff4e0, 5),
   };
 }
 
-function canopyGlass(mats) {
-  const key = 'kit_canopy';
+/** plafonne la composante sRGB la plus forte d'une couleur (hex) à `max` (0..1), teinte conservée */
+export function capAlbedo(hex, max = 0.71) {
+  const r = (hex >> 16) & 255, g = (hex >> 8) & 255, b = hex & 255, m = Math.max(r, g, b) / 255;
+  if (m <= max) return hex;
+  const k = max / m, q = (v) => Math.round(v * k);
+  return (q(r) << 16) | (q(g) << 8) | q(b);
+}
+
+/**
+ * Réglages complémentaires d'une peinture de Materials (une fois par matériau mis en cache) :
+ * rugosité minimale, crasse des dessus, échelle de crasse, couleurs de sommet. Les uniformes d'usure
+ * (addWear) sont conservés ; le shader est complété à la compilation.
+ */
+function finishPaint(m, o = {}) {
+  if (m.userData.kitDone) return m;
+  m.userData.kitDone = true;
+  if (o.vc) m.vertexColors = true;
+  if (o.scale && m.userData.wear) m.userData.wear.uWear.value.w = o.scale;
+  const rough = o.rough ?? 0, top = o.top ?? 0;
+  if (!rough && !top) return m;
+  const prev = m.onBeforeCompile;
+  m.onBeforeCompile = (sh, r) => {
+    prev?.call(m, sh, r);
+    sh.fragmentShader = sh.fragmentShader.replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+      {
+        float up_ = smoothstep(0.6, 0.95, normalize(vWNrm).y);
+        diffuseColor.rgb *= 1.0 - ${top.toFixed(3)} * up_ * (0.35 + 0.65 * gr_.r);
+        roughnessFactor = max(roughnessFactor, ${rough.toFixed(3)} + 0.15 * up_ * ${top.toFixed(3)});
+      }`);
+  };
+  const ck = `wear_kit${rough.toFixed(2)}_${top.toFixed(2)}`;
+  m.customProgramCacheKey = () => ck;
+  m.needsUpdate = true;
+  return m;
+}
+
+/** clone « couleurs de sommet » d'un matériau de base de Materials (caoutchouc, grille), usure comprise */
+function vcClone(mats, name, make) {
+  const key = 'kit_vc_' + name;
   if (mats.cache[key]) return mats.cache[key];
-  // verre fumé épais : quasi opaque (pas de tri de transparence), réflexions de l'environnement
-  const m = new THREE.MeshStandardMaterial({ color: 0x2a3640, roughness: 0.14, metalness: 0.9, envMapIntensity: 1.1, emissive: 0x0b1416, emissiveIntensity: 1 });
+  const base = make(), m = base.clone();
+  m.vertexColors = true;
+  if (base.userData.wear) { const w = base.userData.wear; mats.addWear(m, { grime: w.uWear.value.x, floor: w.uWear.value.y, scratch: w.uWear.value.z, scale: w.uWear.value.w, paint: w.uWear2.value.x, floorH: w.uWear2.value.y, rust: w.uWear2.value.z }); }
+  return (mats.cache[key] = m);
+}
+
+/**
+ * Verre de verrière unique (tous les vaisseaux) : diélectrique (Fresnel) avec vernis, au lieu d'un miroir
+ * métallique qui recopiait la charpente du hangar en taches « camouflage ». Opaque par défaut (pas de tri de
+ * transparence) ; { clear: true } : vitrage voyant (opacité 0,3) quand l'intérieur est modélisé.
+ */
+export function canopyGlass(mats, o = {}) {
+  const key = 'kit_canopy' + (o.clear ? '_clear' : '');
+  if (mats.cache[key]) return mats.cache[key];
+  const m = new THREE.MeshPhysicalMaterial({
+    color: 0x0e1418, metalness: 0, roughness: 0.06, clearcoat: 1, clearcoatRoughness: 0.04,
+    specularIntensity: 1, envMapIntensity: o.clear ? 1.4 : 0.8, ior: 1.5,
+    emissive: 0x060a0c, emissiveIntensity: 1,
+    // vitrage posé en patch à quelques millimètres de la peau : il gagne toujours le test de profondeur
+    // (le « camouflage » du pare-brise du Mulet venait en partie de ce conflit à off 0,004)
+    polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4,
+    ...(o.clear ? { transparent: true, opacity: 0.3, depthWrite: false } : {}),
+  });
   return (mats.cache[key] = m);
 }
 
@@ -557,7 +711,9 @@ function gradTex(stops, h = 128) {
 
 /**
  * Matériaux de tuyère (partagés par toutes les tuyères d'un vaisseau → un appel de rendu par rôle).
- * o : { glow (couleur du col, 0x8fb8ff), idle (0.25 : intensité au repos), key (suffixe de cache) }
+ * o : { glow (couleur du col, 0x8fb8ff), idle (0.25 : intensité au repos), key (suffixe de cache),
+ *       temper (1 : force des teintes de revenu — paille, bronze, bleu acier — désaturées ; 0 = acier gris),
+ *       rough (0.5 : rugosité de l'acier réfractaire ; l'ancien 0,38 sur métal pur sortait rose et lavande) }
  * Renvoie { outer, inner, lip, glow, mech, chrome, setThrust(k) } ; setThrust(0..1) règle la lueur.
  */
 export function nozzleMaterials(mats, o = {}) {
@@ -565,8 +721,11 @@ export function nozzleMaterials(mats, o = {}) {
   if (mats.cache[key]) return mats.cache[key];
   const glowCol = new THREE.Color(o.glow ?? 0x8fb8ff);
   // extérieur : acier réfractaire, teintes de revenu près du col (paille → bronze → bleu), suie à la lèvre
-  const outerMap = gradTex([[0, '#4e4d4b'], [0.12, '#67645e'], [0.22, '#857a62'], [0.32, '#77604e'], [0.42, '#5d5660'], [0.55, '#565c66'], [0.8, '#5d6064'], [1, '#33322f']]);
-  const outer = new THREE.MeshStandardMaterial({ color: 0xffffff, map: outerMap, metalness: 1, roughness: 0.38 });
+  // teintes de revenu désaturées (acier vu sous la lumière du hangar) : mélange vers le gris de même valeur
+  const tk = Math.max(0, Math.min(1.5, o.temper ?? 1));
+  const tint = (hex) => { const c = new THREE.Color(hex), l = (c.r + c.g + c.b) / 3; c.r = l + (c.r - l) * tk; c.g = l + (c.g - l) * tk; c.b = l + (c.b - l) * tk; return '#' + c.getHexString(); };
+  const outerMap = gradTex([[0, '#4e4d4b'], [0.12, '#64625e'], [0.22, tint('#7c7562')], [0.32, tint('#6a6052')], [0.42, tint('#545a63')], [0.55, '#585b60'], [0.8, '#5c5f62'], [1, '#33322f']]);
+  const outer = new THREE.MeshStandardMaterial({ color: 0xffffff, map: outerMap, metalness: 0.92, roughness: o.rough ?? 0.5 });
   mats.addWear(outer, { grime: 0.6, scratch: 0.6, floor: 0, rust: 0, paint: 0 });
   // intérieur : sombre, suie ; émissif croissant vers le col (dégradé)
   const innerEm = gradTex([[0, '#000000'], [0.55, '#05070a'], [0.85, '#2a3a55'], [1, '#ffffff']]);
@@ -599,31 +758,36 @@ export function nozzleMaterials(mats, o = {}) {
  * Renvoie une liste de pièces [{ geo, role }] (rôles : outer, inner, lip, glow, mech, chrome) — voir addParts.
  */
 export function nozzle(o = {}) {
-  const rt = o.rt ?? 0.45, re = o.re ?? 1.2, L = o.len ?? 1.8, wall = o.wall ?? 0.06, seg = o.seg ?? 40;
+  const rt = o.rt ?? 0.45, re = o.re ?? 1.2, L = o.len ?? 1.8, wall = o.wall ?? 0.06, seg = segOf(o.seg ?? 40, 12);
   const prof = (t) => rt + (re - rt) * (1 - Math.pow(1 - t, 1.9)) * (0.85 + 0.15 * t); // cloche parabolique
-  const N = 28;
+  // profil : anneaux répartis plus serrés près du col (courbure), anneaux raidisseurs en marches franches
+  // (4 points chacun) → ~40 % de triangles en moins qu'un échantillonnage uniforme fin, même silhouette
+  const N = o.rings ?? segOf(14, 8);
   const outerPts = [], innerPts = [];
-  const bands = o.bands ?? 2;
-  for (let i = 0; i <= N; i++) {
-    const t = i / N, y = t * L;
-    let r = prof(t) + wall + (1 - t) * wall * 1.5;
-    // anneaux raidisseurs : bosses étroites
-    for (let b = 1; b <= bands; b++) {
-      const tb = b / (bands + 1) * 0.8 + 0.05;
-      const d = Math.abs(t - tb) * N;
-      if (d < 0.75) r += wall * 0.9;
-    }
-    outerPts.push(new THREE.Vector2(r, y));
+  const bands = o.bands ?? 2, bw = 0.027;
+  const tbs = []; for (let b = 1; b <= bands; b++) tbs.push(b / (bands + 1) * 0.8 + 0.05);
+  const base = (t) => prof(t) + wall + (1 - t) * wall * 1.5;
+  const ts = new Set();
+  for (let i = 0; i <= N; i++) { const u = i / N; ts.add(+(u * u * 0.35 + u * 0.65).toFixed(5)); }
+  for (const tb of tbs) for (const t of [tb - bw, tb + bw]) ts.add(+t.toFixed(5));
+  const tl = [...ts].filter((t) => !tbs.some((tb) => t > tb - bw + 1e-4 && t < tb + bw - 1e-4)).sort((a, b) => a - b);
+  for (const t of tl) {
+    const hit = tbs.find((tb) => Math.abs(t - (tb - bw)) < 1e-4), out = tbs.find((tb) => Math.abs(t - (tb + bw)) < 1e-4);
+    if (hit !== undefined) { outerPts.push(new THREE.Vector2(base(t), t * L)); outerPts.push(new THREE.Vector2(base(t) + wall * 0.9, t * L + 0.001)); }
+    else if (out !== undefined) { outerPts.push(new THREE.Vector2(base(t) + wall * 0.9, t * L - 0.001)); outerPts.push(new THREE.Vector2(base(t), t * L)); }
+    else outerPts.push(new THREE.Vector2(base(t), t * L));
   }
-  for (let i = N; i >= 0; i--) { const t = i / N; innerPts.push(new THREE.Vector2(prof(t), t * L)); }
+  for (let i = N; i >= 0; i--) { const u = i / N, t = u * u * 0.35 + u * 0.65; innerPts.push(new THREE.Vector2(prof(t), t * L)); }
   const parts = [];
   const rot = (g) => { g.rotateX(Math.PI / 2); return g; }; // axe Y → +Z
-  parts.push({ geo: rot(new THREE.LatheGeometry(outerPts, seg)), role: 'outer' });
-  parts.push({ geo: rot(new THREE.LatheGeometry(innerPts, seg)), role: 'inner' });
+  // v = position le long de l'axe (dégradés de revenu et de lueur indépendants de la répartition des anneaux)
+  const vAxis = (g, flip) => { const p = g.attributes.position, uv = g.attributes.uv; for (let i = 0; i < p.count; i++) { const v = p.getY(i) / L; uv.setY(i, flip ? 1 - v : v); } return g; };
+  parts.push({ geo: rot(vAxis(new THREE.LatheGeometry(outerPts, seg), false)), role: 'outer' });
+  parts.push({ geo: rot(vAxis(new THREE.LatheGeometry(innerPts, seg), true)), role: 'inner' });
   // lèvre : demi-tore entre extérieur et intérieur à la sortie
   {
-    const ro = outerPts[N].x, ri = innerPts[0].x, rm = (ro + ri) / 2, rr = (ro - ri) / 2, lip = [];
-    for (let k = 0; k <= 8; k++) { const a = (k / 8) * Math.PI; lip.push(new THREE.Vector2(rm + Math.cos(a) * rr, L + Math.sin(a) * rr * 0.9)); }
+    const ro = outerPts[outerPts.length - 1].x, ri = innerPts[0].x, rm = (ro + ri) / 2, rr = (ro - ri) / 2, lip = [];
+    for (let k = 0; k <= 5; k++) { const a = (k / 5) * Math.PI; lip.push(new THREE.Vector2(rm + Math.cos(a) * rr, L + Math.sin(a) * rr * 0.9)); }
     parts.push({ geo: rot(new THREE.LatheGeometry(lip, seg)), role: 'lip' });
   }
   // col : disque lumineux (injecteurs) légèrement en retrait + cône central
@@ -640,10 +804,10 @@ export function nozzle(o = {}) {
   if (mount > 0) {
     const pts = [new THREE.Vector2(0.001, -mount), new THREE.Vector2(rt * 1.25, -mount), new THREE.Vector2(rt * 1.32, -mount * 0.6),
       new THREE.Vector2(rt * 1.25, -mount * 0.2), new THREE.Vector2(rt * 1.1, 0.02)];
-    parts.push({ geo: rot(new THREE.LatheGeometry(pts, 24)), role: 'mech' });
+    parts.push({ geo: rot(new THREE.LatheGeometry(pts, segOf(24, 10))), role: 'mech' });
   }
   if (o.gimbal !== false) {
-    const ring = new THREE.TorusGeometry(rt * 1.42, rt * 0.09, 8, 32);
+    const ring = new THREE.TorusGeometry(rt * 1.42, rt * 0.09, 6, segOf(28, 12));
     ring.translate(0, 0, -mount * 0.35);
     parts.push({ geo: ring, role: 'mech' });
     // vérins d'orientation : du cadre (en avant) vers le premier anneau de la cloche
@@ -669,14 +833,19 @@ export function rodBetween(A, B, r, seg = 8, r2 = r) {
   g.translate(0, L / 2, 0);
   const q = new THREE.Quaternion().setFromUnitVectors(V3(0, 1, 0), d.normalize());
   g.applyQuaternion(q); g.translate(A.x, A.y, A.z);
+  if (Math.max(r, r2) < 0.12) g.userData.castShadow = false;   // tige fine : pas d'ombre portée
   return g;
 }
 
 /**
- * Pose une liste de pièces. add(geo, mat, pos, rot) : typiquement (g, m, p, r) => S.add(g, m, p, r)
+ * Pose une liste de pièces. add(geo, mat, pos, rot, opts) : typiquement (g, m, p, r, o) => S.add(g, m, p, r, o)
  * matSet : { role: material } ; une pièce sans matériau dans matSet est ignorée.
  * Les pièces d'un même rôle sont fusionnées avant l'ajout (moins de géométries temporaires).
+ * Ombres : sans opts.cast explicite, un lot de moins de opts.shadowMin (1,8 m de diagonale) ou de rôle
+ * lumineux (glow, inner, lens…) ne projette pas d'ombre (RCS, feux, antennes, grilles, tiges) ; les grosses
+ * pièces (cloches de tuyère, jambes de train) en projettent toujours.
  */
+const NO_SHADOW_ROLES = new Set(['glow', 'inner', 'lens', 'lensWhite', 'glass', 'glassClear', 'vent']);
 export function addParts(add, parts, matSet, pos = [0, 0, 0], rot = null, opts = {}) {
   const byRole = new Map();
   for (const p of parts) {
@@ -687,7 +856,16 @@ export function addParts(add, parts, matSet, pos = [0, 0, 0], rot = null, opts =
     if (!g.attributes.normal) g.computeVertexNormals();
     (byRole.get(p.role) || byRole.set(p.role, []).get(p.role)).push(g);
   }
-  for (const [role, geos] of byRole) add(geos.length > 1 ? mergeGeometries(geos, false) : geos[0], matSet[role], pos, rot, opts);
+  const lim = opts.shadowMin ?? 1.8;
+  for (const [role, geos] of byRole) {
+    const g = geos.length > 1 ? mergeGeometries(geos, false) : geos[0];
+    let o = opts;
+    if (opts.cast === undefined) {
+      if (!g.boundingBox) g.computeBoundingBox();
+      if (NO_SHADOW_ROLES.has(role) || g.boundingBox.max.distanceTo(g.boundingBox.min) < lim) o = { ...opts, cast: false };
+    }
+    add(g, matSet[role], pos, rot, o);
+  }
 }
 
 // ------------------------------------------------------------------------------------ détails
@@ -702,6 +880,8 @@ export function bevelBox(w, h, d, b = 0.04, tex = 1) {
   const g = new THREE.ExtrudeGeometry(shape, { depth: d - 2 * b, bevelEnabled: true, bevelThickness: b, bevelSize: 0, bevelSegments: 1, curveSegments: 1 });
   g.translate(0, 0, -(d - 2 * b) / 2);
   const ng = g.index ? g.toNonIndexed() : g; ng.computeVertexNormals();
+  // petite boîte (< 1,2 m de diagonale) : détail, pas d'ombre portée
+  if (Math.hypot(w, h, d) < 1.2) ng.userData.castShadow = false;
   return projUV(ng, tex);
 }
 
@@ -835,12 +1015,13 @@ export function landingStrut(o = {}) {
   // patin : plaque biseautée + semelle caoutchouc + rotule
   parts.push({ geo: tr(bevelBox(pad, 0.16, pad * 1.2, 0.05), 0, 0.12, 0), role: 'service' });
   parts.push({ geo: tr(bevelBox(pad * 1.04, 0.05, pad * 1.24, 0.015), 0, 0.025, 0), role: 'rubber' });
-  parts.push({ geo: tr(new THREE.SphereGeometry(r * 0.9, 12, 8), 0, 0.32, 0), role: 'mech' });
+  const sg = segOf(16, 10);
+  parts.push({ geo: tr(new THREE.SphereGeometry(r * 0.9, segOf(12, 8), 8), 0, 0.32, 0), role: 'mech' });
   // jambe : tige chromée (bas) + fourreau (haut)
-  parts.push({ geo: tr(new THREE.CylinderGeometry(r * 0.62, r * 0.62, h * 0.5, 16), 0, 0.3 + h * 0.25, 0), role: 'chrome' });
-  parts.push({ geo: tr(new THREE.CylinderGeometry(r, r * 1.05, h * 0.62, 16), 0, h * 0.65, 0), role: 'mech' });
-  parts.push({ geo: tr(new THREE.CylinderGeometry(r * 1.15, r * 1.15, 0.1, 16), 0, h * 0.36, 0), role: 'mech' });
-  parts.push({ geo: tr(new THREE.CylinderGeometry(r * 1.12, r * 1.12, 0.08, 16), 0, h * 0.7, 0), role: 'hazard' });
+  parts.push({ geo: tr(new THREE.CylinderGeometry(r * 0.62, r * 0.62, h * 0.5, sg), 0, 0.3 + h * 0.25, 0), role: 'chrome' });
+  parts.push({ geo: tr(new THREE.CylinderGeometry(r, r * 1.05, h * 0.62, sg), 0, h * 0.65, 0), role: 'mech' });
+  parts.push({ geo: tr(new THREE.CylinderGeometry(r * 1.15, r * 1.15, 0.1, sg), 0, h * 0.36, 0), role: 'mech' });
+  parts.push({ geo: tr(new THREE.CylinderGeometry(r * 1.12, r * 1.12, 0.08, sg), 0, h * 0.7, 0), role: 'hazard' });
   // carter supérieur (dans la coque)
   parts.push({ geo: tr(bevelBox(r * 3.4, h * 0.25, r * 3.4, 0.04), 0, h - h * 0.12, 0), role: 'service' });
   // contrefiche oblique + compas
@@ -918,6 +1099,12 @@ export function wingPanel(o = {}) {
  * Primitives de dessin (coordonnées en mètres, origine en BAS à gauche de la région) :
  *   d.rect(x, y, w, h, color) · d.stripe(y, h, color) · d.text(str, x, y, size, { color, align, weight, spacing, fit })
  *   d.chevrons(x, y, w, h, { a, b, pitch, dir }) · d.wear(amount) · d.ctx / d.px (accès canvas brut)
+ *   d.soot(cx, cy, r, { dir, len, spread, alpha, color }) : suie (dégradé radial, ou panache orienté si len > 0)
+ *
+ * Usure automatique (érosion à la construction) : réglable par région avec region(w, h, draw, { wear }).
+ * Une région qui contient un texte plus petit que `smallText` (0,25 m, option du constructeur) n'est pas érodée
+ * (marquages réglementaires lisibles : « SIÈGE ÉJECTABLE », « RCS »…) ; { wear: x } impose la valeur.
+ *   sootRegion(w, h, o) : région prête à l'emploi contenant une trace de suie (à poser avec sootDecal).
  */
 export class LiveryAtlas {
   constructor(o = {}) {
@@ -931,15 +1118,19 @@ export class LiveryAtlas {
     this.rowH = 0;
     this._mat = null;
     this.seed = o.seed ?? 4242;
+    this.smallText = o.smallText ?? 0.25;
   }
 
-  /** réserve une région wm × hm mètres ; draw(d) est appelé lors de la construction de la texture */
-  region(wm, hm, draw) {
+  /**
+   * Réserve une région wm × hm mètres ; draw(d) est appelé lors de la construction de la texture.
+   * opts (facultatif) : { wear } — usure de cette région (0 = aucune), à la place de l'usure globale.
+   */
+  region(wm, hm, draw, opts = {}) {
     let pw = Math.ceil(wm * this.ppm), ph = Math.ceil(hm * this.ppm);
     let scale = 1;
     if (pw > this.W - 4) { scale = (this.W - 4) / pw; pw = this.W - 4; ph = Math.ceil(ph * scale); }
     if (this.x + pw + 2 > this.W) { this.x = 0; this.y += this.rowH + 2; this.rowH = 0; }
-    const r = { x: this.x + 1, y: this.y + 1, pw, ph, wm, hm, scale, draw, uv: null };
+    const r = { x: this.x + 1, y: this.y + 1, pw, ph, wm, hm, scale, draw, uv: null, wear: opts.wear, minText: Infinity };
     this.x += pw + 2; this.rowH = Math.max(this.rowH, ph);
     this.regions.push(r);
     return r;
@@ -961,6 +1152,7 @@ export class LiveryAtlas {
         rect: (x, y, w, h, color) => { sx.fillStyle = color; sx.fillRect(x * k, Y(y + h), w * k, h * k); },
         stripe: (y, h, color) => { sx.fillStyle = color; sx.fillRect(0, Y(y + h), r.pw, h * k); },
         text: (str, x, y, size, o = {}) => {
+          r.minText = Math.min(r.minText, size);
           sx.font = `${o.weight ?? 700} ${Math.round(size * k)}px ${FONT}`;
           sx.fillStyle = o.color ?? '#1d1f21';
           sx.textBaseline = 'bottom';
@@ -992,9 +1184,11 @@ export class LiveryAtlas {
           sx.restore();
         },
         wear: (a) => erode(sx, r.pw, r.ph, a),
+        soot: (cx, cy, rad, o = {}) => drawSoot(sx, cx * k, Y(cy), rad * k, { ...o, len: (o.len ?? 0) * k }),
       };
       r.draw(d);
-      if (this.wearAmount > 0) erode(sx, r.pw, r.ph, this.wearAmount * Math.min(1.5, (r.pw * r.ph) / 60000 + 0.2));
+      const wa = r.wear ?? (r.minText < this.smallText ? 0 : this.wearAmount);
+      if (wa > 0) erode(sx, r.pw, r.ph, wa * Math.min(1.5, (r.pw * r.ph) / 60000 + 0.2));
       ctx.drawImage(sc, r.x, r.y);
     }
     const t = new THREE.CanvasTexture(c);
@@ -1015,11 +1209,115 @@ export class LiveryAtlas {
     return this._mat;
   }
 
+  /**
+   * Région de suie (sans usure) : traînée en éventail dans le sens +X de la région (souffle d'une tuyère ou
+   * d'un RCS vers la droite de la région), ou tache radiale si o.radial. o : { alpha (0.8), color, spread (0.55) }
+   * À poser avec sootDecal(hull, région, { z0, z1, angle, shift }) : z croissant = sens du souffle.
+   */
+  sootRegion(wm, hm, o = {}) {
+    return this.region(wm, hm, (d) => {
+      if (o.radial) d.soot(wm / 2, hm / 2, Math.min(wm, hm) / 2, { alpha: o.alpha ?? 0.8, color: o.color });
+      else d.soot(hm * 0.35, hm / 2, hm * 0.5, { dir: 0, len: wm - hm * 0.45, spread: o.spread ?? 0.55, alpha: o.alpha ?? 0.8, color: o.color });
+    }, { wear: 0 });
+  }
+
   /** uv d'une région (disponibles avant build : calculées à la volée) */
   uvOf(r) {
     const H = Math.max(64, THREE.MathUtils.ceilPowerOfTwo(this.y + this.rowH + 2));
     return [r.x / this.W, 1 - (r.y + r.ph) / H, (r.x + r.pw) / this.W, 1 - r.y / H];
   }
+}
+
+/**
+ * Suie au pinceau (canvas) : tache radiale douce et mouchetée, ou panache orienté (dir en radians, len en px)
+ * qui s'évase de `spread` (rapport largeur / longueur) en s'éloignant de la source.
+ */
+function drawSoot(c, x, y, r, o = {}) {
+  const a = o.alpha ?? 0.8, col = o.color ?? '20,18,16', len = o.len ?? 0;
+  c.save();
+  c.translate(x, y);
+  c.rotate(-(o.dir ?? 0));   // canvas : y vers le bas
+  const blob = (bx, by, br, ba, sy = 1) => {
+    c.save(); c.translate(bx, by); c.scale(1, sy);
+    const g = c.createRadialGradient(0, 0, 0, 0, 0, br);
+    g.addColorStop(0, `rgba(${col},${ba})`); g.addColorStop(0.45, `rgba(${col},${ba * 0.55})`); g.addColorStop(1, `rgba(${col},0)`);
+    c.fillStyle = g; c.fillRect(-br, -br, br * 2, br * 2); c.restore();
+  };
+  if (len > 0) {
+    // panache : chapelet de taches qui s'élargissent et pâlissent
+    const n = Math.max(6, Math.round(len / (r * 0.35)));
+    for (let i = 0; i <= n; i++) { const t = i / n; blob(t * len, 0, r * (0.55 + t * (o.spread ?? 0.55) * len / r * 0.9), a * (1 - t * 0.85) * 0.55, 0.85); }
+  }
+  blob(0, 0, r, a);
+  // mouchetures et stries (dépôt irrégulier)
+  c.globalCompositeOperation = 'destination-out';
+  let sd = Math.floor(Math.abs(x * 7 + y * 13)) + 11;
+  const rnd = () => ((sd = (sd * 16807) % 2147483647) / 2147483647);
+  for (let i = 0; i < 90; i++) {
+    const t = rnd(), ang = (rnd() - 0.5) * Math.PI * 2, rr = r * (0.3 + rnd() * 0.8);
+    const px = len > 0 ? t * len : Math.cos(ang) * rr, py = len > 0 ? (rnd() - 0.5) * r * (1 + t * 2) : Math.sin(ang) * rr;
+    c.fillStyle = `rgba(0,0,0,${0.15 + rnd() * 0.35})`;
+    c.fillRect(px, py, 1 + rnd() * r * 0.08, 1 + rnd() * r * 0.04);
+  }
+  c.restore();
+}
+
+/**
+ * Trace de suie conforme à une coque (région d'atlas de LiveryAtlas.sootRegion ou dessinée avec d.soot).
+ * o : { z0, z1, angle (rad), shift (m le long du contour), height (m, défaut : hauteur de la région),
+ *       off (0.008), flip (true : souffle vers -Z) }. Renvoie la géométrie (à poser avec le matériau de l'atlas).
+ */
+export function sootDecal(hull, region, o = {}) {
+  const uv = region.uv ?? [0, 0, 1, 1];
+  const g = hull.patch({ z0: o.z0, z1: o.z1, angle: o.angle ?? 0, shift: o.shift ?? 0, height: o.height ?? region.hm,
+    off: o.off ?? 0.008, segZ: o.segZ ?? Math.max(2, Math.ceil(Math.abs(o.z1 - o.z0) / 0.6)), segS: o.segS ?? 3,
+    uv: o.flip ? [uv[2], uv[1], uv[0], uv[3]] : uv });
+  g.userData.castShadow = false;
+  return g;
+}
+
+/**
+ * Occlusion ambiante analytique, précalculée dans les couleurs de sommet (attribut `color`), sans lancer de
+ * rayons : chaque boîte d'occultation assombrit les sommets proches dont la normale la regarde, plus un dégradé
+ * de hauteur (ventre plus sombre). Coût : ~O(sommets × boîtes proches), quelques dizaines de ms pour 200 000
+ * sommets. Matériaux : `vertexColors: true` (kitMaterials({ vertexColors: true })).
+ * boxes : [{ min: [x,y,z], max: [x,y,z], r (portée, m), k (force, 0..1), id }] ; une géométrie dont
+ *         userData.aoId vaut `id` n'est pas occultée par cette boîte (pas d'auto-occlusion).
+ * o : { y0, y1 (dégradé de hauteur), floor (0.55 : valeur au bas du dégradé), strength (0.75), min (0.35),
+ *       tint ([r,g,b] multiplicateur final), tone ((x, y, z) → multiplicateur : variation de ton à grande échelle) }
+ */
+export function bakeOcclusion(geo, boxes, o = {}) {
+  const p = geo.attributes.position, n = geo.attributes.normal, cnt = p.count;
+  const col = new Float32Array(cnt * 3);
+  const y0 = o.y0 ?? 0, y1 = o.y1 ?? 10, fl = o.floor ?? 0.55, st = o.strength ?? 0.75, mn = o.min ?? 0.35;
+  const tint = o.tint ?? [1, 1, 1], self = geo.userData.aoId;
+  geo.computeBoundingBox();
+  const gb = geo.boundingBox;
+  const near = boxes.filter((b) => b.id === undefined || b.id !== self).filter((b) => {
+    const r = b.r ?? 3;
+    return !(gb.max.x < b.min[0] - r || gb.min.x > b.max[0] + r || gb.max.y < b.min[1] - r || gb.min.y > b.max[1] + r || gb.max.z < b.min[2] - r || gb.min.z > b.max[2] + r);
+  });
+  for (let i = 0; i < cnt; i++) {
+    const x = p.getX(i), y = p.getY(i), z = p.getZ(i), nx = n.getX(i), ny = n.getY(i), nz = n.getZ(i);
+    let occ = 0;
+    for (const b of near) {
+      const r = b.r ?? 3;
+      const qx = Math.max(b.min[0], Math.min(b.max[0], x)), qy = Math.max(b.min[1], Math.min(b.max[1], y)), qz = Math.max(b.min[2], Math.min(b.max[2], z));
+      const dx = qx - x, dy = qy - y, dz = qz - z, d = Math.hypot(dx, dy, dz);
+      if (d >= r) continue;
+      if (d < 0.02) { occ += (b.k ?? 0.6) * 0.5; continue; }   // sommet au contact de la boîte (raccord)
+      const facing = (nx * dx + ny * dy + nz * dz) / d;          // la normale regarde-t-elle l'occultant ?
+      if (facing <= -0.2) continue;
+      const f = 1 - d / r;
+      occ += (b.k ?? 0.6) * f * f * (0.35 + 0.65 * Math.max(0, facing + 0.2) / 1.2);
+    }
+    const h = Math.max(0, Math.min(1, (y - y0) / (y1 - y0)));
+    const hv = fl + (1 - fl) * h * h * (3 - 2 * h);
+    const v = Math.max(mn, (1 - st * Math.min(1, occ)) * hv) * (o.tone ? o.tone(x, y, z) : 1);
+    col[i * 3] = v * tint[0]; col[i * 3 + 1] = v * tint[1]; col[i * 3 + 2] = v * tint[2];
+  }
+  geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  return geo;
 }
 
 /**
@@ -1030,5 +1328,6 @@ export function planeDecal(w, h, uv) {
   const g = new THREE.PlaneGeometry(w, h);
   const a = g.attributes.uv, [u0, v0, u1, v1] = uv;
   for (let i = 0; i < a.count; i++) a.setXY(i, u0 + (u1 - u0) * a.getX(i), v0 + (v1 - v0) * a.getY(i));
+  g.userData.castShadow = false;
   return g;
 }

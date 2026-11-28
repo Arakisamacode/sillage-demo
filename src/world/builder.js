@@ -32,16 +32,23 @@ export class Builder {
     return new THREE.Matrix4().compose(_p.clone(), _q.clone(), _s.clone());
   }
 
-  /** Ajoute une géométrie (sera fusionnée). opts: {cast, receive, collide, parent:Matrix4} */
+  /**
+   * Ajoute une géométrie (sera fusionnée). opts: {cast, receive, collide, parent:Matrix4}
+   * Sans opts.cast, une géométrie marquée `userData.castShadow = false` (détails de hullkit2) ne projette pas d'ombre.
+   */
   add(geo, mat, matrix, opts = {}) {
+    const castDefault = geo.userData?.castShadow ?? true;
     let g = geo.index ? geo.toNonIndexed() : geo.clone();
-    for (const k of Object.keys(g.attributes)) if (!['position', 'normal', 'uv'].includes(k)) g.deleteAttribute(k);
+    // couleurs de sommet conservées seulement pour un matériau qui les lit (occlusion précalculée)
+    const keep = mat.vertexColors ? ['position', 'normal', 'uv', 'color'] : ['position', 'normal', 'uv'];
+    for (const k of Object.keys(g.attributes)) if (!keep.includes(k)) g.deleteAttribute(k);
     if (!g.attributes.uv) g.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(g.attributes.position.count * 2), 2));
     if (!g.attributes.normal) g.computeVertexNormals();
+    if (mat.vertexColors && !g.attributes.color) g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(g.attributes.position.count * 3).fill(1), 3));
     const M = opts.parent ? new THREE.Matrix4().multiplyMatrices(opts.parent, matrix) : matrix;
     g.applyMatrix4(M);
     g.morphAttributes = {};
-    const cast = opts.cast ?? true, receive = opts.receive ?? true;
+    const cast = opts.cast ?? castDefault, receive = opts.receive ?? true;
     g.computeBoundingSphere();
     const c = g.boundingSphere.center;
     const cs = this.cellSize || 40;

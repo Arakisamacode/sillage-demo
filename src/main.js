@@ -9,6 +9,7 @@ import { buildHangar } from './world/hangar.js';
 import { buildLighting } from './world/lighting.js';
 import { buildFX } from './world/fx.js';
 import { buildShips } from './world/ships.js';
+import { setKitDetail } from './world/hullkit2.js';
 import { buildProps } from './world/props.js';
 import { buildGallery } from './world/gallery.js';
 import { CharacterLibrary } from './characters/characters.js';
@@ -39,7 +40,7 @@ import { Scanner, nameFor } from './ui/scanner.js';
 import { peopleTree } from './game/chatter.js';
 import { buildBriefRoom, buildMerle } from './world/briefroom.js';
 import { buildNeon } from './world/neon.js';
-import { LightPool, LevelCull, ShadowScheduler, warmShaders, shrinkTextures } from './core/perf.js';
+import { LightPool, LevelCull, ZoneCull, ShadowScheduler, warmShaders, shrinkTextures } from './core/perf.js';
 import { Wingmen, PILOTS } from './game/wingmen.js';
 import { Briefing } from './ui/briefing.js';
 import { buildLuxury, populateLuxury } from './world/luxury.js';
@@ -98,6 +99,7 @@ async function boot() {
   await tick();
   const sky = new Sky(scene, quality);
   buildHangar(ctx);
+  setKitDetail(quality.name === 'low' ? 0.7 : 1);   // tuyères et trains des vaisseaux : moins de facettes sur téléphone
   ctx.ships = buildShips(ctx);
   buildProps(ctx);
   ctx.quai = buildQuai(ctx);
@@ -1320,6 +1322,9 @@ async function boot() {
   const lightPool = new LightPool(scene, quality);
   const levelCull = new LevelCull(staticMeshes.filter((m) => !m.userData.tag));
   ctx.lightPool = lightPool; ctx.levelCull = levelCull;
+  // hangar : galerie (hors du cône du sas ouest) et étages supérieurs non dessinés (masquage le temps d'une image)
+  const zoneCull = new ZoneCull(scene, { hx: HX_ });
+  ctx.zoneCull = zoneCull;
   ctx.updaters.push(() => {
     const free = flight.active && !ground.onFoot;
     levelCull.update(player.pos.y, free);
@@ -1340,6 +1345,7 @@ async function boot() {
     shrinkTextures(scene, { max: touch ? 512 : 1024, maxModel: touch ? 256 : 512, modelTextures, faceTextures, maxFace: touch ? 512 : 1024 });
   }
   if (params.get('warm') !== '0') await warmShaders(renderer.three, scene, camera, () => renderer.render(1 / 30));
+  renderer.cull = () => zoneCull.apply(camera.position);   // après le préchauffage (tout doit être compilé)
   ctx.shadows?.invalidate();   // le préchauffage a rendu les objets cachés dans les cartes d'ombre
   $('loading').classList.add('hidden');
   frame();
