@@ -144,18 +144,19 @@ export function buildScenes(ctx) {
     hose.set(reel, f.end);
   });
 
-  // ===== soudure : nacelle à ciseaux contre le flanc du Faucon
+  // ===== soudure : nacelle à ciseaux contre le flanc gauche du fuselage, devant le bord d'attaque
+  // (positions dérivées de la coque : zone de soudure, plateau, accès, hauteur de travail)
   const lift = makeScissorLift(mats);
-  const liftPos = fau.local(-3.3, 0, 2.3);
+  const liftPos = fau.service.weldLift.clone();
   lift.group.position.copy(liftPos);
   lift.group.rotation.y = PADS.p4.heading;
   scene.add(lift.group);
   ctx.builder.addObstacle(liftPos.x, liftPos.z, 0.75, 1.3, lift.group.rotation.y);
   const sparks = new Sparks(scene, quality);
   S.weld = {
-    lift, sparks, target: 0.55, liftPos,
-    board: fau.local(-3.3, 0, 4.0), onPlatform: () => fau.local(-2.78, 0, 2.3).setY(lift.h + 0.06),
-    torchPoint: fau.local(-1.85, 2.55, 2.3),
+    lift, sparks, target: 0.55, raised: fau.service.weldHeight, liftPos,
+    board: fau.service.weldBoard.clone(), onPlatform: () => fau.service.weldStand.clone().setY(lift.h + 0.06),
+    torchPoint: fau.service.weld.clone(),
     faceYaw: 0,
     welder: null, active: false,
   };

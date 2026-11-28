@@ -41,8 +41,8 @@ export function worldSpots(ctx, scenes) {
     ctx, scenes,
     airlockH: ga(-29.0, AIRLOCK.z), airlockG: ga(-44.6, AIRLOCK.z), airlockMid: ga(-37, AIRLOCK.z),
     habitat: ga(GALLERY.x0 + 1.2, -11), habitatIn: ga(GALLERY.x0 - 2.2, -11),
-    // navette : haut et bas de la passerelle (hauteurs réelles)
-    navTop: new THREE.Vector3(-17, 1.55, 11.75), navBottom: new THREE.Vector3(-17, 0, 9.0),
+    // navette : points dérivés de l'escalier (sas, palier, pied des marches, sol)
+    nav: ships.navette.door,
     coffee: { x: -29.9, z: 3.1, face: ga(-31.3, 3.8) },
     breakChat: [ga(-28.5, 3.6), ga(-28.6, 4.9), ga(-29.9, 5.6)],
     breakTable: ga(-29.8, 4.0),
@@ -101,9 +101,13 @@ function* goHome(a, W, until) {
 
 /** Voyageur qui débarque de la navette et rejoint la galerie (puis le module habitat). */
 function* travelerArriving(a, W) {
-  const top = W.navTop, bot = W.navBottom;
-  a.pos.copy(top); a.yaw = Math.PI;
-  yield move(bot.x, 0, bot.z, { speed: 0.7 });
+  const D = W.nav;
+  a.pos.copy(D.top); a.yaw = Math.atan2(D.stair.x - D.top.x, D.stair.z - D.top.z);
+  // palier, première marche, volée (centre des girons), sol
+  yield move(D.stair.x, D.stair.y, D.stair.z, { speed: 0.7 });
+  yield move(D.step1.x, D.step1.y, D.step1.z, { speed: 0.45 });
+  yield move(D.foot.x, D.foot.y, D.foot.z, { speed: 0.55 });
+  yield move(D.bottom.x, 0, D.bottom.z, { speed: 0.7 });
   yield goto(W.airlockH.x, W.airlockH.z);
   yield goto(W.airlockG.x, W.airlockG.z);
   const r = Math.random();
@@ -136,10 +140,13 @@ function* travelerDeparting(a, W) {
   }
   yield goto(W.airlockG.x, W.airlockG.z);
   yield goto(W.airlockH.x, W.airlockH.z);
-  yield goto(W.navBottom.x, W.navBottom.z - 0.6);
-  yield move(W.navBottom.x, 0, W.navBottom.z, { speed: 0.8 });
-  yield move(W.navTop.x, W.navTop.y, W.navTop.z, { speed: 0.6 });
-  yield move(W.navTop.x, W.navTop.y, W.navTop.z + 1.2, { speed: 0.8 });
+  const D = W.nav;
+  yield goto(D.bottom.x, D.bottom.z);
+  yield move(D.foot.x, D.foot.y, D.foot.z, { speed: 0.6 });
+  yield move(D.step1.x, D.step1.y, D.step1.z, { speed: 0.5 });
+  yield move(D.stair.x, D.stair.y, D.stair.z, { speed: 0.45 });
+  yield move(D.top.x, D.top.y, D.top.z, { speed: 0.7 });
+  yield move(D.deep.x, D.deep.y, D.deep.z, { speed: 0.7 });
 }
 
 /** Client de la galerie : boutiques, kiosque, bancs, vue. */
@@ -297,7 +304,7 @@ function* welder(a, W) {
     yield goto(S.board.x, S.board.z);
     const p = S.onPlatform();
     yield move(p.x, 0.6, p.z, { speed: 0.9 });
-    yield call((ag) => { ag.data.onLift = true; S.target = 1.55; });
+    yield call((ag) => { ag.data.onLift = true; S.target = S.raised ?? 1.55; });
     yield act('idle', 4.5, { face: S.faceYaw });
     yield call(() => { S.active = true; });
     yield act('torch', R(35, 55), { face: S.faceYaw, look: S.torchPoint });
@@ -323,13 +330,16 @@ function* welder(a, W) {
   }
 }
 
-/** Mécanicien au sol : trappe ouverte du Faucon, à genoux. */
+/** Mécanicien : debout sous la baie ouverte du Faucon, puis à genoux sur le panneau déposé au sol. */
 function* mechanic(a, W) {
-  const sp = W.ctx.ships.faucon.service.panel;
+  const F = W.ctx.ships.faucon.service, sp = F.panel, bay = F.bay, gp = F.panelGround, part = F.panelPart;
   a.pos.set(sp.x, 0, sp.z);
   for (;;) {
     yield goto(sp.x, sp.z);
-    yield act('repair', R(25, 40), { face: yawTo(sp, W.ctx.ships.faucon.origin.x, W.ctx.ships.faucon.origin.z) });
+    for (let i = 0; i < 4; i++) yield act('interact', R(3, 4.5), { face: yawTo(sp, bay.x, bay.z), look: bay });
+    yield act('idle', R(2, 4), { face: yawTo(sp, bay.x, bay.z), look: bay });
+    yield goto(gp.x, gp.z);
+    yield act('repair', R(18, 30), { face: yawTo(gp, part.x, part.z), look: part });
     yield goto(W.faucon.tools.x - 0.6, W.faucon.tools.z);
     yield act('interact', R(3, 6), { face: Math.PI });
     if (Math.random() < 0.35) { yield goto(W.coffee.x, W.coffee.z); yield act('interact', 3, { face: W.coffee.face }); yield* chatAt(a, W.breakChat[1], W.breakTable, R(15, 30)); }
