@@ -278,7 +278,14 @@ lueur liée à la poussée, blocs RCS, antennes, radiateurs, trains à vérins,
 feux de navigation et livrée dessinée dans un atlas unique (immatriculation,
 marquages de sécurité). Les baies de l'Atalante et le poste du Héron sont
 réellement percés et alignés sur l'intérieur. Le train du Héron se rentre
-en vol. Budget : moins de 120 000 triangles pour l'extérieur de la frégate,
+en vol. Une revue de direction artistique et une recette QA ont été suivies de
+corrections par vaisseau : verre physique unique, suie et coulures,
+occlusion précalculée sur la frégate, baies étanches vues de l'intérieur,
+train du Héron logé sous la soute, escalier de la Navette praticable,
+porte et échelle d'équipage du Mulet, entrées d'air du Faucon. L'extérieur
+de la frégate est masqué quand il ne peut pas être vu, et un masquage par
+zone allège le hangar (0,55 M triangles en profil téléphone).
+Budget : moins de 120 000 triangles pour l'extérieur de la frégate,
 moins de 85 000 par petit vaisseau, une géométrie fusionnée par matériau.
 
 ## Frégate Atalante (vaisseau à trois ponts, visitable)
