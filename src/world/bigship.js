@@ -1272,9 +1272,18 @@ function atalanteExterior(ctx, E) {
   const aoMs = Math.round(performance.now() - t0);
   for (const [m, list] of bag) E.add(list.length > 1 ? mergeGeometries(list, false) : list[0], m, new THREE.Matrix4(), { cast: false, receive: true });
   // feux à éclats (stroboscopes blancs)
-  let clock = 0;
-  ctx.updaters.push((dt) => { clock += dt; const k = clock % 1.7; strobe.color.setScalar(k < 0.07 || (k > 0.24 && k < 0.3) ? 14 : 0.15); });
+  ctx.updaters.push(strobeUpdater(strobe));
   return { engines: NZ, tris: Math.round(tris), aoMs };
+}
+
+/**
+ * Clignotement des stroboscopes. Fabriqué hors d'atalanteExterior exprès : une fermeture créée dans cette fonction
+ * partagerait son contexte V8 et garderait en vie, pour toute la partie, les coques (caches de contours de skinHull,
+ * ~35 Mo de petits tableaux), la liste `bag` des géométries d'avant fusion, etc.
+ */
+function strobeUpdater(strobe) {
+  let clock = 0;
+  return (dt) => { clock += dt; const k = clock % 1.7; strobe.color.setScalar(k < 0.07 || (k > 0.24 && k < 0.3) ? 14 : 0.15); };
 }
 
 // ------------------------------------------------------------------ équipage de l'Atalante
